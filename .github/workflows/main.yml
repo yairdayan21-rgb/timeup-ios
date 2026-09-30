@@ -6,6 +6,7 @@ on:
 jobs:
   mac:
     runs-on: macos-26-intel
+
     steps:
       - name: Check Mac
         run: |
@@ -13,4 +14,13 @@ jobs:
           uname -m
           xcodebuild -version
           system_profiler SPHardwareDataType
-          
+
+      - name: Connect Mac to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Keep Mac alive
+        run: sleep 3600
