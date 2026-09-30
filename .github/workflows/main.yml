@@ -1,0 +1,16 @@
+name: TimeUp Mac
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mac:
+    runs-on: macos-26-intel
+    steps:
+      - name: Check Mac
+        run: |
+          sw_vers
+          uname -m
+          xcodebuild -version
+          system_profiler SPHardwareDataType
+          
