@@ -24,5 +24,8 @@ jobs:
           version: latest
           use-cache: 'false'
 
+      - name: Enable Tailscale SSH
+        run: sudo tailscale set --ssh
+
       - name: Keep Mac alive
         run: sleep 3600
