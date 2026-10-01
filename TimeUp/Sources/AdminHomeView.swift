@@ -44,7 +44,6 @@ struct AdminHomeView: View {
                             .font(.title3.bold())
 
                         if groups.isEmpty {
-
                             ContentUnavailableView(
                                 "עדיין אין קבוצות",
                                 systemImage: "person.3",
@@ -56,9 +55,13 @@ struct AdminHomeView: View {
                             .padding(.vertical, 30)
 
                         } else {
-
                             ForEach($groups) { $group in
-                                groupCard(group: $group)
+                                NavigationLink {
+                                    AdminGroupDetailView(group: $group)
+                                } label: {
+                                    groupCard(group: $group)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -105,6 +108,7 @@ struct AdminHomeView: View {
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.title3)
+                        .padding(8)
                 }
                 .buttonStyle(.plain)
             }
@@ -133,6 +137,9 @@ struct AdminHomeView: View {
                     Text("\(days) ימים")
                         .foregroundStyle(.secondary)
                 }
+
+                Image(systemName: "chevron.left")
+                    .foregroundStyle(.tertiary)
             }
             .font(.subheadline)
         }
