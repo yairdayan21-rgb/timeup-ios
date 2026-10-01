@@ -1,11 +1,16 @@
 import SwiftUI
 
 struct JoinGroupView: View {
+    @StateObject private var store = TimeUpStore.shared
     @State private var groupCode = ""
+    @State private var displayName = ""
     @State private var showAdminHome = false
+    @State private var joinedGroup: TimeUpGroup?
+    @State private var errorMessage: String?
 
-    private var isCodeValid: Bool {
-        groupCode.count == 4
+    private var isReadyToJoin: Bool {
+        groupCode.count == 4 &&
+        !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -26,7 +31,12 @@ struct JoinGroupView: View {
                     .foregroundStyle(.secondary)
             }
 
-            TextField("0000", text: $groupCode)
+            TextField("השם שלך", text: $displayName)
+                .textInputAutocapitalization(.words)
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("קוד קבוצה", text: $groupCode)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
@@ -34,12 +44,18 @@ struct JoinGroupView: View {
                 .onChange(of: groupCode) { _, newValue in
                     let digits = newValue.filter { $0.isNumber }
                     groupCode = String(digits.prefix(4))
+                    errorMessage = nil
                 }
 
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
+
             Button {
-                if groupCode == "0000" {
-                    showAdminHome = true
-                }
+                join()
             } label: {
                 Text("המשך")
                     .fontWeight(.semibold)
@@ -47,7 +63,7 @@ struct JoinGroupView: View {
                     .frame(height: 52)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!isCodeValid)
+            .disabled(!isReadyToJoin)
 
             Spacer()
 
@@ -63,5 +79,35 @@ struct JoinGroupView: View {
             AdminHomeView()
                 .navigationBarBackButtonHidden(true)
         }
+    }
+
+    private func join() {
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if groupCode == "0000" {
+            showAdminHome = true
+            return
+        }
+
+        guard let group = store.group(forCode: groupCode) else {
+            errorMessage = "לא נמצאה קבוצה עם הקוד הזה."
+            return
+        }
+
+        guard !store.hasMember(named: name, in: group.id) else {
+            errorMessage = "השם הזה כבר קיים בקבוצה."
+            return
+        }
+
+        let member = TimeUpMember(
+            groupID: group.id,
+            displayName: name
+        )
+
+        store.addMember(member)
+        joinedGroup = group
+
+        // בשלב הבא נחבר לכאן את מסך חבר הקבוצה.
+        errorMessage = "הצטרפת בהצלחה ל-(group.name)."
     }
 }
