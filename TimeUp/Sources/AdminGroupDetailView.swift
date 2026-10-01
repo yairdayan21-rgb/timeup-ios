@@ -3,6 +3,7 @@ import SwiftUI
 struct AdminGroupDetailView: View {
 
     @Binding var group: TimeUpGroup
+    @StateObject private var store = TimeUpStore.shared
 
     var body: some View {
         ScrollView {
@@ -28,19 +29,19 @@ struct AdminGroupDetailView: View {
 
                 HStack(spacing: 12) {
                     statCard(
-                        value: "0",
+                        value: "\(store.members(in: group.id).count)",
                         title: "חברים",
                         icon: "person.2.fill"
                     )
 
                     statCard(
-                        value: "0",
+                        value: "—",
                         title: "ביעד היום",
                         icon: "target"
                     )
 
                     statCard(
-                        value: "0",
+                        value: "—",
                         title: "רצף קבוצתי",
                         icon: "flame.fill"
                     )
@@ -103,20 +104,40 @@ struct AdminGroupDetailView: View {
 
                         Spacer()
 
-                        Text("0 חברים")
+                        Text("\(store.members(in: group.id).count) חברים")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
 
-                    ContentUnavailableView(
-                        "עדיין אין חברים",
-                        systemImage: "person.3",
-                        description: Text(
-                            "שתף את קוד הקבוצה \(group.code) כדי שמשתמשים יוכלו להצטרף."
+                    if store.members(in: group.id).isEmpty {
+                        ContentUnavailableView(
+                            "עדיין אין חברים",
+                            systemImage: "person.3",
+                            description: Text(
+                                "שתף את קוד הקבוצה \(group.code) כדי שמשתמשים יוכלו להצטרף."
+                            )
                         )
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                    } else {
+                        ForEach(store.members(in: group.id)) { member in
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.title2)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(member.displayName)
+                                        .fontWeight(.semibold)
+                                    Text("הצטרף \(member.joinedAt.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.vertical, 6)
+                        }
+                    }
                 }
 
                 // MARK: - Analytics
