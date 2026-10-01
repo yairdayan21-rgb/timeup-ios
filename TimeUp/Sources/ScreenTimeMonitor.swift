@@ -16,9 +16,17 @@ final class ScreenTimeMonitor {
             repeats: true
         )
 
+        let events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
+            DeviceActivityEvent.Name("timeup.5min"): DeviceActivityEvent(
+                threshold: DateComponents(minute: 5),
+                includesPastActivity: true
+            )
+        ]
+
         try center.startMonitoring(
             activityName,
-            during: schedule
+            during: schedule,
+            events: events
         )
     }
 
