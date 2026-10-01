@@ -3,6 +3,11 @@ import FamilyControls
 
 struct ContentView: View {
     @State private var statusText = "Checking Screen Time..."
+    @State private var thresholdText = "No Screen Time event received yet"
+
+    private let sharedDefaults = UserDefaults(
+        suiteName: "group.com.timeup.shared"
+    )
 
     var body: some View {
         VStack(spacing: 24) {
@@ -16,6 +21,11 @@ struct ContentView: View {
             Text(statusText)
                 .foregroundStyle(.secondary)
 
+            Text(thresholdText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             Button("Connect Screen Time") {
                 Task {
                     do {
@@ -27,10 +37,16 @@ struct ContentView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
+
+            Button("Refresh Screen Time Status") {
+                readMonitorData()
+            }
+            .buttonStyle(.bordered)
         }
         .padding()
         .onAppear {
             checkAuthorization()
+            readMonitorData()
         }
     }
 
@@ -55,5 +71,24 @@ struct ContentView: View {
         @unknown default:
             statusText = "Unknown authorization status"
         }
+    }
+
+    private func readMonitorData() {
+        guard let date = sharedDefaults?.object(
+            forKey: "lastThresholdReachedAt"
+        ) as? Date else {
+            thresholdText = "No Screen Time event received yet"
+            return
+        }
+
+        let eventName = sharedDefaults?.string(
+            forKey: "lastThresholdEventName"
+        ) ?? "Unknown event"
+
+        thresholdText = """
+        Screen Time event received ✓
+        \(eventName)
+        \(date.formatted(date: .abbreviated, time: .standard))
+        """
     }
 }
