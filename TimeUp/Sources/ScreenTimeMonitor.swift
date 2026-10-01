@@ -9,25 +9,33 @@ final class ScreenTimeMonitor {
 
     private init() {}
 
-    func startMonitoring() throws {
+    func startMonitoring(targetMinutes: Int) throws {
+        let safeTarget = max(1, targetMinutes)
+
         let schedule = DeviceActivitySchedule(
             intervalStart: DateComponents(hour: 0, minute: 0),
             intervalEnd: DateComponents(hour: 23, minute: 59),
             repeats: true
         )
 
-        let events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
-            DeviceActivityEvent.Name("timeup.5min"): DeviceActivityEvent(
-                threshold: DateComponents(minute: 5),
-                includesPastActivity: true
-            )
-        ]
+        let targetEventName = DeviceActivityEvent.Name(
+            "timeup.target.\(safeTarget)"
+        )
+
+        let targetEvent = DeviceActivityEvent(
+            threshold: DateComponents(minute: safeTarget),
+            includesPastActivity: true
+        )
 
         try center.startMonitoring(
             activityName,
             during: schedule,
-            events: events
+            events: [targetEventName: targetEvent]
         )
+    }
+
+    func startPrototypeMonitoring() throws {
+        try startMonitoring(targetMinutes: 5)
     }
 
     func stopMonitoring() {
