@@ -15,7 +15,8 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             forKey: "monitoringIntervalStartedAt"
         )
 
-        print("TimeUp monitoring interval started: \(activity.rawValue)")
+        sharedDefaults?.removeObject(forKey: "dailyTargetReachedAt")
+        sharedDefaults?.removeObject(forKey: "dailyTargetMinutes")
     }
 
     override func eventDidReachThreshold(
@@ -24,17 +25,20 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     ) {
         super.eventDidReachThreshold(event, activity: activity)
 
-        sharedDefaults?.set(
-            Date(),
-            forKey: "lastThresholdReachedAt"
-        )
-
+        let now = Date()
+        sharedDefaults?.set(now, forKey: "lastThresholdReachedAt")
         sharedDefaults?.set(
             event.rawValue,
             forKey: "lastThresholdEventName"
         )
 
-        print("TimeUp threshold reached: \(event.rawValue)")
+        if let targetMinutes = targetMinutes(from: event) {
+            sharedDefaults?.set(now, forKey: "dailyTargetReachedAt")
+            sharedDefaults?.set(
+                targetMinutes,
+                forKey: "dailyTargetMinutes"
+            )
+        }
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
@@ -44,7 +48,17 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             Date(),
             forKey: "monitoringIntervalEndedAt"
         )
+    }
 
-        print("TimeUp monitoring interval ended: \(activity.rawValue)")
+    private func targetMinutes(
+        from event: DeviceActivityEvent.Name
+    ) -> Int? {
+        let prefix = "timeup.target."
+
+        guard event.rawValue.hasPrefix(prefix) else {
+            return nil
+        }
+
+        return Int(event.rawValue.dropFirst(prefix.count))
     }
 }
