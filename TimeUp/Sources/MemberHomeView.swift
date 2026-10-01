@@ -129,7 +129,7 @@ struct MemberHomeView: View {
 
                 if AuthorizationCenter.shared.authorizationStatus == .approved ||
                     AuthorizationCenter.shared.authorizationStatus == .approvedWithDataAccess {
-                    try? ScreenTimeMonitor.shared.startMonitoring()
+                    try? ScreenTimeMonitor.shared.startPrototypeMonitoring()
                 }
             }
         }
