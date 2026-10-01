@@ -72,6 +72,47 @@ enum TimeUpGoalEngine {
         return (achieved, achieved ? currentStreak + 1 : 0)
     }
 
+    static func nextDayTargetMinutes(
+        for group: TimeUpGroup,
+        todayUsageMinutes: Int,
+        todayTargetMinutes: Int?,
+        todayAchieved: Bool,
+        memberTargetMinutes: Int?,
+        historicalUsageMinutes: [Int]
+    ) -> Int? {
+        switch group.goalMethod {
+        case .manual:
+            return memberTargetMinutes
+
+        case .previousDay:
+            if todayAchieved {
+                return reducedTarget(
+                    from: todayUsageMinutes,
+                    by: group.reductionPercent ?? 0
+                )
+            }
+
+            return todayTargetMinutes
+
+        case .adaptiveAverage:
+            guard !historicalUsageMinutes.isEmpty else {
+                return todayTargetMinutes
+            }
+
+            let average = historicalUsageMinutes.reduce(0, +) / historicalUsageMinutes.count
+            let calculatedTarget = reducedTarget(
+                from: average,
+                by: group.reductionPercent ?? 0
+            )
+
+            if todayAchieved {
+                return calculatedTarget
+            }
+
+            return todayTargetMinutes
+        }
+    }
+
     private static func reducedTarget(from minutes: Int, by percent: Int) -> Int {
         let reduction = Double(max(0, min(percent, 100))) / 100.0
         return max(0, Int(floor(Double(minutes) * (1.0 - reduction))))
