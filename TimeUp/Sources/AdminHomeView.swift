@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AdminHomeView: View {
+    @State private var showCreateGroup = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -15,7 +17,7 @@ struct AdminHomeView: View {
                     }
 
                     Button {
-                        // Create Group – נחבר במסך הבא
+                        showCreateGroup = true
                     } label: {
                         HStack {
                             Image(systemName: "plus.circle.fill")
@@ -56,11 +58,14 @@ struct AdminHomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        // Admin settings – נחבר בהמשך
+                        // הגדרות מנהל – נחבר בהמשך
                     } label: {
                         Image(systemName: "gearshape")
                     }
                 }
+            }
+            .navigationDestination(isPresented: $showCreateGroup) {
+                CreateGroupView()
             }
         }
     }
