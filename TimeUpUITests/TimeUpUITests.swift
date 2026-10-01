@@ -1,24 +1,58 @@
 import XCTest
 
 final class TimeUpUITests: XCTestCase {
-    func testAllowScreenTime() throws {
+    func testLaunchShowsLogin() {
         let app = XCUIApplication()
         app.launch()
 
-        let connect = app.buttons["Connect Screen Time"]
-        XCTAssertTrue(connect.waitForExistence(timeout: 10))
-        connect.tap()
+        XCTAssertTrue(app.staticTexts["TimeUp"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.buttons["Continue with Apple"].waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(
+            app.buttons["Continue with Google"].waitForExistence(timeout: 10)
+        )
+    }
 
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    func testJoinFlowAcceptsAdminDemoCode() {
+        let app = XCUIApplication()
+        app.launch()
 
-        let continueButton = springboard.buttons["Continue"]
-        XCTAssertTrue(continueButton.waitForExistence(timeout: 10))
-        continueButton.tap()
+        app.buttons["Continue with Apple"].tap()
 
-        let allowButton = springboard.buttons["Allow with Passcode"]
-        XCTAssertTrue(allowButton.waitForExistence(timeout: 10))
-        allowButton.tap()
+        XCTAssertTrue(
+            app.staticTexts["הצטרפות ל-TimeUp"].waitForExistence(timeout: 10)
+        )
 
-        sleep(5)
+        app.textFields["השם שלך"].tap()
+        app.textFields["השם שלך"].typeText("Test User")
+
+        app.textFields["קוד קבוצה"].tap()
+        app.textFields["קוד קבוצה"].typeText("0000")
+
+        app.buttons["המשך"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["ניהול הקבוצות שלך"].waitForExistence(timeout: 10)
+        )
+    }
+
+    func testInvalidGroupCodeShowsError() {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["Continue with Apple"].tap()
+
+        app.textFields["השם שלך"].tap()
+        app.textFields["השם שלך"].typeText("Test User")
+
+        app.textFields["קוד קבוצה"].tap()
+        app.textFields["קוד קבוצה"].typeText("9999")
+
+        app.buttons["המשך"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["לא נמצאה קבוצה עם הקוד הזה."].waitForExistence(timeout: 10)
+        )
     }
 }
