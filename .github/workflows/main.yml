@@ -34,3 +34,14 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Test TimeUp
+        run: |
+          xcodebuild \
+            -project TimeUp.xcodeproj \
+            -scheme TimeUp \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            test
