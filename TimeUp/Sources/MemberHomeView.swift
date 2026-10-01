@@ -30,7 +30,7 @@ struct MemberHomeView: View {
                     Text(formattedUsage)
                         .font(.system(size: 36, weight: .bold, design: .rounded))
 
-                    Text("המדידה מתעדכנת בקפיצות של כ-5 דקות.")
+                    Text("המדידה מתעדכנת לפי נקודות הבדיקה של TimeUp.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -114,37 +114,41 @@ struct MemberHomeView: View {
         return "\(minutes) דק׳"
     }
 
+    private var hasScreenTimeAuthorization: Bool {
+        let status = AuthorizationCenter.shared.authorizationStatus
+        if status == .approved { return true }
+        if #available(iOS 26.4, *), status == .approvedWithDataAccess { return true }
+        return false
+    }
+
     private var authorizationIcon: String {
-        switch AuthorizationCenter.shared.authorizationStatus {
-        case .approved, .approvedWithDataAccess:
+        if hasScreenTimeAuthorization {
             return "checkmark.circle.fill"
-        case .denied:
-            return "xmark.circle.fill"
-        default:
-            return "circle"
         }
+        if AuthorizationCenter.shared.authorizationStatus == .denied {
+            return "xmark.circle.fill"
+        }
+        return "circle"
     }
 
     private var authorizationColor: Color {
-        switch AuthorizationCenter.shared.authorizationStatus {
-        case .approved, .approvedWithDataAccess:
+        if hasScreenTimeAuthorization {
             return .green
-        case .denied:
-            return .red
-        default:
-            return .secondary
         }
+        if AuthorizationCenter.shared.authorizationStatus == .denied {
+            return .red
+        }
+        return .secondary
     }
 
     private func refreshAuthorizationStatus() {
-        switch AuthorizationCenter.shared.authorizationStatus {
-        case .approved, .approvedWithDataAccess:
+        if hasScreenTimeAuthorization {
             statusText = "זמן המסך מחובר ✓"
-        case .denied:
+        } else if AuthorizationCenter.shared.authorizationStatus == .denied {
             statusText = "הגישה לזמן המסך נדחתה"
-        case .notDetermined:
+        } else if AuthorizationCenter.shared.authorizationStatus == .notDetermined {
             statusText = "נדרש אישור לזמן מסך"
-        @unknown default:
+        } else {
             statusText = "סטטוס זמן מסך לא ידוע"
         }
     }
@@ -169,8 +173,7 @@ struct MemberHomeView: View {
                 isRequestingAuthorization = false
                 refreshAuthorizationStatus()
 
-                if AuthorizationCenter.shared.authorizationStatus == .approved ||
-                    AuthorizationCenter.shared.authorizationStatus == .approvedWithDataAccess {
+                if hasScreenTimeAuthorization {
                     try? ScreenTimeMonitor.shared.startMonitoring()
                     refreshUsageEstimate()
                 }
