@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AdminHomeView: View {
     @State private var showCreateGroup = false
-    @State private var groups: [TimeUpGroup] = []
+    @StateObject private var store = TimeUpStore.shared
 
     var body: some View {
         NavigationStack {
@@ -43,7 +43,7 @@ struct AdminHomeView: View {
                         Text("הקבוצות שלי")
                             .font(.title3.bold())
 
-                        if groups.isEmpty {
+                        if store.groups.isEmpty {
                             ContentUnavailableView(
                                 "עדיין אין קבוצות",
                                 systemImage: "person.3",
@@ -55,11 +55,20 @@ struct AdminHomeView: View {
                             .padding(.vertical, 30)
 
                         } else {
-                            ForEach($groups) { $group in
+                            ForEach(store.groups) { group in
                                 NavigationLink {
-                                    AdminGroupDetailView(group: $group)
+                                    AdminGroupDetailView(
+                                        group: Binding(
+                                            get: {
+                                                store.groups.first(where: { $0.id == group.id }) ?? group
+                                            },
+                                            set: { updated in
+                                                store.updateGroup(updated)
+                                            }
+                                        )
+                                    )
                                 } label: {
-                                    groupCard(group: $group)
+                                    groupCard(group: group)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -79,21 +88,18 @@ struct AdminHomeView: View {
             }
             .navigationDestination(isPresented: $showCreateGroup) {
                 CreateGroupView { newGroup in
-                    groups.append(newGroup)
+                    store.addGroup(newGroup)
                 }
             }
         }
     }
 
-    private func groupCard(
-        group: Binding<TimeUpGroup>
-    ) -> some View {
-
+    private func groupCard(group: TimeUpGroup) -> some View {
         VStack(alignment: .leading, spacing: 14) {
 
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(group.wrappedValue.name)
+                    Text(group.name)
                         .font(.headline)
 
                     Text("קוד קבוצה")
@@ -104,7 +110,16 @@ struct AdminHomeView: View {
                 Spacer()
 
                 NavigationLink {
-                    GroupSettingsView(group: group)
+                    GroupSettingsView(
+                        group: Binding(
+                            get: {
+                                store.groups.first(where: { $0.id == group.id }) ?? group
+                            },
+                            set: { updated in
+                                store.updateGroup(updated)
+                            }
+                        )
+                    )
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.title3)
@@ -113,7 +128,7 @@ struct AdminHomeView: View {
                 .buttonStyle(.plain)
             }
 
-            Text(group.wrappedValue.code)
+            Text(group.code)
                 .font(
                     .system(
                         size: 28,
@@ -127,14 +142,18 @@ struct AdminHomeView: View {
 
             HStack {
                 Label(
-                    goalDescription(group.wrappedValue),
+                    goalDescription(group),
                     systemImage: "target"
                 )
 
                 Spacer()
 
-                if let days = group.wrappedValue.successDays {
-                    Text("\(days) ימים")
+                let memberCount = store.members(in: group.id).count
+                Text("(memberCount) חברים")
+                    .foregroundStyle(.secondary)
+
+                if let days = group.successDays {
+                    Text("(days) ימים")
                         .foregroundStyle(.secondary)
                 }
 
@@ -148,18 +167,12 @@ struct AdminHomeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
-    private func goalDescription(
-        _ group: TimeUpGroup
-    ) -> String {
-
+    private func goalDescription(_ group: TimeUpGroup) -> String {
         switch group.goalMethod {
-
         case .previousDay:
-            return "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
-
+            return "(group.reductionPercent ?? 0)% פחות מהיום הקודם"
         case .adaptiveAverage:
-            return "\(group.reductionPercent ?? 0)% פחות מהממוצע"
-
+            return "(group.reductionPercent ?? 0)% פחות מהממוצע"
         case .manual:
             return "יעד אישי"
         }
