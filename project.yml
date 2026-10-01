@@ -7,7 +7,7 @@ targets:
   TimeUp:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.4"
     sources:
       - TimeUp/Sources
     resources:
@@ -25,7 +25,7 @@ targets:
   TimeUpDeviceActivityMonitor:
     type: app-extension
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.4"
     sources:
       - TimeUpDeviceActivityMonitor/Sources
     settings:
@@ -40,7 +40,7 @@ targets:
   TimeUpUITests:
     type: bundle.ui-testing
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.4"
     sources:
       - TimeUpUITests
     dependencies:
