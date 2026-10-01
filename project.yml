@@ -26,14 +26,18 @@ targets:
     deploymentTarget: "17.4"
     sources:
       - TimeUpDeviceActivityMonitor/Sources
+    info:
+      path: TimeUpDeviceActivityMonitor/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.timeup.app.DeviceActivityMonitor
         SWIFT_VERSION: 5.0
-        GENERATE_INFOPLIST_FILE: YES
+        GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: TimeUpDeviceActivityMonitor/TimeUpDeviceActivityMonitor.entitlements
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
-        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension"
 
   TimeUpUITests:
     type: bundle.ui-testing
