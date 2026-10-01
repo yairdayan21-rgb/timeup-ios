@@ -10,8 +10,6 @@ targets:
     deploymentTarget: "17.4"
     sources:
       - TimeUp/Sources
-    resources:
-      - TimeUp/Resources
     dependencies:
       - target: TimeUpDeviceActivityMonitor
         embed: true
@@ -48,3 +46,14 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  TimeUp:
+    build:
+      targets:
+        TimeUp: all
+        TimeUpDeviceActivityMonitor: all
+        TimeUpUITests: [test]
+    test:
+      targets:
+        - TimeUpUITests
