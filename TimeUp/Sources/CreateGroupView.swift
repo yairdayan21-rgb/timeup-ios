@@ -3,9 +3,9 @@ import SwiftUI
 struct CreateGroupView: View {
 
     enum GoalMethod: String, CaseIterable, Identifiable {
-        case previousDay = "יום קודם"
-        case adaptiveAverage = "ממוצע"
-        case manual = "יעד אישי"
+        case previousDay
+        case adaptiveAverage
+        case manual
 
         var id: String { rawValue }
 
@@ -34,9 +34,10 @@ struct CreateGroupView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    let onGroupCreated: (TimeUpGroup) -> Void
+
     @State private var groupName = ""
     @State private var selectedMethod: GoalMethod = .previousDay
-
     @State private var reductionPercent = 5
     @State private var successDays = 7
 
@@ -105,13 +106,13 @@ struct CreateGroupView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Label(
-                            "יום הלמידה אינו נספר",
+                            "יום למידה + \(successDays) ימי הצלחה",
                             systemImage: "brain.head.profile"
                         )
                         .fontWeight(.medium)
 
                         Text(
-                            "לאחר יום הלמידה המשתמש צריך להשלים \(successDays) ימי הצלחה רצופים. אם הוא לא עומד ביעד, הספירה חוזרת ליום 1. לאחר השלמת התהליך, היעד האחרון הופך ליעד הקבוע."
+                            "יום הלמידה אינו נספר. לאחריו המשתמש צריך להשלים \(successDays) ימי הצלחה רצופים. אם הוא לא עומד ביעד, הספירה חוזרת ליום 1. לאחר השלמת התהליך, היעד האחרון הופך ליעד הקבוע."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -148,10 +149,10 @@ struct CreateGroupView: View {
     private func description(for method: GoalMethod) -> String {
         switch method {
         case .previousDay:
-            return "היעד יורד ב-X% ביחס ליום הקודם"
+            return "היעד יורד ב-X% ביחס ליום הקודם למשך Y ימי הצלחה"
 
         case .adaptiveAverage:
-            return "היעד מחושב מהממוצע האישי פחות X%"
+            return "היעד מחושב מהממוצע האישי פחות X% למשך Y ימי הצלחה"
 
         case .manual:
             return "המנהל קובע יעד נפרד לכל משתמש"
@@ -159,7 +160,33 @@ struct CreateGroupView: View {
     }
 
     private func createGroup() {
-        // בשלב הבא נחבר יצירת קבוצה אמיתית,
-        // יצירת קוד ייחודי ושמירה בשרת.
+
+        let modelMethod: TimeUpGroup.GoalMethod
+
+        switch selectedMethod {
+        case .previousDay:
+            modelMethod = .previousDay
+
+        case .adaptiveAverage:
+            modelMethod = .adaptiveAverage
+
+        case .manual:
+            modelMethod = .manual
+        }
+
+        let newGroup = TimeUpGroup(
+            name: groupName.trimmingCharacters(in: .whitespacesAndNewlines),
+            code: generateGroupCode(),
+            goalMethod: modelMethod,
+            reductionPercent: selectedMethod == .manual ? nil : reductionPercent,
+            successDays: selectedMethod == .manual ? nil : successDays
+        )
+
+        onGroupCreated(newGroup)
+        dismiss()
+    }
+
+    private func generateGroupCode() -> String {
+        String(format: "%04d", Int.random(in: 1...9999))
     }
 }
