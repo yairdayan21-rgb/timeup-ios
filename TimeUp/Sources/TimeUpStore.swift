@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 enum TimeUpMemberRole: String, Codable {
     case admin
@@ -27,7 +28,6 @@ struct TimeUpMember: Identifiable, Codable {
     }
 }
 
-@MainActor
 final class TimeUpStore: ObservableObject {
     static let shared = TimeUpStore()
 
