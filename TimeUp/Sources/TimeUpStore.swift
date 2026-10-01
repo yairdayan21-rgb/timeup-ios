@@ -36,6 +36,7 @@ final class TimeUpStore: ObservableObject {
 
     private let groupsKey = "timeup.groups.v1"
     private let membersKey = "timeup.members.v1"
+    private let currentMemberKey = "timeup.currentMemberID.v1"
     private let defaults = UserDefaults.standard
 
     private init() {
@@ -65,6 +66,22 @@ final class TimeUpStore: ObservableObject {
 
     func members(in groupID: UUID) -> [TimeUpMember] {
         members.filter { $0.groupID == groupID }
+    }
+
+    func member(id: UUID) -> TimeUpMember? {
+        members.first { $0.id == id }
+    }
+
+    var currentMember: TimeUpMember? {
+        guard let idString = defaults.string(forKey: currentMemberKey),
+              let id = UUID(uuidString: idString) else {
+            return nil
+        }
+        return member(id: id)
+    }
+
+    func setCurrentMember(_ member: TimeUpMember) {
+        defaults.set(member.id.uuidString, forKey: currentMemberKey)
     }
 
     func hasMember(named name: String, in groupID: UUID) -> Bool {
