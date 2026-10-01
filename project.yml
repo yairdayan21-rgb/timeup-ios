@@ -1,0 +1,32 @@
+name: TimeUp
+
+options:
+  bundleIdPrefix: com.timeup
+
+targets:
+  TimeUp:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - TimeUp/Sources
+    resources:
+      - TimeUp/Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timeup.app
+        SWIFT_VERSION: 5.0
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: TimeUp/TimeUp.entitlements
+
+  TimeUpUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - TimeUpUITests
+    dependencies:
+      - target: TimeUp
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
