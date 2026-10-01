@@ -1,31 +1,30 @@
-name: TimeUp Mac
+name: TimeUp Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  mac:
+  build:
     runs-on: macos-26-intel
 
     steps:
-      - name: Check Mac
+      - name: Checkout TimeUp
+        uses: actions/checkout@v4
+
+      - name: Check Xcode
         run: |
           sw_vers
-          uname -m
           xcodebuild -version
-          system_profiler SPHardwareDataType
 
-      - name: Connect Mac to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          version: latest
-          use-cache: 'false'
-
-      - name: Enable Tailscale SSH
-        run: sudo tailscale set --ssh
-
-      - name: Keep Mac alive
-        run: sleep 3600
+      - name: Build TimeUp
+        run: |
+          xcodebuild \
+            -project TimeUp.xcodeproj \
+            -scheme TimeUp \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
