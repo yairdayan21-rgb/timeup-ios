@@ -57,8 +57,8 @@ struct AdminHomeView: View {
 
                         } else {
 
-                            ForEach(groups) { group in
-                                groupCard(group)
+                            ForEach($groups) { $group in
+                                groupCard(group: $group)
                             }
                         }
                     }
@@ -82,12 +82,15 @@ struct AdminHomeView: View {
         }
     }
 
-    private func groupCard(_ group: TimeUpGroup) -> some View {
+    private func groupCard(
+        group: Binding<TimeUpGroup>
+    ) -> some View {
+
         VStack(alignment: .leading, spacing: 14) {
 
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(group.name)
+                    Text(group.wrappedValue.name)
                         .font(.headline)
 
                     Text("קוד קבוצה")
@@ -97,8 +100,8 @@ struct AdminHomeView: View {
 
                 Spacer()
 
-                Button {
-                    // הגדרות הקבוצה – נחבר בהמשך
+                NavigationLink {
+                    GroupSettingsView(group: group)
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.title3)
@@ -106,18 +109,27 @@ struct AdminHomeView: View {
                 .buttonStyle(.plain)
             }
 
-            Text(group.code)
-                .font(.system(size: 28, weight: .bold, design: .monospaced))
+            Text(group.wrappedValue.code)
+                .font(
+                    .system(
+                        size: 28,
+                        weight: .bold,
+                        design: .monospaced
+                    )
+                )
                 .tracking(4)
 
             Divider()
 
             HStack {
-                Label(goalDescription(group), systemImage: "target")
+                Label(
+                    goalDescription(group.wrappedValue),
+                    systemImage: "target"
+                )
 
                 Spacer()
 
-                if let days = group.successDays {
+                if let days = group.wrappedValue.successDays {
                     Text("\(days) ימים")
                         .foregroundStyle(.secondary)
                 }
@@ -129,7 +141,10 @@ struct AdminHomeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
-    private func goalDescription(_ group: TimeUpGroup) -> String {
+    private func goalDescription(
+        _ group: TimeUpGroup
+    ) -> String {
+
         switch group.goalMethod {
 
         case .previousDay:
