@@ -6,9 +6,8 @@ struct JoinGroupView: View {
     @State private var displayName = ""
     @State private var showAdminHome = false
     @State private var showMemberHome = false
-    @State private var joinedGroup: TimeUpGroup?
-    @State private var errorMessage: String?
     @State private var currentMember: TimeUpMember?
+    @State private var errorMessage: String?
 
     private var isReadyToJoin: Bool {
         groupCode.count == 4 &&
@@ -17,19 +16,16 @@ struct JoinGroupView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-
             Spacer()
 
             Image(systemName: "person.3.fill")
                 .font(.system(size: 54))
-                .foregroundStyle(.primary)
 
             VStack(spacing: 8) {
                 Text("הצטרפות ל-TimeUp")
                     .font(.system(size: 30, weight: .bold, design: .rounded))
 
                 Text("הזן את הקוד שקיבלת כדי להמשיך")
-                    .font(.body)
                     .foregroundStyle(.secondary)
             }
 
@@ -44,8 +40,7 @@ struct JoinGroupView: View {
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: groupCode) { _, newValue in
-                    let digits = newValue.filter { $0.isNumber }
-                    groupCode = String(digits.prefix(4))
+                    groupCode = String(newValue.filter { $0.isNumber }.prefix(4))
                     errorMessage = nil
                 }
 
@@ -56,14 +51,12 @@ struct JoinGroupView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button {
+            Button("המשך") {
                 join()
-            } label: {
-                Text("המשך")
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
             }
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
             .buttonStyle(.borderedProminent)
             .disabled(!isReadyToJoin)
 
@@ -73,8 +66,7 @@ struct JoinGroupView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 24)
+        .padding(24)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showAdminHome) {
@@ -107,15 +99,10 @@ struct JoinGroupView: View {
             return
         }
 
-        let member = TimeUpMember(
-            groupID: group.id,
-            displayName: name
-        )
-
+        let member = TimeUpMember(groupID: group.id, displayName: name)
         store.addMember(member)
-        joinedGroup = group
-
-        // בשלב הבא נחבר לכאן את מסך חבר הקבוצה.
-        errorMessage = "הצטרפת בהצלחה ל-(group.name)."
+        store.setCurrentMember(member)
+        currentMember = member
+        showMemberHome = true
     }
 }
