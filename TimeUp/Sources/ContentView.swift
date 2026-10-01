@@ -38,10 +38,19 @@ struct ContentView: View {
         switch AuthorizationCenter.shared.authorizationStatus {
         case .approved:
             statusText = "Screen Time connected ✓"
+
+            do {
+                try ScreenTimeMonitor.shared.startMonitoring()
+            } catch {
+                statusText = "Screen Time connected — monitoring failed"
+            }
+
         case .denied:
             statusText = "Screen Time access denied"
+
         case .notDetermined:
             statusText = "Screen Time is not connected"
+
         @unknown default:
             statusText = "Unknown authorization status"
         }
