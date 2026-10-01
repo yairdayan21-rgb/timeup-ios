@@ -1,5 +1,6 @@
 import Foundation
 import DeviceActivity
+import UserNotifications
 
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
@@ -18,6 +19,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         sharedDefaults?.set(0, forKey: "estimatedUsageMinutes")
         sharedDefaults?.removeObject(forKey: "dailyTargetReachedAt")
         sharedDefaults?.removeObject(forKey: "dailyTargetMinutes")
+        sharedDefaults?.removeObject(forKey: "dailyTargetWarningSentAt")
     }
 
     override func eventDidReachThreshold(
@@ -51,8 +53,19 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             forKey: "configuredDailyTargetMinutes"
         ) ?? 0
 
-        if configuredTarget > 0,
-           newEstimate >= configuredTarget,
+        guard configuredTarget > 0 else { return }
+
+        let minutesRemaining = configuredTarget - newEstimate
+
+        // Warn once per day when the member enters the final five minutes.
+        if minutesRemaining > 0,
+           minutesRemaining <= 5,
+           sharedDefaults?.object(forKey: "dailyTargetWarningSentAt") == nil {
+            sendTargetWarning(minutesRemaining: minutesRemaining)
+            sharedDefaults?.set(now, forKey: "dailyTargetWarningSentAt")
+        }
+
+        if newEstimate >= configuredTarget,
            sharedDefaults?.object(forKey: "dailyTargetReachedAt") == nil {
             sharedDefaults?.set(now, forKey: "dailyTargetReachedAt")
             sharedDefaults?.set(
@@ -82,6 +95,23 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             now,
             forKey: "lastCompletedDayDate"
         )
+    }
+
+    private func sendTargetWarning(minutesRemaining: Int) {
+        let content = UNMutableNotificationContent()
+        content.title = "TimeUp"
+        content.body = minutesRemaining == 1
+            ? "נשארה לך בערך דקה אחת עד ליעד היומי."
+            : "נשארו לך בערך \(minutesRemaining) דקות עד ליעד היומי."
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "timeup.daily-target-warning",
+            content: content,
+            trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request)
     }
 
     private func usageMinutes(
