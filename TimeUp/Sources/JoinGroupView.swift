@@ -2,7 +2,7 @@ import SwiftUI
 
 struct JoinGroupView: View {
     @State private var groupCode = ""
-    @State private var showNextScreen = false
+    @State private var showAdminHome = false
 
     private var isCodeValid: Bool {
         groupCode.count == 4
@@ -37,7 +37,9 @@ struct JoinGroupView: View {
                 }
 
             Button {
-                showNextScreen = true
+                if groupCode == "0000" {
+                    showAdminHome = true
+                }
             } label: {
                 Text("המשך")
                     .fontWeight(.semibold)
@@ -57,5 +59,9 @@ struct JoinGroupView: View {
         .padding(.vertical, 24)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showAdminHome) {
+            AdminHomeView()
+                .navigationBarBackButtonHidden(true)
+        }
     }
 }
