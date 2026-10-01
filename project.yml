@@ -12,12 +12,30 @@ targets:
       - TimeUp/Sources
     resources:
       - TimeUp/Resources
+    dependencies:
+      - target: TimeUpDeviceActivityMonitor
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.timeup.app
         SWIFT_VERSION: 5.0
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: TimeUp/TimeUp.entitlements
+
+  TimeUpDeviceActivityMonitor:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - TimeUpDeviceActivityMonitor/Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timeup.app.DeviceActivityMonitor
+        SWIFT_VERSION: 5.0
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: TimeUpDeviceActivityMonitor/TimeUpDeviceActivityMonitor.entitlements
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension"
 
   TimeUpUITests:
     type: bundle.ui-testing
