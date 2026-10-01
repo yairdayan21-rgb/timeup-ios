@@ -57,7 +57,7 @@ struct ContentView: View {
             statusText = "Screen Time connected ✓"
 
             do {
-                try ScreenTimeMonitor.shared.startMonitoring()
+                try ScreenTimeMonitor.shared.startPrototypeMonitoring()
             } catch {
                 statusText = "Screen Time connected — monitoring failed"
             }
