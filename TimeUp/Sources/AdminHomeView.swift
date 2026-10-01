@@ -149,11 +149,11 @@ struct AdminHomeView: View {
                 Spacer()
 
                 let memberCount = store.members(in: group.id).count
-                Text("(memberCount) חברים")
+                Text("\(memberCount) חברים")
                     .foregroundStyle(.secondary)
 
                 if let days = group.successDays {
-                    Text("(days) ימים")
+                    Text("\(days) ימים")
                         .foregroundStyle(.secondary)
                 }
 
@@ -170,9 +170,9 @@ struct AdminHomeView: View {
     private func goalDescription(_ group: TimeUpGroup) -> String {
         switch group.goalMethod {
         case .previousDay:
-            return "(group.reductionPercent ?? 0)% פחות מהיום הקודם"
+            return "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
         case .adaptiveAverage:
-            return "(group.reductionPercent ?? 0)% פחות מהממוצע"
+            return "\(group.reductionPercent ?? 0)% פחות מהממוצע"
         case .manual:
             return "יעד אישי"
         }
