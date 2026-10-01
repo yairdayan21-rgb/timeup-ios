@@ -15,6 +15,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             forKey: "monitoringIntervalStartedAt"
         )
 
+        sharedDefaults?.set(0, forKey: "estimatedUsageMinutes")
         sharedDefaults?.removeObject(forKey: "dailyTargetReachedAt")
         sharedDefaults?.removeObject(forKey: "dailyTargetMinutes")
     }
@@ -32,10 +33,30 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             forKey: "lastThresholdEventName"
         )
 
-        if let targetMinutes = targetMinutes(from: event) {
+        guard let usageMinutes = usageMinutes(from: event) else {
+            return
+        }
+
+        let previousEstimate = sharedDefaults?.integer(
+            forKey: "estimatedUsageMinutes"
+        ) ?? 0
+
+        let newEstimate = max(previousEstimate, usageMinutes)
+        sharedDefaults?.set(
+            newEstimate,
+            forKey: "estimatedUsageMinutes"
+        )
+
+        let configuredTarget = sharedDefaults?.integer(
+            forKey: "configuredDailyTargetMinutes"
+        ) ?? 0
+
+        if configuredTarget > 0,
+           newEstimate >= configuredTarget,
+           sharedDefaults?.object(forKey: "dailyTargetReachedAt") == nil {
             sharedDefaults?.set(now, forKey: "dailyTargetReachedAt")
             sharedDefaults?.set(
-                targetMinutes,
+                configuredTarget,
                 forKey: "dailyTargetMinutes"
             )
         }
@@ -44,16 +65,29 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
 
+        let now = Date()
+        let usageMinutes = sharedDefaults?.integer(
+            forKey: "estimatedUsageMinutes"
+        ) ?? 0
+
         sharedDefaults?.set(
-            Date(),
+            now,
             forKey: "monitoringIntervalEndedAt"
+        )
+        sharedDefaults?.set(
+            usageMinutes,
+            forKey: "lastCompletedDayUsageMinutes"
+        )
+        sharedDefaults?.set(
+            now,
+            forKey: "lastCompletedDayDate"
         )
     }
 
-    private func targetMinutes(
+    private func usageMinutes(
         from event: DeviceActivityEvent.Name
     ) -> Int? {
-        let prefix = "timeup.target."
+        let prefix = "timeup.usage."
 
         guard event.rawValue.hasPrefix(prefix) else {
             return nil
