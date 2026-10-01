@@ -5,8 +5,10 @@ struct JoinGroupView: View {
     @State private var groupCode = ""
     @State private var displayName = ""
     @State private var showAdminHome = false
+    @State private var showMemberHome = false
     @State private var joinedGroup: TimeUpGroup?
     @State private var errorMessage: String?
+    @State private var currentMember: TimeUpMember?
 
     private var isReadyToJoin: Bool {
         groupCode.count == 4 &&
@@ -78,6 +80,12 @@ struct JoinGroupView: View {
         .navigationDestination(isPresented: $showAdminHome) {
             AdminHomeView()
                 .navigationBarBackButtonHidden(true)
+        }
+        .navigationDestination(isPresented: $showMemberHome) {
+            if let currentMember {
+                MemberHomeView(member: currentMember)
+                    .navigationBarBackButtonHidden(true)
+            }
         }
     }
 
