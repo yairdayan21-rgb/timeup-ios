@@ -36,7 +36,8 @@ struct ContentView: View {
 
     private func checkAuthorization() {
         switch AuthorizationCenter.shared.authorizationStatus {
-        case .approved:
+
+        case .approved, .approvedWithDataAccess:
             statusText = "Screen Time connected ✓"
 
             do {
