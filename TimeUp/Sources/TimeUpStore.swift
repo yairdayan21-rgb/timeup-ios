@@ -13,18 +13,23 @@ struct TimeUpMember: Identifiable, Codable {
     let role: TimeUpMemberRole
     let joinedAt: Date
 
+    // היעד היומי הנוכחי של המשתמש בדקות
+    var dailyTargetMinutes: Int?
+
     init(
         id: UUID = UUID(),
         groupID: UUID,
         displayName: String,
         role: TimeUpMemberRole = .member,
-        joinedAt: Date = Date()
+        joinedAt: Date = Date(),
+        dailyTargetMinutes: Int? = nil
     ) {
         self.id = id
         self.groupID = groupID
         self.displayName = displayName
         self.role = role
         self.joinedAt = joinedAt
+        self.dailyTargetMinutes = dailyTargetMinutes
     }
 }
 
@@ -49,7 +54,10 @@ final class TimeUpStore: ObservableObject {
     }
 
     func updateGroup(_ group: TimeUpGroup) {
-        guard let index = groups.firstIndex(where: { $0.id == group.id }) else { return }
+        guard let index = groups.firstIndex(where: { $0.id == group.id }) else {
+            return
+        }
+
         groups[index] = group
         save()
     }
@@ -59,8 +67,37 @@ final class TimeUpStore: ObservableObject {
     }
 
     func addMember(_ member: TimeUpMember) {
-        guard !members.contains(where: { $0.id == member.id }) else { return }
+        guard !members.contains(where: { $0.id == member.id }) else {
+            return
+        }
+
         members.append(member)
+        save()
+    }
+
+    func updateMember(_ member: TimeUpMember) {
+        guard let index = members.firstIndex(where: { $0.id == member.id }) else {
+            return
+        }
+
+        members[index] = member
+        save()
+    }
+
+    func setDailyTarget(
+        _ targetMinutes: Int?,
+        for memberID: UUID
+    ) {
+        guard let index = members.firstIndex(where: { $0.id == memberID }) else {
+            return
+        }
+
+        if let targetMinutes {
+            members[index].dailyTargetMinutes = max(0, targetMinutes)
+        } else {
+            members[index].dailyTargetMinutes = nil
+        }
+
         save()
     }
 
@@ -73,18 +110,27 @@ final class TimeUpStore: ObservableObject {
     }
 
     var currentMember: TimeUpMember? {
-        guard let idString = defaults.string(forKey: currentMemberKey),
-              let id = UUID(uuidString: idString) else {
+        guard
+            let idString = defaults.string(forKey: currentMemberKey),
+            let id = UUID(uuidString: idString)
+        else {
             return nil
         }
+
         return member(id: id)
     }
 
     func setCurrentMember(_ member: TimeUpMember) {
-        defaults.set(member.id.uuidString, forKey: currentMemberKey)
+        defaults.set(
+            member.id.uuidString,
+            forKey: currentMemberKey
+        )
     }
 
-    func hasMember(named name: String, in groupID: UUID) -> Bool {
+    func hasMember(
+        named name: String,
+        in groupID: UUID
+    ) -> Bool {
         members.contains {
             $0.groupID == groupID &&
             $0.displayName.caseInsensitiveCompare(name) == .orderedSame
@@ -92,24 +138,40 @@ final class TimeUpStore: ObservableObject {
     }
 
     private func load() {
-        if let data = defaults.data(forKey: groupsKey),
-           let decoded = try? JSONDecoder().decode([TimeUpGroup].self, from: data) {
+        if
+            let data = defaults.data(forKey: groupsKey),
+            let decoded = try? JSONDecoder().decode(
+                [TimeUpGroup].self,
+                from: data
+            )
+        {
             groups = decoded
         }
 
-        if let data = defaults.data(forKey: membersKey),
-           let decoded = try? JSONDecoder().decode([TimeUpMember].self, from: data) {
+        if
+            let data = defaults.data(forKey: membersKey),
+            let decoded = try? JSONDecoder().decode(
+                [TimeUpMember].self,
+                from: data
+            )
+        {
             members = decoded
         }
     }
 
     private func save() {
         if let data = try? JSONEncoder().encode(groups) {
-            defaults.set(data, forKey: groupsKey)
+            defaults.set(
+                data,
+                forKey: groupsKey
+            )
         }
 
         if let data = try? JSONEncoder().encode(members) {
-            defaults.set(data, forKey: membersKey)
+            defaults.set(
+                data,
+                forKey: membersKey
+            )
         }
     }
 }
