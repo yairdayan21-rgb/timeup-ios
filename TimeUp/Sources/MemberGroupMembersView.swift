@@ -1,238 +1,85 @@
 import SwiftUI
+import Charts
 
-struct MemberGroupView: View {
+struct MemberGroupMembersView: View {
 
     let member: TimeUpMember
 
-    @ObservedObject private var store =
-        TimeUpStore.shared
-
-    @State private var selectedSection:
-        GroupSection = .overview
-
-    private enum GroupSection: String, CaseIterable {
-        case overview = "סקירה"
-        case detail = "פירוט"
-        case dashboard = "Dashboard"
-        case members = "חברים"
-        case chat = "צ׳אט"
-    }
-
-    var body: some View {
-
-        VStack(spacing: 0) {
-
-            sectionPicker
-
-            Divider()
-
-            Group {
-
-                switch selectedSection {
-
-                case .overview:
-
-                    overviewView
-
-                case .detail:
-
-                    MemberGroupDetailView(
-                        member: currentMember
-                    )
-
-                case .dashboard:
-
-                    MemberGroupDashboardView(
-                        member: currentMember
-                    )
-
-                case .members:
-
-                    MemberGroupMembersView(
-                        member: currentMember
-                    )
-
-                case .chat:
-
-                    comingSoonView(
-                        title: "צ׳אט",
-                        icon: "bubble.left.and.bubble.right.fill",
-                        message:
-                            "כאן יהיה הצ׳אט של הקבוצה."
-                    )
-                }
-            }
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
-            )
-        }
-        .navigationTitle(
-            group?.name ?? "הקבוצה"
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
-    }
-
-    // MARK: - Current Member
+    @ObservedObject private var store = TimeUpStore.shared
 
     private var currentMember: TimeUpMember {
-
-        store.member(
-            id: member.id
-        ) ?? member
+        store.member(id: member.id) ?? member
     }
 
-    // MARK: - Group
-
     private var group: TimeUpGroup? {
-
         store.groups.first {
             $0.id == currentMember.groupID
         }
     }
 
-    // MARK: - Members
-
     private var groupMembers: [TimeUpMember] {
-
         guard let group else {
             return []
         }
 
-        return store.members.filter {
-            $0.groupID == group.id
-        }
-    }
-
-    // MARK: - Section Picker
-
-    private var sectionPicker: some View {
-
-        ScrollView(
-            .horizontal,
-            showsIndicators: false
-        ) {
-
-            HStack(spacing: 8) {
-
-                ForEach(
-                    GroupSection.allCases,
-                    id: \.self
-                ) { section in
-
-                    Button {
-
-                        withAnimation(
-                            .easeInOut(duration: 0.18)
-                        ) {
-
-                            selectedSection =
-                                section
-                        }
-
-                    } label: {
-
-                        Text(section.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(
-                                selectedSection == section
-                                    ? .bold
-                                    : .medium
-                            )
-                            .padding(
-                                .horizontal,
-                                14
-                            )
-                            .padding(
-                                .vertical,
-                                9
-                            )
-                            .background {
-
-                                if selectedSection == section {
-
-                                    Capsule()
-                                        .fill(
-                                            Color.accentColor
-                                        )
-
-                                } else {
-
-                                    Capsule()
-                                        .fill(
-                                            Color.secondary
-                                                .opacity(0.12)
-                                        )
-                                }
-                            }
-                            .foregroundStyle(
-                                selectedSection == section
-                                    ? Color.white
-                                    : Color.primary
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
+        return store.members
+            .filter {
+                $0.groupID == group.id &&
+                $0.role == .member
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
+            .sorted {
+                $0.displayName.localizedCompare(
+                    $1.displayName
+                ) == .orderedAscending
+            }
     }
 
-    // MARK: - Overview
-
-    private var overviewView: some View {
-
+    var body: some View {
         ScrollView {
-
             VStack(
                 alignment: .leading,
-                spacing: 20
+                spacing: 16
             ) {
 
-                groupHeader
+                header
 
-                groupStreakCard
-
-                journeyCard
-
-                todayStatusCard
-
-                membersPreview
+                if groupMembers.isEmpty {
+                    ContentUnavailableView(
+                        "אין חברים בקבוצה",
+                        systemImage: "person.3",
+                        description: Text(
+                            "כאשר חברים יצטרפו לקבוצה הם יופיעו כאן."
+                        )
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 300
+                    )
+                } else {
+                    membersList
+                }
             }
             .padding(16)
         }
+        .navigationTitle("חברים")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     // MARK: - Header
 
-    private var groupHeader: some View {
-
+    private var header: some View {
         VStack(
             alignment: .leading,
             spacing: 6
         ) {
 
-            Text(
-                group?.name ?? "הקבוצה שלך"
-            )
-            .font(.largeTitle)
-            .fontWeight(.bold)
+            Text("חברי הקבוצה")
+                .font(.title2)
+                .fontWeight(.bold)
 
-            HStack(spacing: 6) {
-
-                Image(
-                    systemName: "person.3.fill"
-                )
-
-                Text(
-                    "\(groupMembers.count) חברים"
-                )
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            Text("\(groupMembers.count) חברים")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .frame(
             maxWidth: .infinity,
@@ -240,378 +87,561 @@ struct MemberGroupView: View {
         )
     }
 
-    // MARK: - Group Streak
+    // MARK: - Members List
 
-    private var groupStreakCard: some View {
+    private var membersList: some View {
+        VStack(spacing: 0) {
 
-        VStack(
-            alignment: .leading,
-            spacing: 14
-        ) {
+            ForEach(
+                Array(groupMembers.enumerated()),
+                id: \.element.id
+            ) { index, groupMember in
 
-            HStack {
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-
-                    Text("רצף קבוצתי")
-                        .font(.headline)
-
-                    Text(
-                        "\(groupStreak) ימים"
+                NavigationLink {
+                    MemberGroupMemberDetailView(
+                        member: groupMember,
+                        viewingMember: currentMember
                     )
-                    .font(
-                        .system(
-                            size: 34,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
+                } label: {
+                    memberRow(groupMember)
                 }
+                .buttonStyle(.plain)
 
-                Spacer()
-
-                Image(
-                    systemName: "flame.fill"
-                )
-                .font(
-                    .system(size: 40)
-                )
-                .foregroundStyle(.orange)
+                if index < groupMembers.count - 1 {
+                    Divider()
+                        .padding(.leading, 58)
+                }
             }
-
-            Text(
-                groupStreak == 0
-                    ? "הרצף מתחיל כאשר כל חברי הקבוצה עומדים ביעד."
-                    : "כל חברי הקבוצה צריכים לעמוד ביעד כדי להמשיך את הרצף."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
-        .padding(18)
+        .padding(.horizontal, 16)
         .background {
-
             RoundedRectangle(
                 cornerRadius: 20,
                 style: .continuous
             )
             .fill(
-                Color.secondary
-                    .opacity(0.10)
+                Color.secondary.opacity(0.10)
             )
         }
     }
 
-    // MARK: - Journey
+    // MARK: - Member Row
 
-    private var journeyCard: some View {
+    private func memberRow(
+        _ groupMember: TimeUpMember
+    ) -> some View {
 
-        VStack(
-            alignment: .leading,
-            spacing: 16
+        HStack(spacing: 12) {
+
+            Image(
+                systemName: "person.crop.circle.fill"
+            )
+            .font(.system(size: 38))
+            .foregroundStyle(.secondary)
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+
+                HStack(spacing: 6) {
+
+                    Text(groupMember.displayName)
+                        .fontWeight(.semibold)
+
+                    if groupMember.id == currentMember.id {
+                        Text("אתה")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let progress = store.todayProgress(
+                    for: groupMember.id
+                ) {
+                    Text(
+                        "היום: \(formattedMinutes(progress.usageMinutes))"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text("אין עדיין נתונים להיום")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            todayStatus(for: groupMember)
+
+            Image(systemName: "chevron.left")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Today Status
+
+    @ViewBuilder
+    private func todayStatus(
+        for groupMember: TimeUpMember
+    ) -> some View {
+
+        if let progress = store.todayProgress(
+            for: groupMember.id
         ) {
 
-            HStack {
+            if progress.isLearningDay {
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
+                Text("למידה")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
 
-                    Text("המסע הקבוצתי")
-                        .font(.headline)
+            } else if let target = progress.targetMinutes {
 
+                if progress.usageMinutes <= target {
+                    Image(
+                        systemName: "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(.green)
+                } else {
+                    Image(
+                        systemName: "xmark.circle.fill"
+                    )
+                    .foregroundStyle(.red)
+                }
+
+            } else {
+                Image(systemName: "minus.circle")
+                    .foregroundStyle(.secondary)
+            }
+
+        } else {
+            Image(systemName: "minus.circle")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Formatting
+
+    private func formattedMinutes(
+        _ minutes: Int
+    ) -> String {
+
+        let safe = max(minutes, 0)
+        let hours = safe / 60
+        let remaining = safe % 60
+
+        if hours == 0 {
+            return "\(remaining) דק׳"
+        }
+
+        if remaining == 0 {
+            return "\(hours) שע׳"
+        }
+
+        return "\(hours) שע׳ \(remaining) דק׳"
+    }
+}
+
+
+// MARK: - Member Detail
+
+private struct MemberGroupMemberDetailView: View {
+
+    let member: TimeUpMember
+    let viewingMember: TimeUpMember
+
+    @ObservedObject private var store = TimeUpStore.shared
+
+    @State private var selectedDays = 14
+
+    private let calendar = Calendar.current
+
+    private let rangeOptions = [
+        7,
+        14,
+        30
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+
+                memberHeader
+
+                rangeSelector
+
+                summaryCard
+
+                historyChart
+
+                historyList
+            }
+            .padding(16)
+        }
+        .navigationTitle(member.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Current Stored Member
+
+    private var storedMember: TimeUpMember {
+        store.member(id: member.id) ?? member
+    }
+
+    // MARK: - Dates
+
+    private var startDate: Date {
+        let today = calendar.startOfDay(
+            for: Date()
+        )
+
+        return calendar.date(
+            byAdding: .day,
+            value: -(selectedDays - 1),
+            to: today
+        ) ?? today
+    }
+
+    private var endDate: Date {
+        calendar.startOfDay(for: Date())
+    }
+
+    // MARK: - Progress
+
+    private var progressInRange: [TimeUpDailyProgress] {
+        store.progress(for: storedMember.id)
+            .filter {
+                let date = calendar.startOfDay(
+                    for: $0.date
+                )
+
+                return date >= startDate &&
+                    date <= endDate
+            }
+            .sorted {
+                $0.date < $1.date
+            }
+    }
+
+    private var progressNewestFirst: [TimeUpDailyProgress] {
+        progressInRange.sorted {
+            $0.date > $1.date
+        }
+    }
+
+    // MARK: - Header
+
+    private var memberHeader: some View {
+        HStack(spacing: 14) {
+
+            Image(
+                systemName: "person.crop.circle.fill"
+            )
+            .font(.system(size: 58))
+            .foregroundStyle(.secondary)
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+
+                HStack(spacing: 7) {
+
+                    Text(storedMember.displayName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    if storedMember.id == viewingMember.id {
+                        Text("אתה")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let target = storedMember.dailyTargetMinutes {
                     Text(
-                        journeySubtitle
+                        "יעד נוכחי: \(formattedMinutes(target))"
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                } else {
+                    Text("אין יעד נוכחי")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-
-                Spacer()
-
-                Text(
-                    "\(min(groupStreak, successDays))/\(successDays)"
-                )
-                .font(.headline)
-                .monospacedDigit()
             }
 
-            ProgressView(
-                value: Double(
-                    min(
-                        groupStreak,
-                        successDays
-                    )
-                ),
-                total: Double(
-                    max(successDays, 1)
-                )
-            )
-
-            journeyDays
+            Spacer()
         }
-        .padding(18)
-        .background {
-
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-            .fill(
-                Color.secondary
-                    .opacity(0.10)
-            )
-        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
     }
 
-    private var journeyDays: some View {
+    // MARK: - Range
 
-        LazyVGrid(
-            columns: [
-                GridItem(
-                    .adaptive(
-                        minimum: 42,
-                        maximum: 48
-                    ),
-                    spacing: 10
-                )
-            ],
+    private var rangeSelector: some View {
+        VStack(
+            alignment: .leading,
             spacing: 10
         ) {
 
-            ForEach(
-                1...successDays,
-                id: \.self
-            ) { day in
+            Text("טווח")
+                .font(.headline)
 
-                ZStack {
-
-                    Circle()
-                        .fill(
-                            day <= groupStreak
-                                ? Color.accentColor
-                                : Color.secondary
-                                    .opacity(0.14)
-                        )
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-
-                    if day <= groupStreak {
-
-                        Image(
-                            systemName: "checkmark"
-                        )
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-
-                    } else {
-
-                        Text("\(day)")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(
-                                .secondary
-                            )
-                    }
+            Picker(
+                "טווח",
+                selection: $selectedDays
+            ) {
+                ForEach(
+                    rangeOptions,
+                    id: \.self
+                ) { days in
+                    Text("\(days) ימים")
+                        .tag(days)
                 }
             }
+            .pickerStyle(.segmented)
+        }
+        .padding(18)
+        .background {
+            cardBackground
         }
     }
 
-    private var journeySubtitle: String {
+    // MARK: - Summary
 
-        if groupStreak >= successDays {
+    private var summaryCard: some View {
+        HStack(spacing: 0) {
 
-            return "הקבוצה השלימה את היעד"
+            summaryItem(
+                title: "ממוצע",
+                value: averageUsage.map {
+                    formattedMinutes($0)
+                } ?? "אין נתונים"
+            )
 
-        } else {
+            Divider()
+                .frame(height: 54)
 
-            let remaining =
-                max(
-                    successDays - groupStreak,
-                    0
-                )
-
-            return
-                "עוד \(remaining) ימים להשלמת היעד"
+            summaryItem(
+                title: "עמידה ביעד",
+                value: successRate.map {
+                    "\(Int($0.rounded()))%"
+                } ?? "אין נתונים"
+            )
+        }
+        .padding(18)
+        .background {
+            cardBackground
         }
     }
 
-    // MARK: - Today
+    private func summaryItem(
+        title: String,
+        value: String
+    ) -> some View {
 
-    private var todayStatusCard: some View {
+        VStack(spacing: 5) {
 
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.headline)
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Chart
+
+    private var historyChart: some View {
         VStack(
             alignment: .leading,
             spacing: 14
         ) {
 
-            HStack {
+            Text("זמן מסך מול יעד")
+                .font(.headline)
 
-                Text("היום בקבוצה")
-                    .font(.headline)
+            if progressInRange.isEmpty {
 
-                Spacer()
+                emptyDataView
 
-                Text(
-                    Date.now,
-                    format:
-                        .dateTime
-                        .day()
-                        .month()
-                )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            }
+            } else {
 
-            Divider()
+                Chart(progressInRange) { progress in
 
-            HStack {
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-
-                    Text("חברי קבוצה")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(
-                        "\(groupMembers.count)"
+                    LineMark(
+                        x: .value(
+                            "תאריך",
+                            progress.date
+                        ),
+                        y: .value(
+                            "זמן מסך",
+                            progress.usageMinutes
+                        ),
+                        series: .value(
+                            "סדרה",
+                            "זמן מסך"
+                        )
                     )
-                    .font(.title2)
-                    .fontWeight(.bold)
-                }
-
-                Spacer()
-
-                VStack(
-                    alignment: .trailing,
-                    spacing: 4
-                ) {
-
-                    Text("רצף נוכחי")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(
-                        "\(groupStreak)"
+                    .foregroundStyle(
+                        Color.accentColor
                     )
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .interpolationMethod(
+                        .catmullRom
+                    )
+
+                    PointMark(
+                        x: .value(
+                            "תאריך",
+                            progress.date
+                        ),
+                        y: .value(
+                            "זמן מסך",
+                            progress.usageMinutes
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.accentColor
+                    )
+
+                    if let target = progress.targetMinutes {
+                        LineMark(
+                            x: .value(
+                                "תאריך",
+                                progress.date
+                            ),
+                            y: .value(
+                                "יעד",
+                                target
+                            ),
+                            series: .value(
+                                "סדרה",
+                                "יעד"
+                            )
+                        )
+                        .foregroundStyle(.secondary)
+                        .lineStyle(
+                            StrokeStyle(
+                                lineWidth: 2,
+                                dash: [5, 4]
+                            )
+                        )
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(
+                        position: .leading
+                    ) { value in
+
+                        AxisGridLine()
+
+                        AxisValueLabel {
+                            if let minutes = value.as(Int.self) {
+                                Text(
+                                    shortTime(minutes)
+                                )
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(
+                        values: .automatic(
+                            desiredCount:
+                                selectedDays == 30
+                                    ? 5
+                                    : 7
+                        )
+                    ) { _ in
+
+                        AxisGridLine()
+
+                        AxisValueLabel(
+                            format:
+                                .dateTime
+                                .day()
+                                .month(.twoDigits)
+                        )
+                    }
+                }
+                .frame(height: 250)
+
+                HStack(spacing: 18) {
+
+                    Label(
+                        "זמן מסך",
+                        systemImage: "circle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        Color.accentColor
+                    )
+
+                    Label(
+                        "יעד",
+                        systemImage: "minus"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
-
-            Text(
-                "היום ייחשב כחלק מהרצף רק לאחר שכל חברי הקבוצה יסיימו את היום ויעמדו ביעד שלהם."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
         .padding(18)
         .background {
-
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-            .fill(
-                Color.secondary
-                    .opacity(0.10)
-            )
+            cardBackground
         }
     }
 
-    // MARK: - Members Preview
+    // MARK: - History List
 
-    private var membersPreview: some View {
-
+    private var historyList: some View {
         VStack(
             alignment: .leading,
-            spacing: 12
+            spacing: 0
         ) {
 
-            HStack {
+            Text("היסטוריה")
+                .font(.headline)
+                .padding(.bottom, 12)
 
-                Text("חברי הקבוצה")
-                    .font(.headline)
+            if progressNewestFirst.isEmpty {
 
-                Spacer()
-
-                Button("הצג הכל") {
-
-                    selectedSection =
-                        .members
-                }
-                .font(.subheadline)
-            }
-
-            if groupMembers.isEmpty {
-
-                ContentUnavailableView(
-                    "אין חברים בקבוצה",
-                    systemImage: "person.3"
-                )
+                Text("אין נתונים בטווח שנבחר.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .center
+                    )
+                    .padding(.vertical, 30)
 
             } else {
 
                 ForEach(
                     Array(
-                        groupMembers.prefix(4)
-                    )
-                ) { groupMember in
+                        progressNewestFirst.enumerated()
+                    ),
+                    id: \.element.id
+                ) { index, progress in
 
-                    HStack(spacing: 12) {
+                    historyRow(progress)
 
-                        Image(
-                            systemName:
-                                "person.crop.circle.fill"
-                        )
-                        .font(
-                            .system(size: 34)
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-
-                            Text(
-                                groupMember.displayName
-                            )
-                            .fontWeight(.semibold)
-
-                            if groupMember.id ==
-                                currentMember.id
-                            {
-
-                                Text("אתה")
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                            }
-                        }
-
-                        Spacer()
-                    }
-
-                    if groupMember.id !=
-                        groupMembers
-                            .prefix(4)
-                            .last?
-                            .id
+                    if index <
+                        progressNewestFirst.count - 1
                     {
-
                         Divider()
                     }
                 }
@@ -619,146 +649,228 @@ struct MemberGroupView: View {
         }
         .padding(18)
         .background {
-
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-            .fill(
-                Color.secondary
-                    .opacity(0.10)
-            )
+            cardBackground
         }
     }
 
-    // MARK: - Current Group Streak
+    private func historyRow(
+        _ progress: TimeUpDailyProgress
+    ) -> some View {
 
-    private var groupStreak: Int {
+        HStack(spacing: 12) {
 
-        let calendar =
-            Calendar.current
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
 
-        let members =
-            groupMembers.filter {
-                $0.role == .member
-            }
+                Text(
+                    progress.date.formatted(
+                        date: .abbreviated,
+                        time: .omitted
+                    )
+                )
+                .fontWeight(.semibold)
 
-        guard !members.isEmpty else {
-            return 0
-        }
+                if progress.isLearningDay {
 
-        var streak = 0
+                    Text("יום למידה")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-        var date =
-            calendar.startOfDay(
-                for:
-                    calendar.date(
-                        byAdding: .day,
-                        value: -1,
-                        to: Date()
-                    ) ?? Date()
-            )
+                } else if let target = progress.targetMinutes {
 
-        while true {
+                    Text(
+                        "יעד: \(formattedMinutes(target))"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-            var allAchieved = true
+                } else {
 
-            for groupMember in members {
-
-                let progress =
-                    store.dailyProgress
-                        .filter {
-                            $0.memberID ==
-                                groupMember.id
-                        }
-                        .first {
-                            calendar.isDate(
-                                $0.date,
-                                inSameDayAs: date
-                            )
-                        }
-
-                guard
-                    let progress,
-                    !progress.isLearningDay,
-                    progress.achieved
-                else {
-
-                    allAchieved = false
-                    break
+                    Text("אין יעד")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            guard allAchieved else {
-                break
-            }
+            Spacer()
 
-            streak += 1
+            VStack(
+                alignment: .trailing,
+                spacing: 4
+            ) {
 
-            guard
-                let previousDay =
-                    calendar.date(
-                        byAdding: .day,
-                        value: -1,
-                        to: date
+                Text(
+                    formattedMinutes(
+                        progress.usageMinutes
                     )
-            else {
-                break
-            }
-
-            date =
-                calendar.startOfDay(
-                    for: previousDay
                 )
-        }
+                .fontWeight(.semibold)
+                .monospacedDigit()
 
-        return streak
+                statusLabel(progress)
+            }
+        }
+        .padding(.vertical, 12)
     }
 
-    // MARK: - Success Days
+    // MARK: - Status
 
-    private var successDays: Int {
+    @ViewBuilder
+    private func statusLabel(
+        _ progress: TimeUpDailyProgress
+    ) -> some View {
 
-        max(
-            group?.successDays ?? 7,
-            1
+        if progress.isLearningDay {
+
+            Text("למידה")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+        } else if let target = progress.targetMinutes {
+
+            if progress.usageMinutes <= target {
+
+                Label(
+                    "בתוך היעד",
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.green)
+
+            } else {
+
+                Label(
+                    "מעל היעד",
+                    systemImage: "xmark.circle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.red)
+            }
+
+        } else {
+
+            Text("אין יעד")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Calculations
+
+    private var averageUsage: Int? {
+        let values = progressInRange.map {
+            $0.usageMinutes
+        }
+
+        guard !values.isEmpty else {
+            return nil
+        }
+
+        return Int(
+            (
+                Double(values.reduce(0, +)) /
+                Double(values.count)
+            ).rounded()
         )
     }
 
-    // MARK: - Placeholder
-
-    private func comingSoonView(
-        title: String,
-        icon: String,
-        message: String
-    ) -> some View {
-
-        VStack(spacing: 16) {
-
-            Spacer()
-
-            Image(systemName: icon)
-                .font(
-                    .system(size: 48)
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Text(message)
-                .foregroundStyle(
-                    .secondary
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-                .padding(.horizontal, 32)
-
-            Spacer()
+    private var eligibleProgress: [TimeUpDailyProgress] {
+        progressInRange.filter {
+            !$0.isLearningDay &&
+            $0.targetMinutes != nil
         }
+    }
+
+    private var successRate: Double? {
+        guard !eligibleProgress.isEmpty else {
+            return nil
+        }
+
+        let successful = eligibleProgress
+            .filter {
+                $0.achieved
+            }
+            .count
+
+        return
+            Double(successful) /
+            Double(eligibleProgress.count) *
+            100
+    }
+
+    // MARK: - Empty
+
+    private var emptyDataView: some View {
+        VStack(spacing: 10) {
+
+            Image(
+                systemName: "chart.xyaxis.line"
+            )
+            .font(.system(size: 36))
+            .foregroundStyle(.secondary)
+
+            Text("אין נתונים")
+                .font(.headline)
+
+            Text(
+                "אין נתוני זמן מסך בטווח שנבחר."
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 190)
+    }
+
+    // MARK: - Formatting
+
+    private func formattedMinutes(
+        _ minutes: Int
+    ) -> String {
+
+        let safe = max(minutes, 0)
+        let hours = safe / 60
+        let remaining = safe % 60
+
+        if hours == 0 {
+            return "\(remaining) דק׳"
+        }
+
+        if remaining == 0 {
+            return "\(hours) שע׳"
+        }
+
+        return "\(hours) שע׳ \(remaining) דק׳"
+    }
+
+    private func shortTime(
+        _ minutes: Int
+    ) -> String {
+
+        if minutes < 60 {
+            return "\(minutes)ד׳"
+        }
+
+        let hours =
+            Double(minutes) / 60
+
+        return String(
+            format: "%.1fש׳",
+            hours
+        )
+    }
+
+    // MARK: - Card
+
+    private var cardBackground: some View {
+        RoundedRectangle(
+            cornerRadius: 20,
+            style: .continuous
+        )
+        .fill(
+            Color.secondary.opacity(0.10)
+        )
     }
 }
