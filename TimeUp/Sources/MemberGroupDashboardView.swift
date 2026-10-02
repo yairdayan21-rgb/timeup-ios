@@ -286,7 +286,7 @@ struct MemberGroupDashboardView: View {
                                         ? 5
                                         : 7
                             )
-                    ) { value in
+                    ) { _ in
 
                         AxisGridLine()
 
@@ -385,14 +385,14 @@ struct MemberGroupDashboardView: View {
                 )
                 .chartXAxis {
 
-                    AxisMarks {
+                    AxisMarks { value in
 
                         AxisGridLine()
 
                         AxisValueLabel {
 
                             if let minutes =
-                                $0.as(
+                                value.as(
                                     Int.self
                                 )
                             {
