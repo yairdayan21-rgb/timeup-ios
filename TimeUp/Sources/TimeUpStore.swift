@@ -6,6 +6,11 @@ enum TimeUpMemberRole: String, Codable {
     case member
 }
 
+enum TimeUpAuthProvider: String, Codable {
+    case apple
+    case google
+}
+
 struct TimeUpMember: Identifiable, Codable {
     let id: UUID
     let groupID: UUID
@@ -13,8 +18,11 @@ struct TimeUpMember: Identifiable, Codable {
     let role: TimeUpMemberRole
     let joinedAt: Date
 
-    // היעד היומי הנוכחי של המשתמש בדקות
     var dailyTargetMinutes: Int?
+
+    // זהות חיצונית של המשתמש.
+    var authProvider: TimeUpAuthProvider?
+    var externalUserID: String?
 
     init(
         id: UUID = UUID(),
@@ -22,7 +30,9 @@ struct TimeUpMember: Identifiable, Codable {
         displayName: String,
         role: TimeUpMemberRole = .member,
         joinedAt: Date = Date(),
-        dailyTargetMinutes: Int? = nil
+        dailyTargetMinutes: Int? = nil,
+        authProvider: TimeUpAuthProvider? = nil,
+        externalUserID: String? = nil
     ) {
         self.id = id
         self.groupID = groupID
@@ -30,6 +40,8 @@ struct TimeUpMember: Identifiable, Codable {
         self.role = role
         self.joinedAt = joinedAt
         self.dailyTargetMinutes = dailyTargetMinutes
+        self.authProvider = authProvider
+        self.externalUserID = externalUserID
     }
 }
 
@@ -39,8 +51,6 @@ final class TimeUpStore: ObservableObject {
     @Published private(set) var groups: [TimeUpGroup] = []
     @Published private(set) var members: [TimeUpMember] = []
     @Published private(set) var dailyProgress: [TimeUpDailyProgress] = []
-
-    // המשתמש הפעיל נשמר גם בזיכרון וגם ב-UserDefaults.
     @Published private(set) var currentMember: TimeUpMember?
 
     private let groupsKey = "timeup.groups.v1"
@@ -100,8 +110,6 @@ final class TimeUpStore: ObservableObject {
 
         members[index] = member
 
-        // אם עדכנו את המשתמש הפעיל,
-        // מעדכנים גם את ה-session.
         if currentMember?.id == member.id {
             currentMember = member
         }
@@ -147,11 +155,43 @@ final class TimeUpStore: ObservableObject {
         }
     }
 
+    func member(
+        authProvider: TimeUpAuthProvider,
+        externalUserID: String
+    ) -> TimeUpMember? {
+
+        members.first {
+            $0.authProvider == authProvider &&
+            $0.externalUserID == externalUserID
+        }
+    }
+
+    func connectAuthentication(
+        provider: TimeUpAuthProvider,
+        externalUserID: String,
+        to memberID: UUID
+    ) {
+
+        guard let index = members.firstIndex(
+            where: { $0.id == memberID }
+        ) else {
+            return
+        }
+
+        members[index].authProvider = provider
+        members[index].externalUserID = externalUserID
+
+        if currentMember?.id == memberID {
+            currentMember = members[index]
+        }
+
+        save()
+    }
+
     // MARK: - Session
 
     func setCurrentMember(_ member: TimeUpMember) {
 
-        // מוודאים שהמשתמש קיים ב-store.
         if let storedMember = self.member(
             id: member.id
         ) {
@@ -316,16 +356,8 @@ final class TimeUpStore: ObservableObject {
             return nil
         }
 
-        let existingProgress = progress(
-            for: memberID,
-            on: date
-        )
-
-        let previousStreak: Int
-
-        if existingProgress != nil {
-
-            previousStreak = progress(for: memberID)
+        let previousStreak =
+            progress(for: memberID)
                 .filter {
                     $0.date <
                         calendar.startOfDay(
@@ -334,19 +366,6 @@ final class TimeUpStore: ObservableObject {
                 }
                 .last?
                 .streakAfterDay ?? 0
-
-        } else {
-
-            previousStreak = progress(for: memberID)
-                .filter {
-                    $0.date <
-                        calendar.startOfDay(
-                            for: date
-                        )
-                }
-                .last?
-                .streakAfterDay ?? 0
-        }
 
         let progressEntry =
             TimeUpGoalEngine.makeDailyProgress(
