@@ -71,11 +71,8 @@ struct MemberTabView: View {
 
             NavigationStack {
 
-                placeholderView(
-                    title: "הקבוצה",
-                    icon: "person.3.fill",
-                    message:
-                        "כאן תופיע סביבת הקבוצה שלך."
+                MemberGroupView(
+                    member: currentMember
                 )
                 .toolbar {
                     profileToolbar
