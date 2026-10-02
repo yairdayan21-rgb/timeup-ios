@@ -1,5 +1,6 @@
 import SwiftUI
 import FamilyControls
+import UserNotifications
 
 struct MemberHomeView: View {
     let member: TimeUpMember
@@ -239,6 +240,14 @@ struct MemberHomeView: View {
         }
     }
 
+    private func requestNotificationAuthorization() {
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        ) { _, _ in
+            // אם המשתמש מסרב, TimeUp ממשיך לעבוד ללא התראות.
+        }
+    }
+
     private func requestScreenTime() {
         isRequestingAuthorization = true
 
@@ -256,6 +265,7 @@ struct MemberHomeView: View {
                 refreshAuthorizationStatus()
 
                 if hasScreenTimeAuthorization {
+                    requestNotificationAuthorization()
                     startScreenTimeMonitoring()
                     refreshUsageEstimate()
                 }
