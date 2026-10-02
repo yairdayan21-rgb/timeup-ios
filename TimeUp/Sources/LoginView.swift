@@ -3,7 +3,12 @@ import AuthenticationServices
 
 struct LoginView: View {
 
+    @StateObject private var store = TimeUpStore.shared
+
     @State private var showJoinScreen = false
+    @State private var existingMemberDestination:
+        ExistingMemberDestination?
+
     @State private var appleSignInError = ""
 
     @State private var authenticatedProvider:
@@ -11,6 +16,12 @@ struct LoginView: View {
 
     @State private var authenticatedUserID:
         String?
+
+    private enum ExistingMemberDestination:
+        Hashable {
+        case admin(UUID)
+        case member(UUID)
+    }
 
     var body: some View {
 
@@ -113,6 +124,9 @@ struct LoginView: View {
                     .frame(height: 32)
             }
             .padding(.horizontal, 24)
+
+            // MARK: New Apple account
+
             .navigationDestination(
                 isPresented: $showJoinScreen
             ) {
@@ -123,6 +137,47 @@ struct LoginView: View {
                     externalUserID:
                         authenticatedUserID
                 )
+            }
+
+            // MARK: Existing account
+
+            .navigationDestination(
+                item: $existingMemberDestination
+            ) { destination in
+
+                switch destination {
+
+                case .admin:
+
+                    AdminHomeView()
+                        .navigationBarBackButtonHidden(
+                            true
+                        )
+
+                case .member(let memberID):
+
+                    if let member =
+                        store.member(
+                            id: memberID
+                        )
+                    {
+
+                        MemberHomeView(
+                            member: member
+                        )
+                        .navigationBarBackButtonHidden(
+                            true
+                        )
+
+                    } else {
+
+                        ContentUnavailableView(
+                            "לא ניתן לפתוח את המשתמש",
+                            systemImage:
+                                "person.crop.circle.badge.exclamationmark"
+                        )
+                    }
+                }
             }
         }
     }
@@ -175,13 +230,47 @@ struct LoginView: View {
                 return
             }
 
+            appleSignInError = ""
+
+            // קודם בודקים אם החשבון כבר קיים.
+            if let existingMember =
+                store.member(
+                    authProvider: .apple,
+                    externalUserID:
+                        appleUserID
+                )
+            {
+
+                store.setCurrentMember(
+                    existingMember
+                )
+
+                switch existingMember.role {
+
+                case .admin:
+
+                    existingMemberDestination =
+                        .admin(
+                            existingMember.id
+                        )
+
+                case .member:
+
+                    existingMemberDestination =
+                        .member(
+                            existingMember.id
+                        )
+                }
+
+                return
+            }
+
+            // חשבון Apple חדש.
             authenticatedProvider =
                 .apple
 
             authenticatedUserID =
                 appleUserID
-
-            appleSignInError = ""
 
             showJoinScreen = true
 
