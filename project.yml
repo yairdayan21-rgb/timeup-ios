@@ -19,6 +19,7 @@ targets:
         SWIFT_VERSION: 5.0
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: TimeUp/TimeUp.entitlements
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "TimeUp uses Face ID to securely unlock your account."
 
   TimeUpDeviceActivityMonitor:
     type: app-extension
