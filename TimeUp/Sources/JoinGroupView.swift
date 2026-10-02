@@ -231,7 +231,7 @@ struct JoinGroupView: View {
                     )
                 {
 
-                    MemberHomeView(
+                    MemberTabView(
                         member: member
                     )
                     .navigationBarBackButtonHidden(
