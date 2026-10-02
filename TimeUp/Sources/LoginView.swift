@@ -6,6 +6,12 @@ struct LoginView: View {
     @State private var showJoinScreen = false
     @State private var appleSignInError = ""
 
+    @State private var authenticatedProvider:
+        TimeUpAuthProvider?
+
+    @State private var authenticatedUserID:
+        String?
+
     var body: some View {
 
         NavigationStack {
@@ -45,8 +51,10 @@ struct LoginView: View {
 
                     SignInWithAppleButton(
                         .continue,
-                        onRequest: configureAppleRequest,
-                        onCompletion: handleAppleResult
+                        onRequest:
+                            configureAppleRequest,
+                        onCompletion:
+                            handleAppleResult
                     )
                     .signInWithAppleButtonStyle(
                         .black
@@ -108,7 +116,13 @@ struct LoginView: View {
             .navigationDestination(
                 isPresented: $showJoinScreen
             ) {
-                JoinGroupView()
+
+                JoinGroupView(
+                    authProvider:
+                        authenticatedProvider,
+                    externalUserID:
+                        authenticatedUserID
+                )
             }
         }
     }
@@ -116,7 +130,8 @@ struct LoginView: View {
     // MARK: - Sign in with Apple
 
     private func configureAppleRequest(
-        _ request: ASAuthorizationAppleIDRequest
+        _ request:
+            ASAuthorizationAppleIDRequest
     ) {
 
         request.requestedScopes = [
@@ -139,7 +154,8 @@ struct LoginView: View {
             guard
                 let credential =
                     authorization.credential
-                        as? ASAuthorizationAppleIDCredential
+                        as?
+                        ASAuthorizationAppleIDCredential
             else {
 
                 appleSignInError =
@@ -159,10 +175,11 @@ struct LoginView: View {
                 return
             }
 
-            // Apple מחזירה שם ואימייל בדרך כלל
-            // רק באישור הראשון.
-            // בהמשך נשמור את מזהה Apple הקבוע
-            // ונקשר אותו למשתמש TimeUp.
+            authenticatedProvider =
+                .apple
+
+            authenticatedUserID =
+                appleUserID
 
             appleSignInError = ""
 
@@ -170,13 +187,17 @@ struct LoginView: View {
 
         case .failure(let error):
 
-            if let authorizationError =
-                error as? ASAuthorizationError,
-               authorizationError.code
-                    == .canceled {
+            authenticatedProvider = nil
+            authenticatedUserID = nil
 
-                // המשתמש פשוט ביטל.
-                // אין צורך להציג שגיאה.
+            if
+                let authorizationError =
+                    error as?
+                    ASAuthorizationError,
+                authorizationError.code
+                    == .canceled
+            {
+
                 appleSignInError = ""
 
             } else {
@@ -191,9 +212,8 @@ struct LoginView: View {
 
     private func startGoogleSignIn() {
 
-        // Google Sign-In יחובר בשלב הבא.
-        // עד אז לא מאפשרים לכפתור לעקוף
-        // את תהליך האימות האמיתי.
+        authenticatedProvider = nil
+        authenticatedUserID = nil
 
         appleSignInError =
             "Google Sign-In עדיין לא מחובר."
