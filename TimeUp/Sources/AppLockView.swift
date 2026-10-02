@@ -5,20 +5,24 @@ struct AppLockView: View {
 
     let member: TimeUpMember
 
-    @Environment(\.scenePhase)
-    private var scenePhase
+    @ObservedObject private var store =
+        TimeUpStore.shared
 
     @State private var isUnlocked = false
-    @State private var isAuthenticating = false
-    @State private var authenticationMessage = ""
 
-    @State private var shouldAuthenticateOnActive = true
+    @State private var isAuthenticating = false
+
+    @State private var authenticationMessage = ""
 
     var body: some View {
 
         Group {
 
-            if isUnlocked {
+            if !store.isAppLockEnabled {
+
+                authenticatedDestination
+
+            } else if isUnlocked {
 
                 authenticatedDestination
 
@@ -29,13 +33,15 @@ struct AppLockView: View {
         }
         .onAppear {
 
-            authenticate()
-        }
-        .onChange(of: scenePhase) { _, newPhase in
+            guard store.isAppLockEnabled else {
+                return
+            }
 
-            handleScenePhase(
-                newPhase
-            )
+            guard !isUnlocked else {
+                return
+            }
+
+            authenticate()
         }
     }
 
@@ -58,7 +64,7 @@ struct AppLockView: View {
         }
     }
 
-    // MARK: - Locked Screen
+    // MARK: - Locked View
 
     private var lockedView: some View {
 
@@ -66,10 +72,12 @@ struct AppLockView: View {
 
             Spacer()
 
-            Image(systemName: "faceid")
-                .font(
-                    .system(size: 72)
-                )
+            Image(
+                systemName: "faceid"
+            )
+            .font(
+                .system(size: 72)
+            )
 
             Text("TimeUp")
                 .font(.largeTitle)
@@ -119,8 +127,8 @@ struct AppLockView: View {
 
                     Text(
                         isAuthenticating
-                        ? "מאמת..."
-                        : "פתיחה עם Face ID"
+                            ? "מאמת..."
+                            : "פתיחה עם Face ID"
                     )
                 }
                 .frame(
@@ -143,75 +151,38 @@ struct AppLockView: View {
         }
     }
 
-    // MARK: - Scene Phase
-
-    private func handleScenePhase(
-        _ phase: ScenePhase
-    ) {
-
-        switch phase {
-
-        case .background:
-
-            lockApp()
-
-        case .active:
-
-            guard
-                shouldAuthenticateOnActive,
-                !isUnlocked
-            else {
-                return
-            }
-
-            shouldAuthenticateOnActive = false
-
-            authenticate()
-
-        case .inactive:
-
-            break
-
-        @unknown default:
-
-            break
-        }
-    }
-
-    // MARK: - Lock
-
-    private func lockApp() {
-
-        isUnlocked = false
-        isAuthenticating = false
-        authenticationMessage = ""
-
-        shouldAuthenticateOnActive = true
-    }
-
     // MARK: - Authentication
 
     private func authenticate() {
+
+        guard store.isAppLockEnabled else {
+
+            isUnlocked = true
+
+            return
+        }
 
         guard !isAuthenticating else {
             return
         }
 
         isAuthenticating = true
+
         authenticationMessage = ""
 
-        let context =
-            LAContext()
+        let context = LAContext()
 
         context.localizedCancelTitle =
             "ביטול"
 
         var error: NSError?
 
-        guard context.canEvaluatePolicy(
-            .deviceOwnerAuthentication,
-            error: &error
-        ) else {
+        guard
+            context.canEvaluatePolicy(
+                .deviceOwnerAuthentication,
+                error: &error
+            )
+        else {
 
             isAuthenticating = false
 
@@ -227,7 +198,9 @@ struct AppLockView: View {
         context.evaluatePolicy(
             .deviceOwnerAuthentication,
             localizedReason: reason
-        ) { success, authenticationError in
+        ) {
+            success,
+            authenticationError in
 
             DispatchQueue.main.async {
 
@@ -238,9 +211,6 @@ struct AppLockView: View {
                     isUnlocked = true
 
                     authenticationMessage = ""
-
-                    shouldAuthenticateOnActive =
-                        false
 
                 } else {
 
