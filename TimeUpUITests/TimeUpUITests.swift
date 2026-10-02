@@ -51,9 +51,18 @@ final class TimeUpUITests: XCTestCase {
         nameField.typeText(name)
         XCTAssertEqual(nameField.value as? String, name)
 
+        // Dismiss the first field's keyboard before moving focus. This makes
+        // the transition reliable on the Hebrew simulator keyboard as well.
+        app.keyboards.buttons["סיום"].tapIfExists()
+        app.keyboards.buttons["Done"].tapIfExists()
+        if app.keyboards.count > 0 {
+            app.tap()
+        }
+
         let codeField = app.textFields["group-code-field"]
         XCTAssertTrue(codeField.waitForExistence(timeout: 10))
         codeField.tap()
+        XCTAssertTrue(codeField.waitForKeyboardFocus(timeout: 5))
         codeField.typeText(code)
         XCTAssertEqual(codeField.value as? String, code)
 
@@ -67,5 +76,11 @@ private extension XCUIElement {
         if exists && isHittable {
             tap()
         }
+    }
+
+    func waitForKeyboardFocus(timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "hasKeyboardFocus == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: self)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }
