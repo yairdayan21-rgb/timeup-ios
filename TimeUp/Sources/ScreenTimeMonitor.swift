@@ -130,7 +130,7 @@ final class ScreenTimeMonitor {
 
         guard
             let defaults = sharedDefaults,
-            let completedDate = defaults.object(
+            let completedDay = defaults.object(
                 forKey: "lastCompletedDayDate"
             ) as? Date
         else {
@@ -149,22 +149,17 @@ final class ScreenTimeMonitor {
             return
         }
 
-        let completedDay =
-            calendar.date(
-                byAdding: .day,
-                value: -1,
-                to: completedDate
-            ) ?? completedDate
+        // ה-extension כבר שומר את היום המדויק
+        // שאליו שייכים נתוני זמן המסך.
+        // לכן לא מחסירים כאן יום נוסף.
 
-        // אם היום הזה כבר נשמר,
-        // לא שומרים אותו שוב.
         if TimeUpStore.shared.progress(
             for: member.id,
             on: completedDay
         ) != nil {
 
             markCompletedDayAsSynced(
-                completedDate
+                completedDay
             )
 
             return
@@ -183,7 +178,7 @@ final class ScreenTimeMonitor {
         )
 
         markCompletedDayAsSynced(
-            completedDate
+            completedDay
         )
     }
 
