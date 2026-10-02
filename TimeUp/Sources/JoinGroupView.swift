@@ -214,10 +214,8 @@ struct JoinGroupView: View {
             case .member(let memberID):
 
                 if let member =
-                    store.members.first(
-                        where: {
-                            $0.id == memberID
-                        }
+                    store.member(
+                        id: memberID
                     )
                 {
 
@@ -309,12 +307,14 @@ struct JoinGroupView: View {
             return
         }
 
-        // MARK: Admin shortcut
+        // MARK: Admin
 
         if code == "0000" {
 
-            errorMessage = nil
-            destination = .admin
+            createAdmin(
+                displayName: name
+            )
+
             return
         }
 
@@ -344,7 +344,7 @@ struct JoinGroupView: View {
             return
         }
 
-        // MARK: Create member
+        // MARK: Create Member
 
         let member =
             TimeUpMember(
@@ -368,5 +368,86 @@ struct JoinGroupView: View {
             .member(
                 member.id
             )
+    }
+
+    // MARK: - Create Admin
+
+    private func createAdmin(
+        displayName: String
+    ) {
+
+        // למנהל דרוש groupID אמיתי.
+        // אם כבר קיימת קבוצה, משתמשים בה.
+        // אחרת יוצרים קבוצת מנהל ראשונה.
+
+        let group: TimeUpGroup
+
+        if let existingGroup =
+            store.groups.first
+        {
+
+            group = existingGroup
+
+        } else {
+
+            let newGroup =
+                TimeUpGroup(
+                    name: "TimeUp",
+                    code: generateGroupCode(),
+                    goalMethod: .previousDay,
+                    reductionPercent: 5,
+                    successDays: 7
+                )
+
+            store.addGroup(
+                newGroup
+            )
+
+            group = newGroup
+        }
+
+        let admin =
+            TimeUpMember(
+                groupID: group.id,
+                displayName:
+                    displayName,
+                role: .admin,
+                authProvider:
+                    authProvider,
+                externalUserID:
+                    externalUserID
+            )
+
+        store.addMember(
+            admin
+        )
+
+        store.setCurrentMember(
+            admin
+        )
+
+        errorMessage = nil
+        destination = .admin
+    }
+
+    // MARK: - Group Code
+
+    private func generateGroupCode() -> String {
+
+        var code: String
+
+        repeat {
+
+            code = String(
+                Int.random(
+                    in: 1000...9999
+                )
+            )
+
+        } while store.group(
+            forCode: code
+        ) != nil
+
+        return code
     }
 }
