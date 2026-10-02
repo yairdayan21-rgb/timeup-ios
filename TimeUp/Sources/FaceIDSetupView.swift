@@ -113,7 +113,6 @@ struct FaceIDSetupView: View {
             }
             .buttonStyle(.bordered)
             .disabled(isAuthenticating)
-
         }
         .padding(24)
     }
@@ -132,7 +131,7 @@ struct FaceIDSetupView: View {
 
         case .member:
 
-            MemberHomeView(
+            MemberTabView(
                 member: member
             )
             .navigationBarBackButtonHidden(true)
