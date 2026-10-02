@@ -30,9 +30,11 @@ struct JoinGroupView: View {
     private enum Destination: Hashable {
         case admin
         case member(UUID)
+        case faceIDSetup(UUID)
     }
 
     private var isReadyToJoin: Bool {
+
         groupCode.count == 4 &&
         !displayName
             .trimmingCharacters(
@@ -92,7 +94,9 @@ struct JoinGroupView: View {
                 )
                 .submitLabel(.next)
                 .onSubmit {
-                    focusedField = .groupCode
+
+                    focusedField =
+                        .groupCode
                 }
 
                 TextField(
@@ -134,7 +138,9 @@ struct JoinGroupView: View {
                         )
 
                     if groupCode != normalized {
-                        groupCode = normalized
+
+                        groupCode =
+                            normalized
                     }
 
                     errorMessage = nil
@@ -154,6 +160,7 @@ struct JoinGroupView: View {
                 }
 
                 Button("המשך") {
+
                     join()
                 }
                 .accessibilityIdentifier(
@@ -167,7 +174,9 @@ struct JoinGroupView: View {
                 .buttonStyle(
                     .borderedProminent
                 )
-                .disabled(!isReadyToJoin)
+                .disabled(
+                    !isReadyToJoin
+                )
 
                 Text(
                     "קוד הקבוצה מתקבל ממנהל הקבוצה"
@@ -194,6 +203,7 @@ struct JoinGroupView: View {
                 Spacer()
 
                 Button("סיום") {
+
                     focusedField = nil
                 }
             }
@@ -211,7 +221,9 @@ struct JoinGroupView: View {
                         true
                     )
 
-            case .member(let memberID):
+            case .member(
+                let memberID
+            ):
 
                 if let member =
                     store.member(
@@ -230,6 +242,32 @@ struct JoinGroupView: View {
 
                     ContentUnavailableView(
                         "לא ניתן לפתוח את החבר",
+                        systemImage:
+                            "person.crop.circle.badge.exclamationmark"
+                    )
+                }
+
+            case .faceIDSetup(
+                let memberID
+            ):
+
+                if let member =
+                    store.member(
+                        id: memberID
+                    )
+                {
+
+                    FaceIDSetupView(
+                        member: member
+                    )
+                    .navigationBarBackButtonHidden(
+                        true
+                    )
+
+                } else {
+
+                    ContentUnavailableView(
+                        "לא ניתן לפתוח את החשבון",
                         systemImage:
                             "person.crop.circle.badge.exclamationmark"
                     )
@@ -295,9 +333,12 @@ struct JoinGroupView: View {
             switch existingMember.role {
 
             case .admin:
-                destination = .admin
+
+                destination =
+                    .admin
 
             case .member:
+
                 destination =
                     .member(
                         existingMember.id
@@ -356,7 +397,9 @@ struct JoinGroupView: View {
                     externalUserID
             )
 
-        store.addMember(member)
+        store.addMember(
+            member
+        )
 
         store.setCurrentMember(
             member
@@ -364,8 +407,10 @@ struct JoinGroupView: View {
 
         errorMessage = nil
 
+        // חשבון חדש בלבד:
+        // מציגים את הצעת Face ID פעם אחת.
         destination =
-            .member(
+            .faceIDSetup(
                 member.id
             )
     }
@@ -386,15 +431,18 @@ struct JoinGroupView: View {
             store.groups.first
         {
 
-            group = existingGroup
+            group =
+                existingGroup
 
         } else {
 
             let newGroup =
                 TimeUpGroup(
                     name: "TimeUp",
-                    code: generateGroupCode(),
-                    goalMethod: .previousDay,
+                    code:
+                        generateGroupCode(),
+                    goalMethod:
+                        .previousDay,
                     reductionPercent: 5,
                     successDays: 7
                 )
@@ -403,7 +451,8 @@ struct JoinGroupView: View {
                 newGroup
             )
 
-            group = newGroup
+            group =
+                newGroup
         }
 
         let admin =
@@ -427,7 +476,12 @@ struct JoinGroupView: View {
         )
 
         errorMessage = nil
-        destination = .admin
+
+        // גם מנהל חדש מקבל את ההצעה פעם אחת.
+        destination =
+            .faceIDSetup(
+                admin.id
+            )
     }
 
     // MARK: - Group Code
@@ -438,11 +492,12 @@ struct JoinGroupView: View {
 
         repeat {
 
-            code = String(
-                Int.random(
-                    in: 1000...9999
+            code =
+                String(
+                    Int.random(
+                        in: 1000...9999
+                    )
                 )
-            )
 
         } while store.group(
             forCode: code
