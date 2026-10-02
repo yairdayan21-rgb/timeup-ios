@@ -8,66 +8,131 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         suiteName: "group.com.timeup.shared"
     )
 
-    override func intervalDidStart(for activity: DeviceActivityName) {
-        super.intervalDidStart(for: activity)
+    private let calendar = Calendar.current
+
+    override func intervalDidStart(
+        for activity: DeviceActivityName
+    ) {
+        super.intervalDidStart(
+            for: activity
+        )
+
+        let now = Date()
+        let dayStart = calendar.startOfDay(
+            for: now
+        )
 
         sharedDefaults?.set(
-            Date(),
+            now,
             forKey: "monitoringIntervalStartedAt"
         )
 
-        sharedDefaults?.set(0, forKey: "estimatedUsageMinutes")
-        sharedDefaults?.removeObject(forKey: "dailyTargetReachedAt")
-        sharedDefaults?.removeObject(forKey: "dailyTargetMinutes")
-        sharedDefaults?.removeObject(forKey: "dailyTargetWarningSentAt")
+        // שומרים במפורש לאיזה יום
+        // שייכים נתוני ה-Screen Time.
+        sharedDefaults?.set(
+            dayStart,
+            forKey: "monitoringDayDate"
+        )
+
+        sharedDefaults?.set(
+            0,
+            forKey: "estimatedUsageMinutes"
+        )
+
+        sharedDefaults?.removeObject(
+            forKey: "dailyTargetReachedAt"
+        )
+
+        sharedDefaults?.removeObject(
+            forKey: "dailyTargetMinutes"
+        )
+
+        sharedDefaults?.removeObject(
+            forKey: "dailyTargetWarningSentAt"
+        )
     }
 
     override func eventDidReachThreshold(
         _ event: DeviceActivityEvent.Name,
         activity: DeviceActivityName
     ) {
-        super.eventDidReachThreshold(event, activity: activity)
+        super.eventDidReachThreshold(
+            event,
+            activity: activity
+        )
 
         let now = Date()
-        sharedDefaults?.set(now, forKey: "lastThresholdReachedAt")
+
+        sharedDefaults?.set(
+            now,
+            forKey: "lastThresholdReachedAt"
+        )
+
         sharedDefaults?.set(
             event.rawValue,
             forKey: "lastThresholdEventName"
         )
 
-        guard let usageMinutes = usageMinutes(from: event) else {
+        guard let usageMinutes =
+            usageMinutes(from: event)
+        else {
             return
         }
 
-        let previousEstimate = sharedDefaults?.integer(
-            forKey: "estimatedUsageMinutes"
-        ) ?? 0
+        let previousEstimate =
+            sharedDefaults?.integer(
+                forKey: "estimatedUsageMinutes"
+            ) ?? 0
 
-        let newEstimate = max(previousEstimate, usageMinutes)
+        let newEstimate = max(
+            previousEstimate,
+            usageMinutes
+        )
+
         sharedDefaults?.set(
             newEstimate,
             forKey: "estimatedUsageMinutes"
         )
 
-        let configuredTarget = sharedDefaults?.integer(
-            forKey: "configuredDailyTargetMinutes"
-        ) ?? 0
+        let configuredTarget =
+            sharedDefaults?.integer(
+                forKey: "configuredDailyTargetMinutes"
+            ) ?? 0
 
-        guard configuredTarget > 0 else { return }
+        guard configuredTarget > 0 else {
+            return
+        }
 
-        let minutesRemaining = configuredTarget - newEstimate
+        let minutesRemaining =
+            configuredTarget - newEstimate
 
-        // Warn once per day when the member enters the final five minutes.
         if minutesRemaining > 0,
            minutesRemaining <= 5,
-           sharedDefaults?.object(forKey: "dailyTargetWarningSentAt") == nil {
-            sendTargetWarning(minutesRemaining: minutesRemaining)
-            sharedDefaults?.set(now, forKey: "dailyTargetWarningSentAt")
+           sharedDefaults?.object(
+                forKey: "dailyTargetWarningSentAt"
+           ) == nil {
+
+            sendTargetWarning(
+                minutesRemaining:
+                    minutesRemaining
+            )
+
+            sharedDefaults?.set(
+                now,
+                forKey: "dailyTargetWarningSentAt"
+            )
         }
 
         if newEstimate >= configuredTarget,
-           sharedDefaults?.object(forKey: "dailyTargetReachedAt") == nil {
-            sharedDefaults?.set(now, forKey: "dailyTargetReachedAt")
+           sharedDefaults?.object(
+                forKey: "dailyTargetReachedAt"
+           ) == nil {
+
+            sharedDefaults?.set(
+                now,
+                forKey: "dailyTargetReachedAt"
+            )
+
             sharedDefaults?.set(
                 configuredTarget,
                 forKey: "dailyTargetMinutes"
@@ -75,54 +140,94 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         }
     }
 
-    override func intervalDidEnd(for activity: DeviceActivityName) {
-        super.intervalDidEnd(for: activity)
+    override func intervalDidEnd(
+        for activity: DeviceActivityName
+    ) {
+        super.intervalDidEnd(
+            for: activity
+        )
 
         let now = Date()
-        let usageMinutes = sharedDefaults?.integer(
-            forKey: "estimatedUsageMinutes"
-        ) ?? 0
+
+        let usageMinutes =
+            sharedDefaults?.integer(
+                forKey: "estimatedUsageMinutes"
+            ) ?? 0
+
+        // משתמשים ביום שנשמר בתחילת
+        // חלון המדידה ולא בתאריך סיום משוער.
+        let completedDay =
+            sharedDefaults?.object(
+                forKey: "monitoringDayDate"
+            ) as? Date
+            ?? calendar.startOfDay(
+                for: now
+            )
 
         sharedDefaults?.set(
             now,
             forKey: "monitoringIntervalEndedAt"
         )
+
         sharedDefaults?.set(
             usageMinutes,
             forKey: "lastCompletedDayUsageMinutes"
         )
+
         sharedDefaults?.set(
-            now,
+            completedDay,
             forKey: "lastCompletedDayDate"
         )
     }
 
-    private func sendTargetWarning(minutesRemaining: Int) {
-        let content = UNMutableNotificationContent()
+    // MARK: - Notifications
+
+    private func sendTargetWarning(
+        minutesRemaining: Int
+    ) {
+
+        let content =
+            UNMutableNotificationContent()
+
         content.title = "TimeUp"
-        content.body = minutesRemaining == 1
+
+        content.body =
+            minutesRemaining == 1
             ? "נשארה לך בערך דקה אחת עד ליעד היומי."
             : "נשארו לך בערך \(minutesRemaining) דקות עד ליעד היומי."
+
         content.sound = .default
 
-        let request = UNNotificationRequest(
-            identifier: "timeup.daily-target-warning",
-            content: content,
-            trigger: nil
-        )
+        let request =
+            UNNotificationRequest(
+                identifier:
+                    "timeup.daily-target-warning",
+                content: content,
+                trigger: nil
+            )
 
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current()
+            .add(request)
     }
+
+    // MARK: - Usage Event
 
     private func usageMinutes(
         from event: DeviceActivityEvent.Name
     ) -> Int? {
-        let prefix = "timeup.usage."
 
-        guard event.rawValue.hasPrefix(prefix) else {
+        let prefix =
+            "timeup.usage."
+
+        guard event.rawValue
+            .hasPrefix(prefix)
+        else {
             return nil
         }
 
-        return Int(event.rawValue.dropFirst(prefix.count))
+        return Int(
+            event.rawValue
+                .dropFirst(prefix.count)
+        )
     }
 }
