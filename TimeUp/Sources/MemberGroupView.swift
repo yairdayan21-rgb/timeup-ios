@@ -36,11 +36,8 @@ struct MemberGroupView: View {
 
                 case .detail:
 
-                    comingSoonView(
-                        title: "פירוט קבוצתי",
-                        icon: "list.bullet.rectangle",
-                        message:
-                            "כאן יוצגו זמני המסך של כל חברי הקבוצה לפי תאריך."
+                    MemberGroupDetailView(
+                        member: currentMember
                     )
 
                 case .dashboard:
