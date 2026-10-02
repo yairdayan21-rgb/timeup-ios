@@ -45,9 +45,7 @@ struct JoinGroupView: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($focusedField, equals: .displayName)
                     .submitLabel(.next)
-                    .onSubmit {
-                        focusedField = .groupCode
-                    }
+                    .onSubmit { focusedField = .groupCode }
 
                 TextField("קוד קבוצה", text: $groupCode)
                     .accessibilityIdentifier("group-code-field")
@@ -58,9 +56,7 @@ struct JoinGroupView: View {
                     .focused($focusedField, equals: .groupCode)
                     .onChange(of: groupCode) { _, newValue in
                         let normalized = String(newValue.filter { $0.isNumber }.prefix(4))
-                        if groupCode != normalized {
-                            groupCode = normalized
-                        }
+                        if groupCode != normalized { groupCode = normalized }
                         errorMessage = nil
                     }
 
@@ -73,7 +69,6 @@ struct JoinGroupView: View {
                 }
 
                 Button("המשך") {
-                    focusedField = nil
                     join()
                 }
                 .accessibilityIdentifier("join-button")
@@ -96,9 +91,7 @@ struct JoinGroupView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("סיום") {
-                    focusedField = nil
-                }
+                Button("סיום") { focusedField = nil }
             }
         }
         .navigationDestination(item: $destination) { destination in
@@ -106,16 +99,12 @@ struct JoinGroupView: View {
             case .admin:
                 AdminHomeView()
                     .navigationBarBackButtonHidden(true)
-
             case .member(let memberID):
                 if let member = store.members.first(where: { $0.id == memberID }) {
                     MemberHomeView(member: member)
                         .navigationBarBackButtonHidden(true)
                 } else {
-                    ContentUnavailableView(
-                        "לא ניתן לפתוח את החבר",
-                        systemImage: "person.crop.circle.badge.exclamationmark"
-                    )
+                    ContentUnavailableView("לא ניתן לפתוח את החבר", systemImage: "person.crop.circle.badge.exclamationmark")
                 }
             }
         }
@@ -124,27 +113,25 @@ struct JoinGroupView: View {
     private func join() {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let code = groupCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        focusedField = nil
 
         guard !name.isEmpty else {
             errorMessage = "יש להזין שם כדי להמשיך."
             return
         }
-
         guard code.count == 4 else {
             errorMessage = "יש להזין קוד קבוצה בן 4 ספרות."
             return
         }
-
         if code == "0000" {
+            errorMessage = nil
             destination = .admin
             return
         }
-
         guard let group = store.group(forCode: code) else {
             errorMessage = "לא נמצאה קבוצה עם הקוד הזה."
             return
         }
-
         guard !store.hasMember(named: name, in: group.id) else {
             errorMessage = "השם הזה כבר קיים בקבוצה."
             return
@@ -153,6 +140,7 @@ struct JoinGroupView: View {
         let member = TimeUpMember(groupID: group.id, displayName: name)
         store.addMember(member)
         store.setCurrentMember(member)
+        errorMessage = nil
         destination = .member(member.id)
     }
 }
