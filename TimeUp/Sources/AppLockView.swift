@@ -14,7 +14,7 @@ struct AppLockView: View {
 
             if isUnlocked {
 
-                MemberHomeView(member: member)
+                authenticatedDestination
 
             } else {
 
@@ -23,6 +23,25 @@ struct AppLockView: View {
         }
         .onAppear {
             authenticate()
+        }
+    }
+
+    // MARK: - Destination
+
+    @ViewBuilder
+    private var authenticatedDestination: some View {
+
+        switch member.role {
+
+        case .admin:
+
+            AdminHomeView()
+
+        case .member:
+
+            MemberHomeView(
+                member: member
+            )
         }
     }
 
