@@ -35,6 +35,61 @@ struct MemberHomeView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // MARK: - Daily Status
+
+                HStack(spacing: 12) {
+
+                    statusCard(
+                        value: "\(currentStreak)",
+                        title: "רצף",
+                        icon: "flame.fill"
+                    )
+
+                    statusCard(
+                        value: yesterdayStatusText,
+                        title: "אתמול",
+                        icon: yesterdayStatusIcon
+                    )
+
+                    statusCard(
+                        value: "\(completedDaysCount)",
+                        title: "ימים",
+                        icon: "calendar"
+                    )
+                }
+
+                // MARK: - Learning Day
+
+                if isCurrentLearningPhase {
+                    VStack(alignment: .leading, spacing: 10) {
+
+                        Label(
+                            "יום למידה",
+                            systemImage: "brain.head.profile"
+                        )
+                        .font(.headline)
+
+                        Text(
+                            "TimeUp אוסף נתוני שימוש כדי לבנות את היעד הראשון שלך."
+                        )
+                        .foregroundStyle(.secondary)
+
+                        Text(
+                            "היום הזה לא נחשב הצלחה או כישלון ולא מאפס את הרצף."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18
+                        )
+                    )
+                }
+
                 // MARK: - Screen Time
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -124,6 +179,17 @@ struct MemberHomeView: View {
                             )
                         )
 
+                    } else if isCurrentLearningPhase {
+
+                        Text("היעד הראשון ייקבע לאחר יום הלמידה.")
+                            .fontWeight(.semibold)
+
+                        Text(
+                            "בינתיים TimeUp מודד את זמן המסך שלך כרגיל."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     } else {
 
                         Text("עדיין לא נקבע יעד יומי.")
@@ -144,6 +210,83 @@ struct MemberHomeView: View {
                     )
                 )
 
+                // MARK: - Yesterday
+
+                if let yesterdayProgress {
+                    VStack(alignment: .leading, spacing: 12) {
+
+                        Label(
+                            "סיכום היום האחרון",
+                            systemImage: "clock.arrow.circlepath"
+                        )
+                        .font(.headline)
+
+                        HStack {
+                            Text("זמן מסך")
+
+                            Spacer()
+
+                            Text(
+                                formattedMinutes(
+                                    yesterdayProgress.usageMinutes
+                                )
+                            )
+                            .fontWeight(.semibold)
+                        }
+
+                        if let target =
+                            yesterdayProgress.targetMinutes
+                        {
+                            HStack {
+                                Text("יעד")
+
+                                Spacer()
+
+                                Text(
+                                    formattedMinutes(target)
+                                )
+                                .fontWeight(.semibold)
+                            }
+                        }
+
+                        Divider()
+
+                        if yesterdayProgress.isLearningDay {
+
+                            Label(
+                                "יום למידה הושלם",
+                                systemImage: "brain.head.profile"
+                            )
+                            .fontWeight(.semibold)
+
+                        } else if yesterdayProgress.achieved {
+
+                            Label(
+                                "עמדת ביעד",
+                                systemImage: "checkmark.circle.fill"
+                            )
+                            .foregroundStyle(.green)
+                            .fontWeight(.semibold)
+
+                        } else {
+
+                            Label(
+                                "היעד לא הושג",
+                                systemImage: "xmark.circle.fill"
+                            )
+                            .foregroundStyle(.red)
+                            .fontWeight(.semibold)
+                        }
+                    }
+                    .padding()
+                    .background(.thinMaterial)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18
+                        )
+                    )
+                }
+
                 // MARK: - Screen Time Connection
 
                 Button {
@@ -156,17 +299,28 @@ struct MemberHomeView: View {
                         Text(
                             isRequestingAuthorization
                             ? "מתחבר..."
-                            : "חבר את זמן המסך"
+                            : hasScreenTimeAuthorization
+                                ? "זמן המסך מחובר"
+                                : "חבר את זמן המסך"
                         )
                         .fontWeight(.semibold)
 
                         Spacer()
+
+                        if hasScreenTimeAuthorization {
+                            Image(
+                                systemName: "checkmark.circle.fill"
+                            )
+                        }
                     }
                     .padding()
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isRequestingAuthorization)
+                .disabled(
+                    isRequestingAuthorization ||
+                    hasScreenTimeAuthorization
+                )
 
                 // MARK: - Group
 
@@ -202,9 +356,6 @@ struct MemberHomeView: View {
 
         .onAppear {
 
-            // אם ה-DeviceActivity extension סיים יום קודם,
-            // כאן אנחנו מכניסים אותו להיסטוריה,
-            // מחשבים הצלחה/כישלון, רצף ויעד חדש.
             ScreenTimeMonitor.shared
                 .syncCompletedDayIfNeeded()
 
@@ -212,11 +363,7 @@ struct MemberHomeView: View {
             refreshUsageEstimate()
 
             if hasScreenTimeAuthorization {
-
-                // אם ההרשאה כבר ניתנה בעבר,
-                // עדיין נוודא שביקשנו הרשאת התראות.
                 requestNotificationAuthorization()
-
                 startScreenTimeMonitoring()
             }
         }
@@ -246,12 +393,68 @@ struct MemberHomeView: View {
         }
     }
 
-    // MARK: - Current Member
+    // MARK: - Member
 
     private var currentMember: TimeUpMember {
         store.member(
             id: member.id
         ) ?? member
+    }
+
+    // MARK: - Progress
+
+    private var memberProgress: [TimeUpDailyProgress] {
+        store.progress(
+            for: currentMember.id
+        )
+    }
+
+    private var completedDaysCount: Int {
+        memberProgress.count
+    }
+
+    private var currentStreak: Int {
+        store.currentStreak(
+            for: currentMember.id
+        )
+    }
+
+    private var yesterdayProgress: TimeUpDailyProgress? {
+        store.previousProgress(
+            for: currentMember.id
+        )
+    }
+
+    private var isCurrentLearningPhase: Bool {
+        memberProgress.isEmpty
+    }
+
+    private var yesterdayStatusText: String {
+        guard let progress = yesterdayProgress else {
+            return "—"
+        }
+
+        if progress.isLearningDay {
+            return "למידה"
+        }
+
+        return progress.achieved
+            ? "הצלחה"
+            : "לא הושג"
+    }
+
+    private var yesterdayStatusIcon: String {
+        guard let progress = yesterdayProgress else {
+            return "minus.circle"
+        }
+
+        if progress.isLearningDay {
+            return "brain.head.profile"
+        }
+
+        return progress.achieved
+            ? "checkmark.circle.fill"
+            : "xmark.circle.fill"
     }
 
     // MARK: - Group
@@ -264,7 +467,7 @@ struct MemberHomeView: View {
         )?.code ?? "—"
     }
 
-    // MARK: - Usage Formatting
+    // MARK: - Formatting
 
     private var formattedUsage: String {
         formattedMinutes(
@@ -299,11 +502,47 @@ struct MemberHomeView: View {
         let hours = minutes / 60
         let remainingMinutes = minutes % 60
 
-        if hours > 0 {
+        if hours > 0 && remainingMinutes > 0 {
             return "\(hours) ש׳ \(remainingMinutes) דק׳"
         }
 
+        if hours > 0 {
+            return "\(hours) ש׳"
+        }
+
         return "\(remainingMinutes) דק׳"
+    }
+
+    // MARK: - Status Card
+
+    private func statusCard(
+        value: String,
+        title: String,
+        icon: String
+    ) -> some View {
+
+        VStack(spacing: 7) {
+
+            Image(systemName: icon)
+                .font(.title3)
+
+            Text(value)
+                .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(.thinMaterial)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 16
+            )
+        )
     }
 
     // MARK: - Screen Time Authorization
@@ -425,9 +664,7 @@ struct MemberHomeView: View {
                     .badge
                 ]
             ) { _, _ in
-
-                // אם המשתמש מסרב,
-                // TimeUp ממשיך לעבוד ללא התראות.
+                // TimeUp ממשיך לעבוד גם ללא התראות.
             }
     }
 
@@ -446,7 +683,6 @@ struct MemberHomeView: View {
                     )
 
             } catch {
-
                 // הסטטוס יוצג לאחר סיום הבקשה.
             }
 
