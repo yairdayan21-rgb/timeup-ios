@@ -331,7 +331,8 @@ final class TimeUpStore: ObservableObject {
                 todayTargetMinutes: progressEntry.targetMinutes,
                 todayAchieved: progressEntry.achieved,
                 memberTargetMinutes: member.dailyTargetMinutes,
-                historicalUsageMinutes: historyBeforeToday
+                historicalUsageMinutes: historyBeforeToday,
+                isLearningDay: progressEntry.isLearningDay
             )
 
         setDailyTarget(
