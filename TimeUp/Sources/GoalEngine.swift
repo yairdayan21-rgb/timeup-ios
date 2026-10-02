@@ -89,11 +89,14 @@ enum TimeUpGoalEngine {
             )
         }
 
-        let achieved = usageMinutes <= targetMinutes
+        let achieved =
+            usageMinutes <= targetMinutes
 
         return (
             achieved: achieved,
-            streak: achieved ? currentStreak + 1 : 0
+            streak: achieved
+                ? currentStreak + 1
+                : 0
         )
     }
 
@@ -105,22 +108,33 @@ enum TimeUpGoalEngine {
         todayTargetMinutes: Int?,
         todayAchieved: Bool,
         memberTargetMinutes: Int?,
-        historicalUsageMinutes: [Int]
+        historicalUsageMinutes: [Int],
+        isLearningDay: Bool = false
     ) -> Int? {
 
         switch group.goalMethod {
 
-        // יעד ידני נשאר בדיוק כפי שהמנהל הגדיר אותו.
+        // יעד ידני נשאר בדיוק כפי
+        // שהמנהל הגדיר אותו.
         case .manual:
             return memberTargetMinutes
 
-        // אם המשתמש הצליח:
-        // היעד הבא מחושב מהשימוש האמיתי של היום.
+        // ביום הלמידה עדיין אין יעד שצריך לעמוד בו.
+        // לכן השימוש של יום הלמידה הופך לבסיס
+        // שממנו מחשבים את היעד הראשון.
         //
-        // אם המשתמש נכשל:
-        // לא מעלים ולא מקלים את היעד.
-        // מחר נשאר אותו יעד.
+        // לאחר מכן:
+        // הצלחה = היעד הבא מחושב מהשימוש בפועל.
+        // כישלון = היעד הקיים נשאר ללא שינוי.
         case .previousDay:
+
+            if isLearningDay {
+                return reducedTarget(
+                    from: todayUsageMinutes,
+                    by: group.reductionPercent ?? 0
+                )
+            }
+
             guard todayAchieved else {
                 return todayTargetMinutes
             }
@@ -130,21 +144,25 @@ enum TimeUpGoalEngine {
                 by: group.reductionPercent ?? 0
             )
 
-        // בשיטת הממוצע:
-        // בכל יום מחשבים מחדש לפי ממוצע השימוש בפועל.
+        // ביום הלמידה הראשון השימוש של אותו יום
+        // הוא נקודת הבסיס הראשונה.
         //
-        // היום הנוכחי מתווסף להיסטוריה אם הוא עדיין
-        // לא נמצא ברשימה שהועברה לפונקציה.
+        // לאחר מכן כל יום שימוש אמיתי מתווסף
+        // להיסטוריה והממוצע מחושב מחדש.
         case .adaptiveAverage:
-            var usageHistory = historicalUsageMinutes
 
-            if usageHistory.last != todayUsageMinutes {
-                usageHistory.append(todayUsageMinutes)
-            }
+            var usageHistory =
+                historicalUsageMinutes
 
-            guard let average = averageUsage(
-                from: usageHistory
-            ) else {
+            usageHistory.append(
+                todayUsageMinutes
+            )
+
+            guard let average =
+                averageUsage(
+                    from: usageHistory
+                )
+            else {
                 return todayTargetMinutes
             }
 
@@ -166,9 +184,10 @@ enum TimeUpGoalEngine {
         isLearningDay: Bool
     ) -> TimeUpDailyProgress {
 
-        // יום למידה אינו נחשב ככישלון.
-        // הוא מיועד לאיסוף נתוני בסיס.
+        // יום למידה אינו הצלחה ואינו כישלון.
+        // הוא רק אוסף את נתוני הבסיס.
         if isLearningDay {
+
             return TimeUpDailyProgress(
                 memberID: memberID,
                 date: date,
@@ -180,11 +199,12 @@ enum TimeUpGoalEngine {
             )
         }
 
-        let result = evaluate(
-            usageMinutes: usageMinutes,
-            targetMinutes: targetMinutes,
-            currentStreak: currentStreak
-        )
+        let result =
+            evaluate(
+                usageMinutes: usageMinutes,
+                targetMinutes: targetMinutes,
+                currentStreak: currentStreak
+            )
 
         return TimeUpDailyProgress(
             memberID: memberID,
@@ -207,15 +227,20 @@ enum TimeUpGoalEngine {
             return nil
         }
 
-        let validValues = usageMinutes.filter {
-            $0 >= 0
-        }
+        let validValues =
+            usageMinutes.filter {
+                $0 >= 0
+            }
 
         guard !validValues.isEmpty else {
             return nil
         }
 
-        let total = validValues.reduce(0, +)
+        let total =
+            validValues.reduce(
+                0,
+                +
+            )
 
         return Int(
             round(
@@ -230,15 +255,24 @@ enum TimeUpGoalEngine {
         by percent: Int
     ) -> Int {
 
-        let safeMinutes = max(0, minutes)
+        let safeMinutes =
+            max(
+                0,
+                minutes
+            )
 
-        let safePercent = max(
-            0,
-            min(percent, 100)
-        )
+        let safePercent =
+            max(
+                0,
+                min(
+                    percent,
+                    100
+                )
+            )
 
         let reduction =
-            Double(safePercent) / 100.0
+            Double(safePercent) /
+            100.0
 
         return max(
             0,
