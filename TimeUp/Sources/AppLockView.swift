@@ -5,11 +5,17 @@ struct AppLockView: View {
 
     let member: TimeUpMember
 
+    @Environment(\.scenePhase)
+    private var scenePhase
+
     @State private var isUnlocked = false
     @State private var isAuthenticating = false
     @State private var authenticationMessage = ""
 
+    @State private var shouldAuthenticateOnActive = true
+
     var body: some View {
+
         Group {
 
             if isUnlocked {
@@ -22,7 +28,14 @@ struct AppLockView: View {
             }
         }
         .onAppear {
+
             authenticate()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+
+            handleScenePhase(
+                newPhase
+            )
         }
     }
 
@@ -54,27 +67,41 @@ struct AppLockView: View {
             Spacer()
 
             Image(systemName: "faceid")
-                .font(.system(size: 72))
+                .font(
+                    .system(size: 72)
+                )
 
             Text("TimeUp")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("יש לאמת את הזהות כדי להיכנס")
-                .font(.headline)
-                .multilineTextAlignment(.center)
+            Text(
+                "יש לאמת את הזהות כדי להיכנס"
+            )
+            .font(.headline)
+            .multilineTextAlignment(
+                .center
+            )
 
             if !authenticationMessage.isEmpty {
 
-                Text(authenticationMessage)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
+                Text(
+                    authenticationMessage
+                )
+                .font(.subheadline)
+                .multilineTextAlignment(
+                    .center
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .padding(.horizontal)
             }
 
             Button {
+
                 authenticate()
+
             } label: {
 
                 HStack {
@@ -85,7 +112,9 @@ struct AppLockView: View {
 
                     } else {
 
-                        Image(systemName: "faceid")
+                        Image(
+                            systemName: "faceid"
+                        )
                     }
 
                     Text(
@@ -94,15 +123,70 @@ struct AppLockView: View {
                         : "פתיחה עם Face ID"
                     )
                 }
-                .frame(maxWidth: .infinity)
+                .frame(
+                    maxWidth: .infinity
+                )
                 .padding()
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(isAuthenticating)
-            .padding(.horizontal, 32)
+            .buttonStyle(
+                .borderedProminent
+            )
+            .disabled(
+                isAuthenticating
+            )
+            .padding(
+                .horizontal,
+                32
+            )
 
             Spacer()
         }
+    }
+
+    // MARK: - Scene Phase
+
+    private func handleScenePhase(
+        _ phase: ScenePhase
+    ) {
+
+        switch phase {
+
+        case .background:
+
+            lockApp()
+
+        case .active:
+
+            guard
+                shouldAuthenticateOnActive,
+                !isUnlocked
+            else {
+                return
+            }
+
+            shouldAuthenticateOnActive = false
+
+            authenticate()
+
+        case .inactive:
+
+            break
+
+        @unknown default:
+
+            break
+        }
+    }
+
+    // MARK: - Lock
+
+    private func lockApp() {
+
+        isUnlocked = false
+        isAuthenticating = false
+        authenticationMessage = ""
+
+        shouldAuthenticateOnActive = true
     }
 
     // MARK: - Authentication
@@ -116,9 +200,11 @@ struct AppLockView: View {
         isAuthenticating = true
         authenticationMessage = ""
 
-        let context = LAContext()
+        let context =
+            LAContext()
 
-        context.localizedCancelTitle = "ביטול"
+        context.localizedCancelTitle =
+            "ביטול"
 
         var error: NSError?
 
@@ -150,14 +236,20 @@ struct AppLockView: View {
                 if success {
 
                     isUnlocked = true
+
                     authenticationMessage = ""
+
+                    shouldAuthenticateOnActive =
+                        false
 
                 } else {
 
                     isUnlocked = false
 
                     if let authenticationError =
-                        authenticationError as? LAError {
+                        authenticationError
+                            as? LAError
+                    {
 
                         switch authenticationError.code {
 
