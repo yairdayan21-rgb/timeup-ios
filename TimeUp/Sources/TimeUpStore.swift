@@ -40,6 +40,9 @@ final class TimeUpStore: ObservableObject {
     @Published private(set) var members: [TimeUpMember] = []
     @Published private(set) var dailyProgress: [TimeUpDailyProgress] = []
 
+    // המשתמש הפעיל נשמר גם בזיכרון וגם ב-UserDefaults.
+    @Published private(set) var currentMember: TimeUpMember?
+
     private let groupsKey = "timeup.groups.v1"
     private let membersKey = "timeup.members.v1"
     private let progressKey = "timeup.dailyProgress.v1"
@@ -50,6 +53,7 @@ final class TimeUpStore: ObservableObject {
 
     private init() {
         load()
+        restoreCurrentMember()
     }
 
     // MARK: - Groups
@@ -95,6 +99,13 @@ final class TimeUpStore: ObservableObject {
         }
 
         members[index] = member
+
+        // אם עדכנו את המשתמש הפעיל,
+        // מעדכנים גם את ה-session.
+        if currentMember?.id == member.id {
+            currentMember = member
+        }
+
         save()
     }
 
@@ -117,6 +128,10 @@ final class TimeUpStore: ObservableObject {
             members[index].dailyTargetMinutes = nil
         }
 
+        if currentMember?.id == memberID {
+            currentMember = members[index]
+        }
+
         save()
     }
 
@@ -132,24 +147,51 @@ final class TimeUpStore: ObservableObject {
         }
     }
 
-    var currentMember: TimeUpMember? {
-        guard
-            let idString = defaults.string(
-                forKey: currentMemberKey
-            ),
-            let id = UUID(uuidString: idString)
-        else {
-            return nil
-        }
-
-        return member(id: id)
-    }
+    // MARK: - Session
 
     func setCurrentMember(_ member: TimeUpMember) {
+
+        // מוודאים שהמשתמש קיים ב-store.
+        if let storedMember = self.member(
+            id: member.id
+        ) {
+            currentMember = storedMember
+        } else {
+            currentMember = member
+        }
+
         defaults.set(
             member.id.uuidString,
             forKey: currentMemberKey
         )
+    }
+
+    func clearCurrentMember() {
+        currentMember = nil
+
+        defaults.removeObject(
+            forKey: currentMemberKey
+        )
+    }
+
+    private func restoreCurrentMember() {
+
+        guard
+            let idString = defaults.string(
+                forKey: currentMemberKey
+            ),
+            let id = UUID(
+                uuidString: idString
+            ),
+            let storedMember = member(
+                id: id
+            )
+        else {
+            currentMember = nil
+            return
+        }
+
+        currentMember = storedMember
     }
 
     func hasMember(
@@ -282,19 +324,28 @@ final class TimeUpStore: ObservableObject {
         let previousStreak: Int
 
         if existingProgress != nil {
+
             previousStreak = progress(for: memberID)
                 .filter {
-                    !calendar.isDate(
-                        $0.date,
-                        inSameDayAs: date
-                    )
+                    $0.date <
+                        calendar.startOfDay(
+                            for: date
+                        )
                 }
                 .last?
                 .streakAfterDay ?? 0
+
         } else {
-            previousStreak = currentStreak(
-                for: memberID
-            )
+
+            previousStreak = progress(for: memberID)
+                .filter {
+                    $0.date <
+                        calendar.startOfDay(
+                            for: date
+                        )
+                }
+                .last?
+                .streakAfterDay ?? 0
         }
 
         let progressEntry =
@@ -315,10 +366,10 @@ final class TimeUpStore: ObservableObject {
         let historyBeforeToday =
             progress(for: memberID)
                 .filter {
-                    !calendar.isDate(
-                        $0.date,
-                        inSameDayAs: date
-                    )
+                    $0.date <
+                        calendar.startOfDay(
+                            for: date
+                        )
                 }
                 .map {
                     $0.usageMinutes
@@ -346,6 +397,7 @@ final class TimeUpStore: ObservableObject {
     // MARK: - Persistence
 
     private func load() {
+
         if
             let data = defaults.data(
                 forKey: groupsKey
@@ -386,6 +438,7 @@ final class TimeUpStore: ObservableObject {
     }
 
     private func save() {
+
         if let data = try? JSONEncoder().encode(
             groups
         ) {
