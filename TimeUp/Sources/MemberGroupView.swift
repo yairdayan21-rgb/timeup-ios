@@ -42,11 +42,8 @@ struct MemberGroupView: View {
 
                 case .dashboard:
 
-                    comingSoonView(
-                        title: "Dashboard",
-                        icon: "chart.xyaxis.line",
-                        message:
-                            "כאן יוצגו הנתונים והגרפים הקבוצתיים."
+                    MemberGroupDashboardView(
+                        member: currentMember
                     )
 
                 case .members:
