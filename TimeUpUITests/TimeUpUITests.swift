@@ -51,17 +51,13 @@ final class TimeUpUITests: XCTestCase {
         nameField.typeText(name)
         XCTAssertEqual(nameField.value as? String, name)
 
-        // Dismiss the first field's keyboard before moving focus. This makes
-        // the transition reliable on the Hebrew simulator keyboard as well.
-        app.keyboards.buttons["סיום"].tapIfExists()
-        app.keyboards.buttons["Done"].tapIfExists()
-        if app.keyboards.count > 0 {
-            app.tap()
-        }
+        // Use the field's Return/Next action instead of tapping through a
+        // keyboard that can cover the code field on CI. JoinGroupView maps
+        // this submit action directly to the group-code FocusState.
+        nameField.typeText("\n")
 
         let codeField = app.textFields["group-code-field"]
         XCTAssertTrue(codeField.waitForExistence(timeout: 10))
-        codeField.tap()
         XCTAssertTrue(codeField.waitForKeyboardFocus(timeout: 5))
         codeField.typeText(code)
         XCTAssertEqual(codeField.value as? String, code)
