@@ -554,69 +554,107 @@ struct AdminGroupDetailView: View {
             .count
     }
 
-    // MARK: - Group Streak
+// MARK: - Group Streak
 
-    private var groupStreak: Int {
+private var groupStreak: Int {
 
-        guard !groupMembers.isEmpty else {
-            return 0
-        }
+    let members = groupMembers
 
-        let histories =
-            groupMembers.map { member in
-                store.progress(
-                    for: member.id
+    guard !members.isEmpty else {
+        return 0
+    }
+
+    let calendar = Calendar.current
+
+    var progressByMember:
+        [UUID: [Date: TimeUpDailyProgress]] = [:]
+
+    for member in members {
+
+        var days:
+            [Date: TimeUpDailyProgress] = [:]
+
+        for progress in store.progress(
+            for: member.id
+        ) {
+
+            guard !progress.isLearningDay else {
+                continue
+            }
+
+            let day =
+                calendar.startOfDay(
+                    for: progress.date
                 )
-                .filter {
-                    !$0.isLearningDay
-                }
-            }
 
-        // עדיין אין מספיק מידע לכל חברי הקבוצה.
-        guard histories.allSatisfy(
-            { !$0.isEmpty }
-        ) else {
-            return 0
+            days[day] = progress
         }
 
-        let minimumHistoryCount =
-            histories.map {
-                $0.count
-            }
-            .min() ?? 0
+        progressByMember[
+            member.id
+        ] = days
+    }
 
-        guard minimumHistoryCount > 0 else {
-            return 0
-        }
-
-        var streak = 0
-
-        // סופרים אחורה ימים שבהם כל חברי הקבוצה
-        // עמדו ביעד.
-        for offset in 0..<minimumHistoryCount {
-
-            let allSucceeded =
-                histories.allSatisfy { history in
-
-                    let index =
-                        history.count - 1 - offset
-
-                    guard index >= 0 else {
-                        return false
-                    }
-
-                    return history[index].achieved
+    let allDates =
+        Set(
+            progressByMember
+                .values
+                .flatMap {
+                    $0.keys
                 }
+        )
+        .sorted(by: >)
 
-            if allSucceeded {
-                streak += 1
-            } else {
+    guard !allDates.isEmpty else {
+        return 0
+    }
+
+    var streak = 0
+    var expectedDay: Date?
+
+    for day in allDates {
+
+        if let expectedDay {
+
+            guard calendar.isDate(
+                day,
+                inSameDayAs: expectedDay
+            ) else {
                 break
             }
         }
 
-        return streak
+        let allSucceeded =
+            members.allSatisfy { member in
+
+                guard
+                    let progress =
+                        progressByMember[
+                            member.id
+                        ]?[day]
+                else {
+                    return false
+                }
+
+                return progress.achieved
+            }
+
+        guard allSucceeded else {
+            break
+        }
+
+        streak += 1
+
+        expectedDay =
+            calendar.date(
+                byAdding: .day,
+                value: -1,
+                to: day
+            )
     }
+
+    return streak
+}
 
     // MARK: - Target Editor
 
