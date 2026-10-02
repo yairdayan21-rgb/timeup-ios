@@ -356,13 +356,26 @@ struct MemberGroupDetailView: View {
 
                 if let progress {
 
-                    Text(
-                        "יעד: \(formattedMinutes(progress.targetMinutes))"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    if let target =
+                        progress.targetMinutes
+                    {
+
+                        Text(
+                            "יעד: \(formattedMinutes(target))"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                    } else {
+
+                        Text("אין יעד ליום זה")
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
 
                 } else if let target =
                             groupMember
@@ -398,7 +411,7 @@ struct MemberGroupDetailView: View {
 
                     Text(
                         formattedMinutes(
-                            progress.screenTimeMinutes
+                            progress.usageMinutes
                         )
                     )
                     .font(.headline)
@@ -435,18 +448,10 @@ struct MemberGroupDetailView: View {
         for groupMember: TimeUpMember
     ) -> TimeUpDailyProgress? {
 
-        store.dailyProgress
-            .filter {
-                $0.memberID ==
-                    groupMember.id
-            }
-            .first {
-                calendar.isDate(
-                    $0.date,
-                    inSameDayAs:
-                        selectedDate
-                )
-            }
+        store.progress(
+            for: groupMember.id,
+            on: selectedDate
+        )
     }
 
     // MARK: - Status
@@ -464,8 +469,13 @@ struct MemberGroupDetailView: View {
             return .secondary
         }
 
-        return progress.screenTimeMinutes <=
+        guard let target =
             progress.targetMinutes
+        else {
+            return .secondary
+        }
+
+        return progress.usageMinutes <= target
             ? .green
             : .red
     }
@@ -484,28 +494,38 @@ struct MemberGroupDetailView: View {
                     .secondary
                 )
 
-        } else if
-            progress.screenTimeMinutes <=
-                progress.targetMinutes
+        } else if let target =
+                    progress.targetMinutes
         {
 
-            Label(
-                "בתוך היעד",
-                systemImage:
-                    "checkmark.circle.fill"
-            )
-            .font(.caption)
-            .foregroundStyle(.green)
+            if progress.usageMinutes <= target {
+
+                Label(
+                    "בתוך היעד",
+                    systemImage:
+                        "checkmark.circle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.green)
+
+            } else {
+
+                Label(
+                    "מעל היעד",
+                    systemImage:
+                        "xmark.circle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.red)
+            }
 
         } else {
 
-            Label(
-                "מעל היעד",
-                systemImage:
-                    "xmark.circle.fill"
-            )
-            .font(.caption)
-            .foregroundStyle(.red)
+            Text("אין יעד")
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
         }
     }
 
@@ -529,7 +549,7 @@ struct MemberGroupDetailView: View {
 
         let values =
             progressesForSelectedDate.map {
-                $0.screenTimeMinutes
+                $0.usageMinutes
             }
 
         guard !values.isEmpty else {
@@ -540,9 +560,11 @@ struct MemberGroupDetailView: View {
             values.reduce(0, +)
 
         return Int(
-            (Double(total) /
-             Double(values.count))
-                .rounded()
+            (
+                Double(total) /
+                Double(values.count)
+            )
+            .rounded()
         )
     }
 
