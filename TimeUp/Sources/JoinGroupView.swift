@@ -4,15 +4,18 @@ struct JoinGroupView: View {
     @StateObject private var store = TimeUpStore.shared
     @State private var groupCode = ""
     @State private var displayName = ""
-    @State private var showAdminHome = false
-    @State private var showMemberHome = false
-    @State private var currentMember: TimeUpMember?
+    @State private var destination: Destination?
     @State private var errorMessage: String?
     @FocusState private var focusedField: Field?
 
     private enum Field {
         case displayName
         case groupCode
+    }
+
+    private enum Destination: Hashable {
+        case admin
+        case member(UUID)
     }
 
     private var isReadyToJoin: Bool {
@@ -36,6 +39,7 @@ struct JoinGroupView: View {
                 }
 
                 TextField("השם שלך", text: $displayName)
+                    .accessibilityIdentifier("display-name-field")
                     .textInputAutocapitalization(.words)
                     .multilineTextAlignment(.center)
                     .textFieldStyle(.roundedBorder)
@@ -46,13 +50,17 @@ struct JoinGroupView: View {
                     }
 
                 TextField("קוד קבוצה", text: $groupCode)
+                    .accessibilityIdentifier("group-code-field")
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.center)
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
                     .textFieldStyle(.roundedBorder)
                     .focused($focusedField, equals: .groupCode)
                     .onChange(of: groupCode) { _, newValue in
-                        groupCode = String(newValue.filter { $0.isNumber }.prefix(4))
+                        let normalized = String(newValue.filter { $0.isNumber }.prefix(4))
+                        if groupCode != normalized {
+                            groupCode = normalized
+                        }
                         errorMessage = nil
                     }
 
@@ -93,27 +101,46 @@ struct JoinGroupView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showAdminHome) {
-            AdminHomeView()
-                .navigationBarBackButtonHidden(true)
-        }
-        .navigationDestination(isPresented: $showMemberHome) {
-            if let currentMember {
-                MemberHomeView(member: currentMember)
+        .navigationDestination(item: $destination) { destination in
+            switch destination {
+            case .admin:
+                AdminHomeView()
                     .navigationBarBackButtonHidden(true)
+
+            case .member(let memberID):
+                if let member = store.members.first(where: { $0.id == memberID }) {
+                    MemberHomeView(member: member)
+                        .navigationBarBackButtonHidden(true)
+                } else {
+                    ContentUnavailableView(
+                        "לא ניתן לפתוח את החבר",
+                        systemImage: "person.crop.circle.badge.exclamationmark"
+                    )
+                }
             }
         }
     }
 
     private func join() {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let code = groupCode.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if groupCode == "0000" {
-            showAdminHome = true
+        guard !name.isEmpty else {
+            errorMessage = "יש להזין שם כדי להמשיך."
             return
         }
 
-        guard let group = store.group(forCode: groupCode) else {
+        guard code.count == 4 else {
+            errorMessage = "יש להזין קוד קבוצה בן 4 ספרות."
+            return
+        }
+
+        if code == "0000" {
+            destination = .admin
+            return
+        }
+
+        guard let group = store.group(forCode: code) else {
             errorMessage = "לא נמצאה קבוצה עם הקוד הזה."
             return
         }
@@ -126,7 +153,6 @@ struct JoinGroupView: View {
         let member = TimeUpMember(groupID: group.id, displayName: name)
         store.addMember(member)
         store.setCurrentMember(member)
-        currentMember = member
-        showMemberHome = true
+        destination = .member(member.id)
     }
 }
