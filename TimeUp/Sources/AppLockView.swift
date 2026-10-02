@@ -58,7 +58,7 @@ struct AppLockView: View {
 
         case .member:
 
-            MemberHomeView(
+            MemberTabView(
                 member: member
             )
         }
