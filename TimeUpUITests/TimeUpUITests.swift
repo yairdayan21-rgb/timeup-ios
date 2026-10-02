@@ -18,7 +18,10 @@ final class TimeUpUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["הצטרפות ל-TimeUp"].waitForExistence(timeout: 10))
 
         fillJoinForm(app: app, name: "Test User", code: "0000")
-        app.buttons["join-button"].tap()
+        let joinButton = app.buttons["join-button"]
+        XCTAssertTrue(joinButton.waitForExistence(timeout: 10))
+        XCTAssertTrue(joinButton.isEnabled)
+        joinButton.tap()
 
         XCTAssertTrue(app.staticTexts["ניהול הקבוצות שלך"].waitForExistence(timeout: 10))
     }
@@ -31,10 +34,14 @@ final class TimeUpUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["הצטרפות ל-TimeUp"].waitForExistence(timeout: 10))
 
         fillJoinForm(app: app, name: "Test User", code: "9999")
-        app.buttons["join-button"].tap()
+        let joinButton = app.buttons["join-button"]
+        XCTAssertTrue(joinButton.waitForExistence(timeout: 10))
+        XCTAssertTrue(joinButton.isEnabled)
+        joinButton.tap()
 
-        XCTAssertTrue(app.staticTexts["join-error"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.staticTexts["join-error"].label, "לא נמצאה קבוצה עם הקוד הזה.")
+        let error = app.staticTexts["join-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 10))
+        XCTAssertEqual(error.label, "לא נמצאה קבוצה עם הקוד הזה.")
     }
 
     private func fillJoinForm(app: XCUIApplication, name: String, code: String) {
@@ -42,18 +49,24 @@ final class TimeUpUITests: XCTestCase {
         XCTAssertTrue(nameField.waitForExistence(timeout: 10))
         nameField.tap()
         nameField.typeText(name)
+        XCTAssertEqual(nameField.value as? String, name)
 
         let codeField = app.textFields["group-code-field"]
         XCTAssertTrue(codeField.waitForExistence(timeout: 10))
         codeField.tap()
-        XCTAssertTrue(codeField.waitForExistence(timeout: 2))
+        XCTAssertTrue(codeField.hasKeyboardFocus)
         codeField.typeText(code)
-
-        let doneButton = app.buttons["סיום"]
-        if doneButton.exists {
-            doneButton.tap()
-        }
-
         XCTAssertEqual(codeField.value as? String, code)
+
+        app.keyboards.buttons["סיום"].tapIfExists()
+        app.keyboards.buttons["Done"].tapIfExists()
+    }
+}
+
+private extension XCUIElement {
+    func tapIfExists() {
+        if exists && isHittable {
+            tap()
+        }
     }
 }
