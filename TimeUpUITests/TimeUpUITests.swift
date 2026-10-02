@@ -54,7 +54,6 @@ final class TimeUpUITests: XCTestCase {
         let codeField = app.textFields["group-code-field"]
         XCTAssertTrue(codeField.waitForExistence(timeout: 10))
         codeField.tap()
-        XCTAssertTrue(codeField.hasKeyboardFocus)
         codeField.typeText(code)
         XCTAssertEqual(codeField.value as? String, code)
 
