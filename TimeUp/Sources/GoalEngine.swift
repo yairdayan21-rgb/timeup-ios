@@ -100,6 +100,40 @@ enum TimeUpGoalEngine {
         )
     }
 
+    // MARK: - Group Daily Result
+
+    static func groupAchieved(
+        memberIDs: [UUID],
+        progress: [TimeUpDailyProgress],
+        on date: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+
+        guard !memberIDs.isEmpty else {
+            return false
+        }
+
+        for memberID in memberIDs {
+
+            guard
+                let memberProgress =
+                    progress.first(where: {
+                        $0.memberID == memberID &&
+                        calendar.isDate(
+                            $0.date,
+                            inSameDayAs: date
+                        )
+                    }),
+                !memberProgress.isLearningDay,
+                memberProgress.achieved
+            else {
+                return false
+            }
+        }
+
+        return true
+    }
+
     // MARK: - Tomorrow Target
 
     static func nextDayTargetMinutes(
@@ -109,7 +143,8 @@ enum TimeUpGoalEngine {
         todayAchieved: Bool,
         memberTargetMinutes: Int?,
         historicalUsageMinutes: [Int],
-        isLearningDay: Bool = false
+        isLearningDay: Bool = false,
+        groupAchievedToday: Bool = true
     ) -> Int? {
 
         switch group.goalMethod {
@@ -117,25 +152,39 @@ enum TimeUpGoalEngine {
         // יעד ידני נשאר בדיוק כפי
         // שהמנהל הגדיר אותו.
         case .manual:
+
             return memberTargetMinutes
 
-        // ביום הלמידה עדיין אין יעד שצריך לעמוד בו.
-        // לכן השימוש של יום הלמידה הופך לבסיס
-        // שממנו מחשבים את היעד הראשון.
+        // יום למידה משמש ליצירת
+        // היעד הראשון של המשתמש.
         //
-        // לאחר מכן:
-        // הצלחה = היעד הבא מחושב מהשימוש בפועל.
-        // כישלון = היעד הקיים נשאר ללא שינוי.
+        // לאחר יום הלמידה:
+        //
+        // הקבוצה כולה הצליחה:
+        // כל משתמש מתקדם לפי השימוש
+        // האישי שלו באותו יום.
+        //
+        // לפחות חבר אחד נכשל:
+        // אף אחד לא מתקדם.
+        // היעד של כל משתמש נשאר
+        // בדיוק כפי שהיה ביום שנכשל.
         case .previousDay:
 
             if isLearningDay {
+
                 return reducedTarget(
                     from: todayUsageMinutes,
                     by: group.reductionPercent ?? 0
                 )
             }
 
+            guard groupAchievedToday else {
+
+                return todayTargetMinutes
+            }
+
             guard todayAchieved else {
+
                 return todayTargetMinutes
             }
 
@@ -144,12 +193,23 @@ enum TimeUpGoalEngine {
                 by: group.reductionPercent ?? 0
             )
 
-        // ביום הלמידה הראשון השימוש של אותו יום
-        // הוא נקודת הבסיס הראשונה.
+        // גם בשיטה המבוססת על ממוצע,
+        // הקבוצה חייבת להצליח כולה
+        // לפני שמתקדמים ליעד הבא.
         //
-        // לאחר מכן כל יום שימוש אמיתי מתווסף
-        // להיסטוריה והממוצע מחושב מחדש.
+        // אם אחד מחברי הקבוצה נכשל,
+        // היעד הנוכחי נשמר ליום הבא.
+        //
+        // ביום למידה עדיין ניתן ליצור
+        // את יעד הבסיס הראשוני.
         case .adaptiveAverage:
+
+            if !isLearningDay &&
+                !groupAchievedToday
+            {
+
+                return todayTargetMinutes
+            }
 
             var usageHistory =
                 historicalUsageMinutes
@@ -163,6 +223,7 @@ enum TimeUpGoalEngine {
                     from: usageHistory
                 )
             else {
+
                 return todayTargetMinutes
             }
 
