@@ -21,7 +21,6 @@ struct TimeUpChatMessage: Identifiable, Codable {
     let senderName: String
     let text: String
     let sentAt: Date
-
     var readByMemberIDs: [UUID]
 
     init(
@@ -53,7 +52,6 @@ struct TimeUpMember: Identifiable, Codable {
 
     var dailyTargetMinutes: Int?
 
-    // זהות חיצונית של המשתמש.
     var authProvider: TimeUpAuthProvider?
     var externalUserID: String?
 
@@ -67,7 +65,6 @@ struct TimeUpMember: Identifiable, Codable {
         authProvider: TimeUpAuthProvider? = nil,
         externalUserID: String? = nil
     ) {
-
         self.id = id
         self.groupID = groupID
         self.displayName = displayName
@@ -84,92 +81,51 @@ final class TimeUpStore: ObservableObject {
     static let shared = TimeUpStore()
 
     @Published private(set) var groups: [TimeUpGroup] = []
-
     @Published private(set) var members: [TimeUpMember] = []
+    @Published private(set) var dailyProgress: [TimeUpDailyProgress] = []
+    @Published private(set) var chatMessages: [TimeUpChatMessage] = []
+    @Published private(set) var currentMember: TimeUpMember?
 
-    @Published private(set) var dailyProgress:
-        [TimeUpDailyProgress] = []
+    @Published private(set) var isAppLockEnabled: Bool = false
 
-    @Published private(set) var chatMessages:
-        [TimeUpChatMessage] = []
+    private let groupsKey = "timeup.groups.v1"
+    private let membersKey = "timeup.members.v1"
+    private let progressKey = "timeup.dailyProgress.v1"
+    private let chatMessagesKey = "timeup.chatMessages.v1"
+    private let currentMemberKey = "timeup.currentMemberID.v1"
+    private let appLockEnabledKey = "timeup.appLockEnabled.v1"
 
-    @Published private(set) var currentMember:
-        TimeUpMember?
-
-    // MARK: - App Lock
-
-    // Face ID כבוי כברירת מחדל.
-    @Published private(set) var isAppLockEnabled:
-        Bool = false
-
-    private let groupsKey =
-        "timeup.groups.v1"
-
-    private let membersKey =
-        "timeup.members.v1"
-
-    private let progressKey =
-        "timeup.dailyProgress.v1"
-
-    private let chatMessagesKey =
-        "timeup.chatMessages.v1"
-
-    private let currentMemberKey =
-        "timeup.currentMemberID.v1"
-
-    private let appLockEnabledKey =
-        "timeup.appLockEnabled.v1"
-
-    private let defaults =
-        UserDefaults.standard
-
-    private let calendar =
-        Calendar.current
+    private let defaults = UserDefaults.standard
+    private let calendar = Calendar.current
 
     private init() {
-
         load()
-
         restoreCurrentMember()
-
         restoreAppLockPreference()
     }
 
     // MARK: - Groups
 
-    func addGroup(
-        _ group: TimeUpGroup
-    ) {
-
+    func addGroup(_ group: TimeUpGroup) {
         groups.append(group)
-
         save()
     }
 
-    func updateGroup(
-        _ group: TimeUpGroup
-    ) {
+    func updateGroup(_ group: TimeUpGroup) {
 
         guard
-            let index =
-                groups.firstIndex(
-                    where: {
-                        $0.id == group.id
-                    }
-                )
+            let index = groups.firstIndex(
+                where: { $0.id == group.id }
+            )
         else {
             return
         }
 
         groups[index] = group
-
         save()
     }
 
-    func group(
-        forCode code: String
-    ) -> TimeUpGroup? {
-
+    func group(forCode code: String) -> TimeUpGroup? {
         groups.first {
             $0.code == code
         }
@@ -177,46 +133,33 @@ final class TimeUpStore: ObservableObject {
 
     // MARK: - Members
 
-    func addMember(
-        _ member: TimeUpMember
-    ) {
+    func addMember(_ member: TimeUpMember) {
 
         guard
             !members.contains(
-                where: {
-                    $0.id == member.id
-                }
+                where: { $0.id == member.id }
             )
         else {
             return
         }
 
         members.append(member)
-
         save()
     }
 
-    func updateMember(
-        _ member: TimeUpMember
-    ) {
+    func updateMember(_ member: TimeUpMember) {
 
         guard
-            let index =
-                members.firstIndex(
-                    where: {
-                        $0.id == member.id
-                    }
-                )
+            let index = members.firstIndex(
+                where: { $0.id == member.id }
+            )
         else {
             return
         }
 
         members[index] = member
 
-        if currentMember?.id ==
-            member.id
-        {
-
+        if currentMember?.id == member.id {
             currentMember = member
         }
 
@@ -229,37 +172,22 @@ final class TimeUpStore: ObservableObject {
     ) {
 
         guard
-            let index =
-                members.firstIndex(
-                    where: {
-                        $0.id == memberID
-                    }
-                )
+            let index = members.firstIndex(
+                where: { $0.id == memberID }
+            )
         else {
             return
         }
 
         if let targetMinutes {
-
-            members[index]
-                .dailyTargetMinutes =
-                    max(
-                        0,
-                        targetMinutes
-                    )
-
+            members[index].dailyTargetMinutes =
+                max(0, targetMinutes)
         } else {
-
-            members[index]
-                .dailyTargetMinutes = nil
+            members[index].dailyTargetMinutes = nil
         }
 
-        if currentMember?.id ==
-            memberID
-        {
-
-            currentMember =
-                members[index]
+        if currentMember?.id == memberID {
+            currentMember = members[index]
         }
 
         save()
@@ -284,53 +212,35 @@ final class TimeUpStore: ObservableObject {
     }
 
     func member(
-        authProvider:
-            TimeUpAuthProvider,
+        authProvider: TimeUpAuthProvider,
         externalUserID: String
     ) -> TimeUpMember? {
 
         members.first {
-
-            $0.authProvider ==
-                authProvider &&
-
-            $0.externalUserID ==
-                externalUserID
+            $0.authProvider == authProvider &&
+            $0.externalUserID == externalUserID
         }
     }
 
     func connectAuthentication(
-        provider:
-            TimeUpAuthProvider,
+        provider: TimeUpAuthProvider,
         externalUserID: String,
         to memberID: UUID
     ) {
 
         guard
-            let index =
-                members.firstIndex(
-                    where: {
-                        $0.id == memberID
-                    }
-                )
+            let index = members.firstIndex(
+                where: { $0.id == memberID }
+            )
         else {
             return
         }
 
-        members[index]
-            .authProvider =
-                provider
+        members[index].authProvider = provider
+        members[index].externalUserID = externalUserID
 
-        members[index]
-            .externalUserID =
-                externalUserID
-
-        if currentMember?.id ==
-            memberID
-        {
-
-            currentMember =
-                members[index]
+        if currentMember?.id == memberID {
+            currentMember = members[index]
         }
 
         save()
@@ -342,14 +252,9 @@ final class TimeUpStore: ObservableObject {
     ) -> Bool {
 
         members.contains {
-
-            $0.groupID ==
-                groupID &&
-
-            $0.displayName
-                .caseInsensitiveCompare(
-                    name
-                ) == .orderedSame
+            $0.groupID == groupID &&
+            $0.displayName.caseInsensitiveCompare(name)
+                == .orderedSame
         }
     }
 
@@ -359,25 +264,15 @@ final class TimeUpStore: ObservableObject {
         _ member: TimeUpMember
     ) {
 
-        if let storedMember =
-            self.member(
-                id: member.id
-            )
-        {
-
-            currentMember =
-                storedMember
-
+        if let storedMember = self.member(id: member.id) {
+            currentMember = storedMember
         } else {
-
-            currentMember =
-                member
+            currentMember = member
         }
 
         defaults.set(
             member.id.uuidString,
-            forKey:
-                currentMemberKey
+            forKey: currentMemberKey
         )
     }
 
@@ -386,39 +281,24 @@ final class TimeUpStore: ObservableObject {
         currentMember = nil
 
         defaults.removeObject(
-            forKey:
-                currentMemberKey
+            forKey: currentMemberKey
         )
     }
 
     private func restoreCurrentMember() {
 
         guard
-            let idString =
-                defaults.string(
-                    forKey:
-                        currentMemberKey
-                ),
-
-            let id =
-                UUID(
-                    uuidString:
-                        idString
-                ),
-
-            let storedMember =
-                member(
-                    id: id
-                )
+            let idString = defaults.string(
+                forKey: currentMemberKey
+            ),
+            let id = UUID(uuidString: idString),
+            let storedMember = member(id: id)
         else {
-
             currentMember = nil
-
             return
         }
 
-        currentMember =
-            storedMember
+        currentMember = storedMember
     }
 
     // MARK: - Face ID Preference
@@ -427,13 +307,11 @@ final class TimeUpStore: ObservableObject {
         _ enabled: Bool
     ) {
 
-        isAppLockEnabled =
-            enabled
+        isAppLockEnabled = enabled
 
         defaults.set(
             enabled,
-            forKey:
-                appLockEnabledKey
+            forKey: appLockEnabledKey
         )
     }
 
@@ -441,8 +319,7 @@ final class TimeUpStore: ObservableObject {
 
         isAppLockEnabled =
             defaults.bool(
-                forKey:
-                    appLockEnabledKey
+                forKey: appLockEnabledKey
             )
     }
 
@@ -454,14 +331,10 @@ final class TimeUpStore: ObservableObject {
 
         dailyProgress
             .filter {
-
-                $0.memberID ==
-                    memberID
+                $0.memberID == memberID
             }
             .sorted {
-
-                $0.date <
-                    $1.date
+                $0.date < $1.date
             }
     }
 
@@ -471,14 +344,10 @@ final class TimeUpStore: ObservableObject {
     ) -> TimeUpDailyProgress? {
 
         dailyProgress.first {
-
-            $0.memberID ==
-                memberID &&
-
+            $0.memberID == memberID &&
             calendar.isDate(
                 $0.date,
-                inSameDayAs:
-                    date
+                inSameDayAs: date
             )
         }
     }
@@ -498,77 +367,55 @@ final class TimeUpStore: ObservableObject {
         before date: Date = Date()
     ) -> TimeUpDailyProgress? {
 
-        progress(
-            for: memberID
-        )
-        .filter {
-
-            $0.date <
-                calendar.startOfDay(
-                    for: date
-                )
-        }
-        .last
+        progress(for: memberID)
+            .filter {
+                $0.date <
+                calendar.startOfDay(for: date)
+            }
+            .last
     }
 
     func usageHistory(
         for memberID: UUID
     ) -> [Int] {
 
-        progress(
-            for: memberID
-        )
-        .map {
-            $0.usageMinutes
-        }
+        progress(for: memberID)
+            .map {
+                $0.usageMinutes
+            }
     }
 
     func currentStreak(
         for memberID: UUID
     ) -> Int {
 
-        progress(
-            for: memberID
-        )
-        .last?
-        .streakAfterDay ?? 0
+        progress(for: memberID)
+            .last?
+            .streakAfterDay ?? 0
     }
 
     func saveDailyProgress(
-        _ progress:
-            TimeUpDailyProgress
+        _ progress: TimeUpDailyProgress
     ) {
 
         if let index =
             dailyProgress.firstIndex(
                 where: {
-
-                    $0.memberID ==
-                        progress.memberID &&
-
+                    $0.memberID == progress.memberID &&
                     calendar.isDate(
                         $0.date,
-                        inSameDayAs:
-                            progress.date
+                        inSameDayAs: progress.date
                     )
                 }
             )
         {
-
-            dailyProgress[index] =
-                progress
-
+            dailyProgress[index] = progress
         } else {
-
-            dailyProgress.append(
-                progress
-            )
+            dailyProgress.append(progress)
         }
 
         dailyProgress.sort {
-
-            $0.date <
-                $1.date
+            $0.date < $1.date
         }
 
         save()
@@ -585,107 +432,198 @@ final class TimeUpStore: ObservableObject {
     ) -> TimeUpDailyProgress? {
 
         guard
-            let member =
-                member(
-                    id: memberID
-                ),
-
-            let group =
-                groups.first(
-                    where: {
-
-                        $0.id ==
-                            member.groupID
-                    }
-                )
+            let member = member(id: memberID),
+            let group = groups.first(
+                where: {
+                    $0.id == member.groupID
+                }
+            )
         else {
-
             return nil
         }
 
         let previousStreak =
-            progress(
-                for: memberID
-            )
-            .filter {
-
-                $0.date <
-                    calendar.startOfDay(
-                        for: date
-                    )
-            }
-            .last?
-            .streakAfterDay ?? 0
+            progress(for: memberID)
+                .filter {
+                    $0.date <
+                    calendar.startOfDay(for: date)
+                }
+                .last?
+                .streakAfterDay ?? 0
 
         let progressEntry =
-            TimeUpGoalEngine
-                .makeDailyProgress(
-                    memberID:
-                        memberID,
-                    date:
-                        date,
-                    usageMinutes:
-                        max(
-                            0,
-                            usageMinutes
-                        ),
-                    targetMinutes:
-                        member
-                            .dailyTargetMinutes,
-                    currentStreak:
-                        previousStreak,
-                    isLearningDay:
-                        isLearningDay
-                )
-
-        saveDailyProgress(
-            progressEntry
-        )
-
-        let historyBeforeToday =
-            progress(
-                for: memberID
+            TimeUpGoalEngine.makeDailyProgress(
+                memberID: memberID,
+                date: date,
+                usageMinutes: max(0, usageMinutes),
+                targetMinutes:
+                    member.dailyTargetMinutes,
+                currentStreak:
+                    previousStreak,
+                isLearningDay:
+                    isLearningDay
             )
-            .filter {
 
-                $0.date <
-                    calendar.startOfDay(
-                        for: date
-                    )
-            }
-            .map {
-                $0.usageMinutes
-            }
+        saveDailyProgress(progressEntry)
 
-        let nextTarget =
-            TimeUpGoalEngine
-                .nextDayTargetMinutes(
-                    for: group,
-                    todayUsageMinutes:
-                        progressEntry
-                            .usageMinutes,
-                    todayTargetMinutes:
-                        progressEntry
-                            .targetMinutes,
-                    todayAchieved:
-                        progressEntry
-                            .achieved,
-                    memberTargetMinutes:
-                        member
-                            .dailyTargetMinutes,
-                    historicalUsageMinutes:
-                        historyBeforeToday,
-                    isLearningDay:
-                        progressEntry
-                            .isLearningDay
-                )
-
-        setDailyTarget(
-            nextTarget,
-            for: memberID
+        finalizeGroupDayIfReady(
+            groupID: group.id,
+            date: date
         )
 
         return progressEntry
+    }
+
+    // MARK: - Group Day Finalization
+
+    private func finalizeGroupDayIfReady(
+        groupID: UUID,
+        date: Date
+    ) {
+
+        guard
+            let group = groups.first(
+                where: { $0.id == groupID }
+            )
+        else {
+            return
+        }
+
+        let groupMembers =
+            members.filter {
+                $0.groupID == groupID &&
+                $0.role == .member
+            }
+
+        guard !groupMembers.isEmpty else {
+            return
+        }
+
+        let dayProgress =
+            groupMembers.compactMap {
+                progress(
+                    for: $0.id,
+                    on: date
+                )
+            }
+
+        // לא מחשבים את היום עד שיש
+        // תוצאה לכל חברי הקבוצה.
+        guard
+            dayProgress.count ==
+            groupMembers.count
+        else {
+            return
+        }
+
+        let hasLearningDay =
+            dayProgress.contains {
+                $0.isLearningDay
+            }
+
+        if hasLearningDay {
+
+            finalizeLearningDay(
+                group: group,
+                groupMembers: groupMembers,
+                dayProgress: dayProgress
+            )
+
+            return
+        }
+
+        let memberIDs =
+            groupMembers.map {
+                $0.id
+            }
+
+        let groupSucceeded =
+            TimeUpGoalEngine.groupAchieved(
+                memberIDs: memberIDs,
+                progress: dailyProgress,
+                on: date,
+                calendar: calendar
+            )
+
+        let groupUsageMinutes =
+            dayProgress.map {
+                $0.usageMinutes
+            }
+
+        for groupMember in groupMembers {
+
+            guard
+                let memberProgress =
+                    dayProgress.first(
+                        where: {
+                            $0.memberID ==
+                            groupMember.id
+                        }
+                    )
+            else {
+                continue
+            }
+
+            let nextTarget =
+                TimeUpGoalEngine.nextTarget(
+                    for: group,
+                    member: groupMember,
+                    todayProgress: memberProgress,
+                    groupUsageMinutes:
+                        groupUsageMinutes,
+                    groupSucceeded:
+                        groupSucceeded
+                )
+
+            setDailyTarget(
+                nextTarget,
+                for: groupMember.id
+            )
+        }
+    }
+
+    // MARK: - Learning Day Finalization
+
+    private func finalizeLearningDay(
+        group: TimeUpGroup,
+        groupMembers: [TimeUpMember],
+        dayProgress: [TimeUpDailyProgress]
+    ) {
+
+        let groupUsageMinutes =
+            dayProgress.map {
+                $0.usageMinutes
+            }
+
+        for groupMember in groupMembers {
+
+            guard
+                let memberProgress =
+                    dayProgress.first(
+                        where: {
+                            $0.memberID ==
+                            groupMember.id
+                        }
+                    )
+            else {
+                continue
+            }
+
+            let nextTarget =
+                TimeUpGoalEngine.learningDayTarget(
+                    for: group,
+                    member: groupMember,
+                    memberUsageMinutes:
+                        memberProgress.usageMinutes,
+                    groupUsageMinutes:
+                        groupUsageMinutes
+                )
+
+            setDailyTarget(
+                nextTarget,
+                for: groupMember.id
+            )
+        }
     }
 
     // MARK: - Group Chat
@@ -718,34 +656,24 @@ final class TimeUpStore: ObservableObject {
         }
 
         guard
-            let sender =
-                member(
-                    id: memberID
-                )
+            let sender = member(id: memberID)
         else {
             return
         }
 
         let message =
             TimeUpChatMessage(
-                groupID:
-                    sender.groupID,
-                senderID:
-                    sender.id,
-                senderName:
-                    sender.displayName,
-                text:
-                    trimmedText,
-                sentAt:
-                    Date(),
+                groupID: sender.groupID,
+                senderID: sender.id,
+                senderName: sender.displayName,
+                text: trimmedText,
+                sentAt: Date(),
                 readByMemberIDs: [
                     sender.id
                 ]
             )
 
-        chatMessages.append(
-            message
-        )
+        chatMessages.append(message)
 
         chatMessages.sort {
             $0.sentAt < $1.sentAt
@@ -760,17 +688,9 @@ final class TimeUpStore: ObservableObject {
     ) -> Int {
 
         chatMessages.filter {
-
-            $0.groupID ==
-                groupID &&
-
-            $0.senderID !=
-                memberID &&
-
-            !$0.readByMemberIDs
-                .contains(
-                    memberID
-                )
+            $0.groupID == groupID &&
+            $0.senderID != memberID &&
+            !$0.readByMemberIDs.contains(memberID)
         }
         .count
     }
@@ -793,22 +713,18 @@ final class TimeUpStore: ObservableObject {
 
         var changed = false
 
-        for index in
-            chatMessages.indices
-        {
+        for index in chatMessages.indices {
 
             guard
-                chatMessages[index]
-                    .groupID ==
-                    groupID
+                chatMessages[index].groupID ==
+                groupID
             else {
                 continue
             }
 
             guard
-                chatMessages[index]
-                    .senderID !=
-                    memberID
+                chatMessages[index].senderID !=
+                memberID
             else {
                 continue
             }
@@ -816,18 +732,14 @@ final class TimeUpStore: ObservableObject {
             guard
                 !chatMessages[index]
                     .readByMemberIDs
-                    .contains(
-                        memberID
-                    )
+                    .contains(memberID)
             else {
                 continue
             }
 
             chatMessages[index]
                 .readByMemberIDs
-                .append(
-                    memberID
-                )
+                .append(memberID)
 
             changed = true
         }
@@ -842,88 +754,60 @@ final class TimeUpStore: ObservableObject {
     private func load() {
 
         if
-            let data =
-                defaults.data(
-                    forKey:
-                        groupsKey
-                ),
-
+            let data = defaults.data(
+                forKey: groupsKey
+            ),
             let decoded =
-                try?
-                    JSONDecoder()
-                    .decode(
-                        [TimeUpGroup].self,
-                        from: data
-                    )
+                try? JSONDecoder().decode(
+                    [TimeUpGroup].self,
+                    from: data
+                )
         {
-
             groups = decoded
         }
 
         if
-            let data =
-                defaults.data(
-                    forKey:
-                        membersKey
-                ),
-
+            let data = defaults.data(
+                forKey: membersKey
+            ),
             let decoded =
-                try?
-                    JSONDecoder()
-                    .decode(
-                        [TimeUpMember].self,
-                        from: data
-                    )
+                try? JSONDecoder().decode(
+                    [TimeUpMember].self,
+                    from: data
+                )
         {
-
             members = decoded
         }
 
         if
-            let data =
-                defaults.data(
-                    forKey:
-                        progressKey
-                ),
-
+            let data = defaults.data(
+                forKey: progressKey
+            ),
             let decoded =
-                try?
-                    JSONDecoder()
-                    .decode(
-                        [TimeUpDailyProgress].self,
-                        from: data
-                    )
+                try? JSONDecoder().decode(
+                    [TimeUpDailyProgress].self,
+                    from: data
+                )
         {
-
             dailyProgress =
                 decoded.sorted {
-
-                    $0.date <
-                        $1.date
+                    $0.date < $1.date
                 }
         }
 
         if
-            let data =
-                defaults.data(
-                    forKey:
-                        chatMessagesKey
-                ),
-
+            let data = defaults.data(
+                forKey: chatMessagesKey
+            ),
             let decoded =
-                try?
-                    JSONDecoder()
-                    .decode(
-                        [TimeUpChatMessage].self,
-                        from: data
-                    )
+                try? JSONDecoder().decode(
+                    [TimeUpChatMessage].self,
+                    from: data
+                )
         {
-
             chatMessages =
                 decoded.sorted {
-
-                    $0.sentAt <
-                        $1.sentAt
+                    $0.sentAt < $1.sentAt
                 }
         }
     }
@@ -931,62 +815,42 @@ final class TimeUpStore: ObservableObject {
     private func save() {
 
         if let data =
-            try?
-                JSONEncoder()
-                .encode(
-                    groups
-                )
+            try? JSONEncoder().encode(groups)
         {
-
             defaults.set(
                 data,
-                forKey:
-                    groupsKey
+                forKey: groupsKey
             )
         }
 
         if let data =
-            try?
-                JSONEncoder()
-                .encode(
-                    members
-                )
+            try? JSONEncoder().encode(members)
         {
-
             defaults.set(
                 data,
-                forKey:
-                    membersKey
+                forKey: membersKey
             )
         }
 
         if let data =
-            try?
-                JSONEncoder()
-                .encode(
-                    dailyProgress
-                )
+            try? JSONEncoder().encode(
+                dailyProgress
+            )
         {
-
             defaults.set(
                 data,
-                forKey:
-                    progressKey
+                forKey: progressKey
             )
         }
 
         if let data =
-            try?
-                JSONEncoder()
-                .encode(
-                    chatMessages
-                )
+            try? JSONEncoder().encode(
+                chatMessages
+            )
         {
-
             defaults.set(
                 data,
-                forKey:
-                    chatMessagesKey
+                forKey: chatMessagesKey
             )
         }
     }
