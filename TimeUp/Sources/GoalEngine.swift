@@ -33,44 +33,6 @@ struct TimeUpDailyProgress: Identifiable, Codable {
 
 enum TimeUpGoalEngine {
 
-    // MARK: - Current Target
-
-    static func targetMinutes(
-        for group: TimeUpGroup,
-        memberTargetMinutes: Int?,
-        previousUsageMinutes: Int?,
-        historicalUsageMinutes: [Int]
-    ) -> Int? {
-
-        switch group.goalMethod {
-
-        case .manual:
-            return memberTargetMinutes
-
-        case .previousDay:
-            guard let previousUsageMinutes else {
-                return nil
-            }
-
-            return reducedTarget(
-                from: previousUsageMinutes,
-                by: group.reductionPercent ?? 0
-            )
-
-        case .adaptiveAverage:
-            guard let average = averageUsage(
-                from: historicalUsageMinutes
-            ) else {
-                return nil
-            }
-
-            return reducedTarget(
-                from: average,
-                by: group.reductionPercent ?? 0
-            )
-        }
-    }
-
     // MARK: - Daily Result
 
     static func evaluate(
@@ -100,7 +62,49 @@ enum TimeUpGoalEngine {
         )
     }
 
-    // MARK: - Group Daily Result
+    // MARK: - Progress Creation
+
+    static func makeDailyProgress(
+        memberID: UUID,
+        date: Date = Date(),
+        usageMinutes: Int,
+        targetMinutes: Int?,
+        currentStreak: Int,
+        isLearningDay: Bool
+    ) -> TimeUpDailyProgress {
+
+        if isLearningDay {
+
+            return TimeUpDailyProgress(
+                memberID: memberID,
+                date: date,
+                usageMinutes: max(0, usageMinutes),
+                targetMinutes: targetMinutes,
+                isLearningDay: true,
+                achieved: false,
+                streakAfterDay: currentStreak
+            )
+        }
+
+        let result =
+            evaluate(
+                usageMinutes: max(0, usageMinutes),
+                targetMinutes: targetMinutes,
+                currentStreak: currentStreak
+            )
+
+        return TimeUpDailyProgress(
+            memberID: memberID,
+            date: date,
+            usageMinutes: max(0, usageMinutes),
+            targetMinutes: targetMinutes,
+            isLearningDay: false,
+            achieved: result.achieved,
+            streakAfterDay: result.streak
+        )
+    }
+
+    // MARK: - Group Result
 
     static func groupAchieved(
         memberIDs: [UUID],
@@ -125,6 +129,7 @@ enum TimeUpGoalEngine {
                         )
                     }),
                 !memberProgress.isLearningDay,
+                memberProgress.targetMinutes != nil,
                 memberProgress.achieved
             else {
                 return false
@@ -134,148 +139,144 @@ enum TimeUpGoalEngine {
         return true
     }
 
-    // MARK: - Tomorrow Target
+    // MARK: - Personal Reduced Target
 
-    static func nextDayTargetMinutes(
+    static func personalReducedTarget(
+        usageMinutes: Int,
+        reductionPercent: Int
+    ) -> Int {
+
+        reducedTarget(
+            from: usageMinutes,
+            by: reductionPercent
+        )
+    }
+
+    // MARK: - Group Average Target
+
+    static func groupAverageTarget(
+        usageMinutes: [Int],
+        reductionPercent: Int
+    ) -> Int? {
+
+        guard
+            let average =
+                averageUsage(
+                    from: usageMinutes
+                )
+        else {
+            return nil
+        }
+
+        return reducedTarget(
+            from: average,
+            by: reductionPercent
+        )
+    }
+
+    // MARK: - Next Target
+
+    static func nextTarget(
         for group: TimeUpGroup,
-        todayUsageMinutes: Int,
-        todayTargetMinutes: Int?,
-        todayAchieved: Bool,
-        memberTargetMinutes: Int?,
-        historicalUsageMinutes: [Int],
-        isLearningDay: Bool = false,
-        groupAchievedToday: Bool = true
+        member: TimeUpMember,
+        todayProgress: TimeUpDailyProgress,
+        groupUsageMinutes: [Int],
+        groupSucceeded: Bool
     ) -> Int? {
 
         switch group.goalMethod {
 
-        // יעד ידני נשאר בדיוק כפי
-        // שהמנהל הגדיר אותו.
+        // ידני:
+        // המנהל קובע את היעד.
+        // המערכת אינה משנה אותו.
         case .manual:
 
-            return memberTargetMinutes
+            return member.dailyTargetMinutes
 
-        // יום למידה משמש ליצירת
-        // היעד הראשון של המשתמש.
+        // אישי יורד:
         //
-        // לאחר יום הלמידה:
+        // אם הקבוצה נכשלה,
+        // היעד נשאר כפי שהיה היום.
         //
-        // הקבוצה כולה הצליחה:
-        // כל משתמש מתקדם לפי השימוש
-        // האישי שלו באותו יום.
-        //
-        // לפחות חבר אחד נכשל:
-        // אף אחד לא מתקדם.
-        // היעד של כל משתמש נשאר
-        // בדיוק כפי שהיה ביום שנכשל.
+        // אם הקבוצה הצליחה,
+        // היעד של המשתמש למחר הוא
+        // זמן המסך שלו בפועל פחות X%.
         case .previousDay:
 
-            if isLearningDay {
+            guard groupSucceeded else {
 
-                return reducedTarget(
-                    from: todayUsageMinutes,
-                    by: group.reductionPercent ?? 0
-                )
+                return todayProgress
+                    .targetMinutes
             }
 
-            guard groupAchievedToday else {
-
-                return todayTargetMinutes
-            }
-
-            guard todayAchieved else {
-
-                return todayTargetMinutes
-            }
-
-            return reducedTarget(
-                from: todayUsageMinutes,
-                by: group.reductionPercent ?? 0
+            return personalReducedTarget(
+                usageMinutes:
+                    todayProgress
+                        .usageMinutes,
+                reductionPercent:
+                    group.reductionPercent ?? 0
             )
 
-        // גם בשיטה המבוססת על ממוצע,
-        // הקבוצה חייבת להצליח כולה
-        // לפני שמתקדמים ליעד הבא.
+        // ממוצע קבוצתי יורד:
         //
-        // אם אחד מחברי הקבוצה נכשל,
-        // היעד הנוכחי נשמר ליום הבא.
+        // אם הקבוצה נכשלה,
+        // היעד נשאר כפי שהיה היום.
         //
-        // ביום למידה עדיין ניתן ליצור
-        // את יעד הבסיס הראשוני.
+        // אם הקבוצה הצליחה,
+        // מחשבים את ממוצע זמן המסך
+        // בפועל של כל חברי הקבוצה,
+        // מפחיתים X%,
+        // וזה היעד הזהה של כולם למחר.
         case .adaptiveAverage:
 
-            if !isLearningDay &&
-                !groupAchievedToday
-            {
+            guard groupSucceeded else {
 
-                return todayTargetMinutes
+                return todayProgress
+                    .targetMinutes
             }
 
-            var usageHistory =
-                historicalUsageMinutes
-
-            usageHistory.append(
-                todayUsageMinutes
-            )
-
-            guard let average =
-                averageUsage(
-                    from: usageHistory
-                )
-            else {
-
-                return todayTargetMinutes
-            }
-
-            return reducedTarget(
-                from: average,
-                by: group.reductionPercent ?? 0
+            return groupAverageTarget(
+                usageMinutes:
+                    groupUsageMinutes,
+                reductionPercent:
+                    group.reductionPercent ?? 0
             )
         }
     }
 
-    // MARK: - Progress Creation
+    // MARK: - Learning Day Target
 
-    static func makeDailyProgress(
-        memberID: UUID,
-        date: Date = Date(),
-        usageMinutes: Int,
-        targetMinutes: Int?,
-        currentStreak: Int,
-        isLearningDay: Bool
-    ) -> TimeUpDailyProgress {
+    static func learningDayTarget(
+        for group: TimeUpGroup,
+        member: TimeUpMember,
+        memberUsageMinutes: Int,
+        groupUsageMinutes: [Int]
+    ) -> Int? {
 
-        // יום למידה אינו הצלחה ואינו כישלון.
-        // הוא רק אוסף את נתוני הבסיס.
-        if isLearningDay {
+        switch group.goalMethod {
 
-            return TimeUpDailyProgress(
-                memberID: memberID,
-                date: date,
-                usageMinutes: usageMinutes,
-                targetMinutes: targetMinutes,
-                isLearningDay: true,
-                achieved: false,
-                streakAfterDay: currentStreak
+        case .manual:
+
+            return member.dailyTargetMinutes
+
+        case .previousDay:
+
+            return personalReducedTarget(
+                usageMinutes:
+                    memberUsageMinutes,
+                reductionPercent:
+                    group.reductionPercent ?? 0
+            )
+
+        case .adaptiveAverage:
+
+            return groupAverageTarget(
+                usageMinutes:
+                    groupUsageMinutes,
+                reductionPercent:
+                    group.reductionPercent ?? 0
             )
         }
-
-        let result =
-            evaluate(
-                usageMinutes: usageMinutes,
-                targetMinutes: targetMinutes,
-                currentStreak: currentStreak
-            )
-
-        return TimeUpDailyProgress(
-            memberID: memberID,
-            date: date,
-            usageMinutes: usageMinutes,
-            targetMinutes: targetMinutes,
-            isLearningDay: false,
-            achieved: result.achieved,
-            streakAfterDay: result.streak
-        )
     }
 
     // MARK: - Helpers
@@ -283,10 +284,6 @@ enum TimeUpGoalEngine {
     private static func averageUsage(
         from usageMinutes: [Int]
     ) -> Int? {
-
-        guard !usageMinutes.isEmpty else {
-            return nil
-        }
 
         let validValues =
             usageMinutes.filter {
@@ -331,16 +328,19 @@ enum TimeUpGoalEngine {
                 )
             )
 
-        let reduction =
-            Double(safePercent) /
-            100.0
+        let multiplier =
+            1.0 -
+            (
+                Double(safePercent) /
+                100.0
+            )
 
         return max(
             0,
             Int(
                 floor(
                     Double(safeMinutes) *
-                    (1.0 - reduction)
+                    multiplier
                 )
             )
         )
