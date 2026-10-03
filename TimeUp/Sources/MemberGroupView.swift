@@ -48,20 +48,14 @@ struct MemberGroupView: View {
 
                 case .members:
 
-                    comingSoonView(
-                        title: "חברים",
-                        icon: "person.2.fill",
-                        message:
-                            "כאן יוצגו כל חברי הקבוצה."
+                    MemberGroupMembersView(
+                        member: currentMember
                     )
 
                 case .chat:
 
-                    comingSoonView(
-                        title: "צ׳אט",
-                        icon: "bubble.left.and.bubble.right.fill",
-                        message:
-                            "כאן יהיה הצ׳אט של הקבוצה."
+                    MemberGroupChatView(
+                        member: currentMember
                     )
                 }
             }
@@ -137,44 +131,68 @@ struct MemberGroupView: View {
 
                     } label: {
 
-                        Text(section.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(
-                                selectedSection == section
-                                    ? .bold
-                                    : .medium
-                            )
-                            .padding(
-                                .horizontal,
-                                14
-                            )
-                            .padding(
-                                .vertical,
-                                9
-                            )
-                            .background {
+                        HStack(spacing: 6) {
 
-                                if selectedSection == section {
+                            Text(section.rawValue)
 
+                            if
+                                section == .chat,
+                                unreadChatCount > 0
+                            {
+
+                                Text(
+                                    unreadChatCount > 99
+                                        ? "99+"
+                                        : "\(unreadChatCount)"
+                                )
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
                                     Capsule()
-                                        .fill(
-                                            Color.accentColor
-                                        )
-
-                                } else {
-
-                                    Capsule()
-                                        .fill(
-                                            Color.secondary
-                                                .opacity(0.12)
-                                        )
-                                }
+                                        .fill(.red)
+                                )
                             }
-                            .foregroundStyle(
-                                selectedSection == section
-                                    ? Color.white
-                                    : Color.primary
-                            )
+                        }
+                        .font(.subheadline)
+                        .fontWeight(
+                            selectedSection == section
+                                ? .bold
+                                : .medium
+                        )
+                        .padding(
+                            .horizontal,
+                            14
+                        )
+                        .padding(
+                            .vertical,
+                            9
+                        )
+                        .background {
+
+                            if selectedSection == section {
+
+                                Capsule()
+                                    .fill(
+                                        Color.accentColor
+                                    )
+
+                            } else {
+
+                                Capsule()
+                                    .fill(
+                                        Color.secondary
+                                            .opacity(0.12)
+                                    )
+                            }
+                        }
+                        .foregroundStyle(
+                            selectedSection == section
+                                ? Color.white
+                                : Color.primary
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -182,6 +200,16 @@ struct MemberGroupView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
+    }
+
+    // MARK: - Unread Chat
+
+    private var unreadChatCount: Int {
+
+        store.unreadMessageCount(
+            in: currentMember.groupID,
+            for: currentMember.id
+        )
     }
 
     // MARK: - Overview
@@ -726,42 +754,5 @@ struct MemberGroupView: View {
             group?.successDays ?? 7,
             1
         )
-    }
-
-    // MARK: - Placeholder
-
-    private func comingSoonView(
-        title: String,
-        icon: String,
-        message: String
-    ) -> some View {
-
-        VStack(spacing: 16) {
-
-            Spacer()
-
-            Image(systemName: icon)
-                .font(
-                    .system(size: 48)
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Text(message)
-                .foregroundStyle(
-                    .secondary
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-                .padding(.horizontal, 32)
-
-            Spacer()
-        }
     }
 }
