@@ -11,6 +11,38 @@ enum TimeUpAuthProvider: String, Codable {
     case google
 }
 
+// MARK: - Chat Message
+
+struct TimeUpChatMessage: Identifiable, Codable {
+
+    let id: UUID
+    let groupID: UUID
+    let senderID: UUID
+    let senderName: String
+    let text: String
+    let sentAt: Date
+
+    var readByMemberIDs: [UUID]
+
+    init(
+        id: UUID = UUID(),
+        groupID: UUID,
+        senderID: UUID,
+        senderName: String,
+        text: String,
+        sentAt: Date = Date(),
+        readByMemberIDs: [UUID] = []
+    ) {
+        self.id = id
+        self.groupID = groupID
+        self.senderID = senderID
+        self.senderName = senderName
+        self.text = text
+        self.sentAt = sentAt
+        self.readByMemberIDs = readByMemberIDs
+    }
+}
+
 struct TimeUpMember: Identifiable, Codable {
 
     let id: UUID
@@ -58,6 +90,9 @@ final class TimeUpStore: ObservableObject {
     @Published private(set) var dailyProgress:
         [TimeUpDailyProgress] = []
 
+    @Published private(set) var chatMessages:
+        [TimeUpChatMessage] = []
+
     @Published private(set) var currentMember:
         TimeUpMember?
 
@@ -75,6 +110,9 @@ final class TimeUpStore: ObservableObject {
 
     private let progressKey =
         "timeup.dailyProgress.v1"
+
+    private let chatMessagesKey =
+        "timeup.chatMessages.v1"
 
     private let currentMemberKey =
         "timeup.currentMemberID.v1"
@@ -650,6 +688,155 @@ final class TimeUpStore: ObservableObject {
         return progressEntry
     }
 
+    // MARK: - Group Chat
+
+    func messages(
+        in groupID: UUID
+    ) -> [TimeUpChatMessage] {
+
+        chatMessages
+            .filter {
+                $0.groupID == groupID
+            }
+            .sorted {
+                $0.sentAt < $1.sentAt
+            }
+    }
+
+    func sendMessage(
+        text: String,
+        from memberID: UUID
+    ) {
+
+        let trimmedText =
+            text.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !trimmedText.isEmpty else {
+            return
+        }
+
+        guard
+            let sender =
+                member(
+                    id: memberID
+                )
+        else {
+            return
+        }
+
+        let message =
+            TimeUpChatMessage(
+                groupID:
+                    sender.groupID,
+                senderID:
+                    sender.id,
+                senderName:
+                    sender.displayName,
+                text:
+                    trimmedText,
+                sentAt:
+                    Date(),
+                readByMemberIDs: [
+                    sender.id
+                ]
+            )
+
+        chatMessages.append(
+            message
+        )
+
+        chatMessages.sort {
+            $0.sentAt < $1.sentAt
+        }
+
+        save()
+    }
+
+    func unreadMessageCount(
+        in groupID: UUID,
+        for memberID: UUID
+    ) -> Int {
+
+        chatMessages.filter {
+
+            $0.groupID ==
+                groupID &&
+
+            $0.senderID !=
+                memberID &&
+
+            !$0.readByMemberIDs
+                .contains(
+                    memberID
+                )
+        }
+        .count
+    }
+
+    func hasUnreadMessages(
+        in groupID: UUID,
+        for memberID: UUID
+    ) -> Bool {
+
+        unreadMessageCount(
+            in: groupID,
+            for: memberID
+        ) > 0
+    }
+
+    func markGroupChatAsRead(
+        groupID: UUID,
+        by memberID: UUID
+    ) {
+
+        var changed = false
+
+        for index in
+            chatMessages.indices
+        {
+
+            guard
+                chatMessages[index]
+                    .groupID ==
+                    groupID
+            else {
+                continue
+            }
+
+            guard
+                chatMessages[index]
+                    .senderID !=
+                    memberID
+            else {
+                continue
+            }
+
+            guard
+                !chatMessages[index]
+                    .readByMemberIDs
+                    .contains(
+                        memberID
+                    )
+            else {
+                continue
+            }
+
+            chatMessages[index]
+                .readByMemberIDs
+                .append(
+                    memberID
+                )
+
+            changed = true
+        }
+
+        if changed {
+            save()
+        }
+    }
+
     // MARK: - Persistence
 
     private func load() {
@@ -715,6 +902,30 @@ final class TimeUpStore: ObservableObject {
                         $1.date
                 }
         }
+
+        if
+            let data =
+                defaults.data(
+                    forKey:
+                        chatMessagesKey
+                ),
+
+            let decoded =
+                try?
+                    JSONDecoder()
+                    .decode(
+                        [TimeUpChatMessage].self,
+                        from: data
+                    )
+        {
+
+            chatMessages =
+                decoded.sorted {
+
+                    $0.sentAt <
+                        $1.sentAt
+                }
+        }
     }
 
     private func save() {
@@ -761,6 +972,21 @@ final class TimeUpStore: ObservableObject {
                 data,
                 forKey:
                     progressKey
+            )
+        }
+
+        if let data =
+            try?
+                JSONEncoder()
+                .encode(
+                    chatMessages
+                )
+        {
+
+            defaults.set(
+                data,
+                forKey:
+                    chatMessagesKey
             )
         }
     }
