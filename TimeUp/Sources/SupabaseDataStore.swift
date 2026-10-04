@@ -14,8 +14,12 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var groupMemberships: [TimeUpRemoteMembership] = []
     @Published private(set) var groupMembers: [TimeUpRemoteUser] = []
 
+    @Published private(set) var dailyTargets: [TimeUpRemoteDailyTarget] = []
+    @Published private(set) var dailyResults: [TimeUpRemoteDailyResult] = []
+
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingGroupMembers = false
+    @Published private(set) var isLoadingDailyProgress = false
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
@@ -79,6 +83,56 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    public struct TimeUpRemoteDailyTarget: Identifiable, Decodable {
+
+        public let id: UUID
+        public let groupID: UUID
+        public let userID: UUID
+        public let targetDate: String
+        public let targetMinutes: Int
+        public let goalMethod: String
+        public let createdAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case groupID = "group_id"
+            case userID = "user_id"
+            case targetDate = "target_date"
+            case targetMinutes = "target_minutes"
+            case goalMethod = "goal_method"
+            case createdAt = "created_at"
+        }
+    }
+
+    public struct TimeUpRemoteDailyResult: Identifiable, Decodable {
+
+        public let id: UUID
+        public let groupID: UUID
+        public let userID: UUID
+        public let resultDate: String
+        public let usageMinutes: Int
+        public let targetMinutes: Int?
+        public let achieved: Bool?
+        public let isLearningDay: Bool
+        public let source: String?
+        public let recordedAt: Date?
+        public let updatedAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case groupID = "group_id"
+            case userID = "user_id"
+            case resultDate = "result_date"
+            case usageMinutes = "usage_minutes"
+            case targetMinutes = "target_minutes"
+            case achieved
+            case isLearningDay = "is_learning_day"
+            case source
+            case recordedAt = "recorded_at"
+            case updatedAt = "updated_at"
+        }
+    }
+
     // MARK: - Load Current Account
 
     func loadCurrentAccount() async {
@@ -125,6 +179,8 @@ final class SupabaseDataStore: ObservableObject {
                 groups = []
                 groupMemberships = []
                 groupMembers = []
+                dailyTargets = []
+                dailyResults = []
 
                 lastError =
                     "TIMEUP_USER_NOT_FOUND"
@@ -145,6 +201,8 @@ final class SupabaseDataStore: ObservableObject {
             groups = []
             groupMemberships = []
             groupMembers = []
+            dailyTargets = []
+            dailyResults = []
 
             lastError =
                 error.localizedDescription
@@ -354,6 +412,210 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    // MARK: - Daily Progress
+
+    func loadDailyProgress(
+        groupID: UUID
+    ) async {
+
+        isLoadingDailyProgress = true
+        lastError = nil
+
+        defer {
+            isLoadingDailyProgress = false
+        }
+
+        do {
+
+            async let targetsRequest:
+                [TimeUpRemoteDailyTarget] =
+                client
+                    .from("daily_targets")
+                    .select(
+                        """
+                        id,
+                        group_id,
+                        user_id,
+                        target_date,
+                        target_minutes,
+                        goal_method,
+                        created_at
+                        """
+                    )
+                    .eq(
+                        "group_id",
+                        value: groupID.uuidString
+                    )
+                    .execute()
+                    .value
+
+            async let resultsRequest:
+                [TimeUpRemoteDailyResult] =
+                client
+                    .from("daily_results")
+                    .select(
+                        """
+                        id,
+                        group_id,
+                        user_id,
+                        result_date,
+                        usage_minutes,
+                        target_minutes,
+                        achieved,
+                        is_learning_day,
+                        source,
+                        recorded_at,
+                        updated_at
+                        """
+                    )
+                    .eq(
+                        "group_id",
+                        value: groupID.uuidString
+                    )
+                    .execute()
+                    .value
+
+            let (
+                loadedTargets,
+                loadedResults
+            ) = try await (
+                targetsRequest,
+                resultsRequest
+            )
+
+            dailyTargets =
+                loadedTargets
+
+            dailyResults =
+                loadedResults
+
+        } catch {
+
+            dailyTargets = []
+            dailyResults = []
+
+            lastError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Daily Helpers
+
+    func target(
+        for userID: UUID,
+        on date: Date = Date()
+    ) -> TimeUpRemoteDailyTarget? {
+
+        let dateKey =
+            databaseDateString(
+                from: date
+            )
+
+        return dailyTargets.first {
+            $0.userID == userID &&
+            $0.targetDate == dateKey
+        }
+    }
+
+    func result(
+        for userID: UUID,
+        on date: Date = Date()
+    ) -> TimeUpRemoteDailyResult? {
+
+        let dateKey =
+            databaseDateString(
+                from: date
+            )
+
+        return dailyResults.first {
+            $0.userID == userID &&
+            $0.resultDate == dateKey
+        }
+    }
+
+    func targetMinutes(
+        for userID: UUID,
+        on date: Date = Date()
+    ) -> Int? {
+
+        if let result =
+            result(
+                for: userID,
+                on: date
+            ),
+           let targetMinutes =
+            result.targetMinutes {
+
+            return targetMinutes
+        }
+
+        return target(
+            for: userID,
+            on: date
+        )?.targetMinutes
+    }
+
+    func usageMinutes(
+        for userID: UUID,
+        on date: Date = Date()
+    ) -> Int? {
+
+        result(
+            for: userID,
+            on: date
+        )?.usageMinutes
+    }
+
+    func achieved(
+        for userID: UUID,
+        on date: Date = Date()
+    ) -> Bool? {
+
+        result(
+            for: userID,
+            on: date
+        )?.achieved
+    }
+
+    func isLearningDay(
+        for userID: UUID,
+        on date: Date = Date()
+    ) -> Bool {
+
+        result(
+            for: userID,
+            on: date
+        )?.isLearningDay ?? false
+    }
+
+    private func databaseDateString(
+        from date: Date
+    ) -> String {
+
+        let formatter =
+            DateFormatter()
+
+        formatter.calendar =
+            Calendar(
+                identifier: .gregorian
+            )
+
+        formatter.locale =
+            Locale(
+                identifier: "en_US_POSIX"
+            )
+
+        formatter.timeZone =
+            .current
+
+        formatter.dateFormat =
+            "yyyy-MM-dd"
+
+        return formatter.string(
+            from: date
+        )
+    }
+
     // MARK: - Join Group
 
     @discardableResult
@@ -482,12 +744,18 @@ final class SupabaseDataStore: ObservableObject {
         currentUser = nil
         memberships = []
         groups = []
+
         groupMemberships = []
         groupMembers = []
 
+        dailyTargets = []
+        dailyResults = []
+
         lastError = nil
+
         isLoading = false
         isLoadingGroupMembers = false
+        isLoadingDailyProgress = false
     }
 }
 
