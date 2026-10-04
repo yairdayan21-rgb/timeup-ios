@@ -81,7 +81,10 @@ struct MemberHomeView: View {
                         .foregroundStyle(.secondary)
                     }
                     .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
                     .background(.thinMaterial)
                     .clipShape(
                         RoundedRectangle(
@@ -109,7 +112,7 @@ struct MemberHomeView: View {
                         )
 
                     Text(
-                        "המדידה מתעדכנת לפי נקודות הבדיקה של TimeUp."
+                        "זמן המסך מתעדכן אוטומטית במהלך היום."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -181,8 +184,10 @@ struct MemberHomeView: View {
 
                     } else if isCurrentLearningPhase {
 
-                        Text("היעד הראשון ייקבע לאחר יום הלמידה.")
-                            .fontWeight(.semibold)
+                        Text(
+                            "היעד הראשון ייקבע לאחר יום הלמידה."
+                        )
+                        .fontWeight(.semibold)
 
                         Text(
                             "בינתיים TimeUp מודד את זמן המסך שלך כרגיל."
@@ -348,6 +353,11 @@ struct MemberHomeView: View {
                 )
             }
             .padding(20)
+        }
+        .background {
+            if hasScreenTimeAuthorization {
+                ScreenTimeReportView()
+            }
         }
         .navigationTitle("TimeUp")
         .navigationBarTitleDisplayMode(.inline)
@@ -628,10 +638,21 @@ struct MemberHomeView: View {
 
     private func refreshUsageEstimate() {
 
-        estimatedUsageMinutes =
-            sharedDefaults?.integer(
-                forKey: "estimatedUsageMinutes"
-            ) ?? 0
+        if let reportedUsage =
+            sharedDefaults?.object(
+                forKey: "reportedUsageMinutes"
+            ) as? Int {
+
+            estimatedUsageMinutes =
+                max(0, reportedUsage)
+
+        } else {
+
+            estimatedUsageMinutes =
+                sharedDefaults?.integer(
+                    forKey: "estimatedUsageMinutes"
+                ) ?? 0
+        }
     }
 
     // MARK: - Monitoring
@@ -663,14 +684,16 @@ struct MemberHomeView: View {
                     .sound,
                     .badge
                 ]
-            ) { _, _ in
-                // TimeUp ממשיך לעבוד גם ללא התראות.
-            }
+            ) { _, _ in }
     }
 
-    // MARK: - Screen Time Request
+    // MARK: - Authorization Request
 
     private func requestScreenTime() {
+
+        guard !isRequestingAuthorization else {
+            return
+        }
 
         isRequestingAuthorization = true
 
@@ -682,23 +705,22 @@ struct MemberHomeView: View {
                         for: .individual
                     )
 
-            } catch {
-                // הסטטוס יוצג לאחר סיום הבקשה.
-            }
-
-            await MainActor.run {
-
-                isRequestingAuthorization = false
-
-                refreshAuthorizationStatus()
-
-                if hasScreenTimeAuthorization {
-
-                    requestNotificationAuthorization()
-
-                    startScreenTimeMonitoring()
-
+                await MainActor.run {
+                    refreshAuthorizationStatus()
                     refreshUsageEstimate()
+                    isRequestingAuthorization = false
+
+                    if hasScreenTimeAuthorization {
+                        requestNotificationAuthorization()
+                        startScreenTimeMonitoring()
+                    }
+                }
+
+            } catch {
+
+                await MainActor.run {
+                    refreshAuthorizationStatus()
+                    isRequestingAuthorization = false
                 }
             }
         }
