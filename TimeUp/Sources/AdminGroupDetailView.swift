@@ -151,14 +151,26 @@ struct AdminGroupDetailView: View {
                             dataStore.groupMembers
                         ) { member in
 
-                            memberCard(member)
+                            NavigationLink {
+
+                                AdminMemberDetailView(
+                                    group: group,
+                                    member: member
+                                )
+
+                            } label: {
+
+                                memberCard(member)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
 
                 // MARK: - Error
 
-                if let error = dataStore.lastError {
+                if let error =
+                    dataStore.lastError {
 
                     VStack(
                         alignment: .leading,
@@ -179,6 +191,7 @@ struct AdminGroupDetailView: View {
                         Button("נסה שוב") {
 
                             Task {
+
                                 await loadGroup()
                             }
                         }
@@ -227,8 +240,10 @@ struct AdminGroupDetailView: View {
                         height: 46
                     )
 
-                Image(systemName: "person.fill")
-                    .foregroundStyle(.secondary)
+                Image(
+                    systemName: "person.fill"
+                )
+                .foregroundStyle(.secondary)
             }
 
             VStack(
@@ -257,9 +272,11 @@ struct AdminGroupDetailView: View {
 
             Spacer()
 
-            Image(systemName: "chevron.left")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            Image(
+                systemName: "chevron.left"
+            )
+            .font(.caption)
+            .foregroundStyle(.tertiary)
         }
         .padding()
         .background(.thinMaterial)
