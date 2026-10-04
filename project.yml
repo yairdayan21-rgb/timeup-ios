@@ -3,6 +3,11 @@ name: TimeUp
 options:
   bundleIdPrefix: com.timeup
 
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift.git
+    from: 2.0.0
+
 targets:
   TimeUp:
     type: application
@@ -11,6 +16,8 @@ targets:
     sources:
       - TimeUp/Sources
     dependencies:
+      - package: Supabase
+        product: Supabase
       - target: TimeUpDeviceActivityMonitor
         embed: true
       - target: TimeUpDeviceActivityReport
