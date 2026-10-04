@@ -10,6 +10,8 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     private let calendar = Calendar.current
 
+    // MARK: - Interval Start
+
     override func intervalDidStart(
         for activity: DeviceActivityName
     ) {
@@ -18,9 +20,11 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         )
 
         let now = Date()
-        let dayStart = calendar.startOfDay(
-            for: now
-        )
+
+        let dayStart =
+            calendar.startOfDay(
+                for: now
+            )
 
         sharedDefaults?.set(
             now,
@@ -34,9 +38,22 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             forKey: "monitoringDayDate"
         )
 
+        // איפוס ההערכה בתחילת יום חדש.
         sharedDefaults?.set(
             0,
             forKey: "estimatedUsageMinutes"
+        )
+
+        // גם ה-snapshot שמיועד לסנכרון
+        // מתחיל מאפס ביום החדש.
+        sharedDefaults?.set(
+            0,
+            forKey: "reportedUsageMinutes"
+        )
+
+        sharedDefaults?.set(
+            now,
+            forKey: "reportedUsageUpdatedAt"
         )
 
         sharedDefaults?.removeObject(
@@ -51,6 +68,8 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             forKey: "dailyTargetWarningSentAt"
         )
     }
+
+    // MARK: - Usage Threshold
 
     override func eventDidReachThreshold(
         _ event: DeviceActivityEvent.Name,
@@ -74,7 +93,9 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         )
 
         guard let usageMinutes =
-            usageMinutes(from: event)
+            usageMinutes(
+                from: event
+            )
         else {
             return
         }
@@ -84,19 +105,58 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
                 forKey: "estimatedUsageMinutes"
             ) ?? 0
 
-        let newEstimate = max(
-            previousEstimate,
-            usageMinutes
-        )
+        let newEstimate =
+            max(
+                previousEstimate,
+                usageMinutes
+            )
+
+        // MARK: Local Screen Time Snapshot
 
         sharedDefaults?.set(
             newEstimate,
             forKey: "estimatedUsageMinutes"
         )
 
+        // MARK: Supabase Sync Snapshot
+        //
+        // SupabaseDataStore קורא את שני
+        // המפתחות האלה ומעלה אותם ל-daily_results.
+        //
+        // לכן בכל threshold של DeviceActivity
+        // נוצר snapshot חדש שמוכן לסנכרון.
+
+        sharedDefaults?.set(
+            newEstimate,
+            forKey: "reportedUsageMinutes"
+        )
+
+        sharedDefaults?.set(
+            now,
+            forKey: "reportedUsageUpdatedAt"
+        )
+
+        // שומרים גם את היום שאליו
+        // שייך ה-snapshot.
+        let monitoringDay =
+            sharedDefaults?.object(
+                forKey: "monitoringDayDate"
+            ) as? Date
+            ?? calendar.startOfDay(
+                for: now
+            )
+
+        sharedDefaults?.set(
+            monitoringDay,
+            forKey: "reportedUsageDayDate"
+        )
+
+        // MARK: Target
+
         let configuredTarget =
             sharedDefaults?.integer(
-                forKey: "configuredDailyTargetMinutes"
+                forKey:
+                    "configuredDailyTargetMinutes"
             ) ?? 0
 
         guard configuredTarget > 0 else {
@@ -104,12 +164,16 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         }
 
         let minutesRemaining =
-            configuredTarget - newEstimate
+            configuredTarget -
+            newEstimate
+
+        // MARK: Target Warning
 
         if minutesRemaining > 0,
            minutesRemaining <= 5,
            sharedDefaults?.object(
-                forKey: "dailyTargetWarningSentAt"
+                forKey:
+                    "dailyTargetWarningSentAt"
            ) == nil {
 
             sendTargetWarning(
@@ -119,26 +183,34 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
             sharedDefaults?.set(
                 now,
-                forKey: "dailyTargetWarningSentAt"
+                forKey:
+                    "dailyTargetWarningSentAt"
             )
         }
 
+        // MARK: Target Reached
+
         if newEstimate >= configuredTarget,
            sharedDefaults?.object(
-                forKey: "dailyTargetReachedAt"
+                forKey:
+                    "dailyTargetReachedAt"
            ) == nil {
 
             sharedDefaults?.set(
                 now,
-                forKey: "dailyTargetReachedAt"
+                forKey:
+                    "dailyTargetReachedAt"
             )
 
             sharedDefaults?.set(
                 configuredTarget,
-                forKey: "dailyTargetMinutes"
+                forKey:
+                    "dailyTargetMinutes"
             )
         }
     }
+
+    // MARK: - Interval End
 
     override func intervalDidEnd(
         for activity: DeviceActivityName
@@ -171,12 +243,31 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
         sharedDefaults?.set(
             usageMinutes,
-            forKey: "lastCompletedDayUsageMinutes"
+            forKey:
+                "lastCompletedDayUsageMinutes"
         )
 
         sharedDefaults?.set(
             completedDay,
-            forKey: "lastCompletedDayDate"
+            forKey:
+                "lastCompletedDayDate"
+        )
+
+        // שומרים snapshot סופי נוסף
+        // עבור היום שהסתיים.
+        sharedDefaults?.set(
+            usageMinutes,
+            forKey: "reportedUsageMinutes"
+        )
+
+        sharedDefaults?.set(
+            now,
+            forKey: "reportedUsageUpdatedAt"
+        )
+
+        sharedDefaults?.set(
+            completedDay,
+            forKey: "reportedUsageDayDate"
         )
     }
 
@@ -189,14 +280,16 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let content =
             UNMutableNotificationContent()
 
-        content.title = "TimeUp"
+        content.title =
+            "TimeUp"
 
         content.body =
             minutesRemaining == 1
             ? "נשארה לך בערך דקה אחת עד ליעד היומי."
             : "נשארו לך בערך \(minutesRemaining) דקות עד ליעד היומי."
 
-        content.sound = .default
+        content.sound =
+            .default
 
         let request =
             UNNotificationRequest(
@@ -206,14 +299,16 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
                 trigger: nil
             )
 
-        UNUserNotificationCenter.current()
+        UNUserNotificationCenter
+            .current()
             .add(request)
     }
 
-    // MARK: - Usage Event
+    // MARK: - Usage Event Parsing
 
     private func usageMinutes(
-        from event: DeviceActivityEvent.Name
+        from event:
+            DeviceActivityEvent.Name
     ) -> Int? {
 
         let prefix =
@@ -227,7 +322,9 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
         return Int(
             event.rawValue
-                .dropFirst(prefix.count)
+                .dropFirst(
+                    prefix.count
+                )
         )
     }
 }
