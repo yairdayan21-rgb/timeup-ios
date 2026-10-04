@@ -61,14 +61,14 @@ final class SupabaseDataStore: ObservableObject {
         public let id: UUID
         public let groupID: UUID
         public let userID: UUID
-        public let isActive: Bool
+        public let membershipRole: String
         public let joinedAt: Date?
 
         enum CodingKeys: String, CodingKey {
             case id
             case groupID = "group_id"
             case userID = "user_id"
-            case isActive = "is_active"
+            case membershipRole = "membership_role"
             case joinedAt = "joined_at"
         }
     }
@@ -81,15 +81,19 @@ final class SupabaseDataStore: ObservableObject {
         public let goalMethod: String
         public let reductionPercent: Int?
         public let successDays: Int?
+        public let currentStreak: Int
+        public let timezone: String
         public let createdAt: Date?
 
         enum CodingKeys: String, CodingKey {
             case id
             case name
-            case code
+            case code = "join_code"
             case goalMethod = "goal_method"
             case reductionPercent = "reduction_percent"
-            case successDays = "success_days"
+            case successDays = "journey_days"
+            case currentStreak = "current_streak"
+            case timezone
             case createdAt = "created_at"
         }
     }
@@ -234,10 +238,7 @@ final class SupabaseDataStore: ObservableObject {
             guard let user = users.first else {
 
                 clearLoadedData()
-
-                lastError =
-                    "TIMEUP_USER_NOT_FOUND"
-
+                lastError = "TIMEUP_USER_NOT_FOUND"
                 return
             }
 
@@ -271,17 +272,13 @@ final class SupabaseDataStore: ObservableObject {
                     id,
                     group_id,
                     user_id,
-                    is_active,
+                    membership_role,
                     joined_at
                     """
                 )
                 .eq(
                     "user_id",
                     value: userID.uuidString
-                )
-                .eq(
-                    "is_active",
-                    value: true
                 )
                 .execute()
                 .value
@@ -306,7 +303,6 @@ final class SupabaseDataStore: ObservableObject {
     ) async throws {
 
         guard !ids.isEmpty else {
-
             groups = []
             return
         }
@@ -324,10 +320,12 @@ final class SupabaseDataStore: ObservableObject {
                         """
                         id,
                         name,
-                        code,
+                        join_code,
                         goal_method,
                         reduction_percent,
-                        success_days,
+                        journey_days,
+                        current_streak,
+                        timezone,
                         created_at
                         """
                     )
@@ -340,10 +338,7 @@ final class SupabaseDataStore: ObservableObject {
                     .value
 
             if let group = result.first {
-
-                loadedGroups.append(
-                    group
-                )
+                loadedGroups.append(group)
             }
         }
 
@@ -375,17 +370,13 @@ final class SupabaseDataStore: ObservableObject {
                         id,
                         group_id,
                         user_id,
-                        is_active,
+                        membership_role,
                         joined_at
                         """
                     )
                     .eq(
                         "group_id",
                         value: groupID.uuidString
-                    )
-                    .eq(
-                        "is_active",
-                        value: true
                     )
                     .execute()
                     .value
@@ -394,7 +385,6 @@ final class SupabaseDataStore: ObservableObject {
                 loadedMemberships
 
             guard !loadedMemberships.isEmpty else {
-
                 groupMembers = []
                 return
             }
@@ -426,10 +416,7 @@ final class SupabaseDataStore: ObservableObject {
                         .value
 
                 if let user = users.first {
-
-                    loadedUsers.append(
-                        user
-                    )
+                    loadedUsers.append(user)
                 }
             }
 
@@ -456,8 +443,7 @@ final class SupabaseDataStore: ObservableObject {
                 error.localizedDescription
         }
     }
-
-    // MARK: - Daily Progress
+        // MARK: - Daily Progress
 
     func loadDailyProgress(
         groupID: UUID
@@ -621,13 +607,11 @@ final class SupabaseDataStore: ObservableObject {
             return
         }
 
-        let calendar =
-            Calendar.current
-
         guard
-            calendar.isDate(
+            isSameGroupLocalDay(
                 reportedAt,
-                inSameDayAs: Date()
+                Date(),
+                group: group
             )
         else {
             return
@@ -642,7 +626,8 @@ final class SupabaseDataStore: ObservableObject {
 
         let today =
             databaseDateString(
-                from: Date()
+                from: Date(),
+                group: group
             )
 
         let target =
@@ -725,9 +710,14 @@ final class SupabaseDataStore: ObservableObject {
         on date: Date = Date()
     ) -> TimeUpRemoteDailyTarget? {
 
+        guard let group = activeMemberGroup else {
+            return nil
+        }
+
         let dateKey =
             databaseDateString(
-                from: date
+                from: date,
+                group: group
             )
 
         return dailyTargets.first {
@@ -741,9 +731,14 @@ final class SupabaseDataStore: ObservableObject {
         on date: Date = Date()
     ) -> TimeUpRemoteDailyResult? {
 
+        guard let group = activeMemberGroup else {
+            return nil
+        }
+
         let dateKey =
             databaseDateString(
-                from: date
+                from: date,
+                group: group
             )
 
         return dailyResults.first {
@@ -756,9 +751,14 @@ final class SupabaseDataStore: ObservableObject {
         on date: Date = Date()
     ) -> TimeUpRemoteGroupDailyResult? {
 
+        guard let group = activeMemberGroup else {
+            return nil
+        }
+
         let dateKey =
             databaseDateString(
-                from: date
+                from: date,
+                group: group
             )
 
         return groupDailyResults.first {
@@ -777,7 +777,11 @@ final class SupabaseDataStore: ObservableObject {
 
     var currentGroupStreak: Int {
 
-        latestGroupResult()?
+        if let group = activeMemberGroup {
+            return group.currentStreak
+        }
+
+        return latestGroupResult()?
             .streakAfterDay ?? 0
     }
 
@@ -836,8 +840,22 @@ final class SupabaseDataStore: ObservableObject {
         )?.isLearningDay ?? false
     }
 
+    // MARK: - Group Timezone
+
+    private func groupTimeZone(
+        for group: TimeUpRemoteGroup
+    ) -> TimeZone {
+
+        TimeZone(
+            identifier: group.timezone
+        ) ?? TimeZone(
+            identifier: "Asia/Jerusalem"
+        ) ?? .current
+    }
+
     private func databaseDateString(
-        from date: Date
+        from date: Date,
+        group: TimeUpRemoteGroup
     ) -> String {
 
         let formatter =
@@ -854,13 +872,37 @@ final class SupabaseDataStore: ObservableObject {
             )
 
         formatter.timeZone =
-            .current
+            groupTimeZone(
+                for: group
+            )
 
         formatter.dateFormat =
             "yyyy-MM-dd"
 
         return formatter.string(
             from: date
+        )
+    }
+
+    private func isSameGroupLocalDay(
+        _ firstDate: Date,
+        _ secondDate: Date,
+        group: TimeUpRemoteGroup
+    ) -> Bool {
+
+        var calendar =
+            Calendar(
+                identifier: .gregorian
+            )
+
+        calendar.timeZone =
+            groupTimeZone(
+                for: group
+            )
+
+        return calendar.isDate(
+            firstDate,
+            inSameDayAs: secondDate
         )
     }
 
@@ -958,7 +1000,8 @@ final class SupabaseDataStore: ObservableObject {
             let membership =
                 memberships.first(
                     where: {
-                        $0.isActive
+                        $0.membershipRole ==
+                            "member"
                     }
                 )
         else {
