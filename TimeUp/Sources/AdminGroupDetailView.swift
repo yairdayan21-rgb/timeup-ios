@@ -1,370 +1,296 @@
 import SwiftUI
 
-struct AdminHomeView: View {
+struct AdminGroupDetailView: View {
 
-    @State private var showCreateGroup = false
+    let group: SupabaseDataStore.TimeUpRemoteGroup
 
     @StateObject private var dataStore =
         SupabaseDataStore.shared
 
+    @State private var isRefreshing = false
+
     var body: some View {
 
-        NavigationStack {
+        ScrollView {
 
-            ScrollView {
+            VStack(
+                alignment: .leading,
+                spacing: 24
+            ) {
+
+                // MARK: - Group Header
 
                 VStack(
                     alignment: .leading,
-                    spacing: 24
+                    spacing: 12
                 ) {
 
-                    // MARK: - Header
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 4
-                    ) {
-
-                        Text("TimeUp")
-                            .font(
-                                .system(
-                                    size: 34,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
-                            )
-
-                        Text("ניהול הקבוצות שלך")
-                            .foregroundStyle(
-                                .secondary
-                            )
-                    }
-
-                    // MARK: - Create Group
-
-                    Button {
-
-                        showCreateGroup = true
-
-                    } label: {
-
-                        HStack {
-
-                            Image(
-                                systemName:
-                                    "plus.circle.fill"
-                            )
-                            .font(.title2)
-
-                            Text(
-                                "יצירת קבוצה חדשה"
-                            )
-                            .fontWeight(
-                                .semibold
-                            )
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    "chevron.left"
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
-                        }
-                        .padding()
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .background(
-                            .thinMaterial
-                        )
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 18
-                            )
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    // MARK: - Groups
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 12
-                    ) {
-
-                        Text("הקבוצות שלי")
-                            .font(
-                                .title3.bold()
-                            )
-
-                        if dataStore.isLoading &&
-                            dataStore.groups.isEmpty {
-
-                            HStack {
-
-                                Spacer()
-
-                                ProgressView(
-                                    "טוען קבוצות..."
-                                )
-
-                                Spacer()
-                            }
-                            .padding(
-                                .vertical,
-                                40
-                            )
-
-                        } else if dataStore.groups.isEmpty {
-
-                            ContentUnavailableView(
-                                "עדיין אין קבוצות",
-                                systemImage:
-                                    "person.3",
-                                description:
-                                    Text(
-                                        "צור את הקבוצה הראשונה שלך כדי להתחיל."
-                                    )
-                            )
-                            .frame(
-                                maxWidth: .infinity
-                            )
-                            .padding(
-                                .vertical,
-                                30
-                            )
-
-                        } else {
-
-                            ForEach(
-                                dataStore.groups
-                            ) { group in
-
-                                NavigationLink {
-
-                                    AdminGroupDetailView(
-                                        group: group
-                                    )
-
-                                } label: {
-
-                                    groupCard(
-                                        group: group
-                                    )
-                                }
-                                .buttonStyle(
-                                    .plain
-                                )
-                            }
-                        }
-                    }
-
-                    // MARK: - Error
-
-                    if let error =
-                        dataStore.lastError {
+                    HStack {
 
                         VStack(
                             alignment: .leading,
-                            spacing: 8
+                            spacing: 4
                         ) {
 
-                            Label(
-                                "לא ניתן לטעון את הנתונים",
-                                systemImage:
-                                    "exclamationmark.triangle"
-                            )
-                            .fontWeight(
-                                .semibold
-                            )
-
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
+                            Text(group.name)
+                                .font(
+                                    .system(
+                                        size: 30,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
                                 )
 
-                            Button(
-                                "נסה שוב"
-                            ) {
-
-                                Task {
-
-                                    await dataStore
-                                        .loadCurrentAccount()
-                                }
-                            }
+                            Text("קוד קבוצה")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding()
-                        .frame(
-                            maxWidth: .infinity,
-                            alignment: .leading
-                        )
-                        .background(
-                            .thinMaterial
-                        )
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 18
+
+                        Spacer()
+
+                        Image(systemName: "person.3.fill")
+                            .font(.title2)
+                    }
+
+                    Text(group.code)
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .bold,
+                                design: .monospaced
                             )
                         )
-                    }
-                }
-                .padding(20)
-            }
-            .refreshable {
+                        .tracking(5)
 
-                await dataStore
-                    .loadCurrentAccount()
-            }
-            .toolbar {
+                    Divider()
 
-                ToolbarItem(
-                    placement:
-                        .topBarTrailing
-                ) {
+                    HStack {
 
-                    Button {
+                        Label(
+                            goalDescription,
+                            systemImage: "target"
+                        )
 
-                        Task {
+                        Spacer()
 
-                            await dataStore
-                                .loadCurrentAccount()
-                        }
-
-                    } label: {
-
-                        Image(
-                            systemName:
-                                "arrow.clockwise"
+                        Label(
+                            "\(group.currentStreak)",
+                            systemImage: "flame.fill"
                         )
                     }
+                    .font(.subheadline)
+
+                    if group.goalMethod != "manual" {
+
+                        Text(
+                            "מסלול של \(group.successDays ?? 7) ימי הצלחה"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
-            }
-            .navigationDestination(
-                isPresented:
-                    $showCreateGroup
-            ) {
+                .padding()
+                .background(.thinMaterial)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 18
+                    )
+                )
 
-                CreateGroupView()
-            }
-            .task {
-
-                await dataStore
-                    .loadCurrentAccount()
-            }
-        }
-    }
-
-    // MARK: - Group Card
-
-    private func groupCard(
-        group:
-            SupabaseDataStore.TimeUpRemoteGroup
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 14
-        ) {
-
-            HStack {
+                // MARK: - Members
 
                 VStack(
                     alignment: .leading,
-                    spacing: 4
+                    spacing: 12
                 ) {
 
-                    Text(group.name)
-                        .font(.headline)
+                    HStack {
 
-                    Text("קוד קבוצה")
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
+                        Text("חברי הקבוצה")
+                            .font(.title3.bold())
+
+                        Spacer()
+
+                        Text(
+                            "\(dataStore.groupMembers.count) חברים"
                         )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if isRefreshing &&
+                        dataStore.groupMembers.isEmpty {
+
+                        HStack {
+
+                            Spacer()
+
+                            ProgressView(
+                                "טוען חברים..."
+                            )
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 30)
+
+                    } else if dataStore.groupMembers.isEmpty {
+
+                        ContentUnavailableView(
+                            "אין חברים בקבוצה",
+                            systemImage: "person.3",
+                            description: Text(
+                                "כאשר משתמשים יצטרפו לקבוצה הם יופיעו כאן."
+                            )
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+
+                    } else {
+
+                        ForEach(
+                            dataStore.groupMembers
+                        ) { member in
+
+                            memberCard(member)
+                        }
+                    }
                 }
 
-                Spacer()
+                // MARK: - Error
 
-                Image(
-                    systemName:
-                        "chevron.left"
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .tertiary
-                )
+                if let error = dataStore.lastError {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+
+                        Label(
+                            "לא ניתן לטעון את נתוני הקבוצה",
+                            systemImage:
+                                "exclamationmark.triangle"
+                        )
+                        .fontWeight(.semibold)
+
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Button("נסה שוב") {
+
+                            Task {
+                                await loadGroup()
+                            }
+                        }
+                    }
+                    .padding()
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .background(.thinMaterial)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18
+                        )
+                    )
+                }
+            }
+            .padding(20)
+        }
+        .navigationTitle(group.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+
+            await loadGroup()
+        }
+        .task {
+
+            await loadGroup()
+        }
+    }
+
+    // MARK: - Member Card
+
+    private func memberCard(
+        _ member: SupabaseDataStore.TimeUpRemoteUser
+    ) -> some View {
+
+        HStack(spacing: 14) {
+
+            ZStack {
+
+                Circle()
+                    .fill(.thinMaterial)
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+
+                Image(systemName: "person.fill")
+                    .foregroundStyle(.secondary)
             }
 
-            Text(group.code)
-                .font(
-                    .system(
-                        size: 28,
-                        weight: .bold,
-                        design: .monospaced
-                    )
-                )
-                .tracking(4)
-
-            Divider()
-
-            HStack(
-                spacing: 12
+            VStack(
+                alignment: .leading,
+                spacing: 4
             ) {
 
-                Label(
-                    goalDescription(
-                        group
-                    ),
-                    systemImage:
-                        "target"
+                Text(
+                    member.displayName ?? "משתמש"
                 )
+                .fontWeight(.semibold)
 
-                Spacer()
+                if member.role == "admin" {
 
-                Label(
-                    "\(group.currentStreak)",
-                    systemImage:
-                        "flame.fill"
-                )
-                .foregroundStyle(
-                    .secondary
-                )
+                    Text("מנהל")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                if group.goalMethod !=
-                    "manual" {
+                } else {
 
-                    Text(
-                        "\(group.successDays ?? 7) ימים"
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    Text("חבר קבוצה")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .font(.subheadline)
+
+            Spacer()
+
+            Image(systemName: "chevron.left")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .padding()
-        .background(
-            .thinMaterial
-        )
+        .background(.thinMaterial)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 18
+                cornerRadius: 16
             )
         )
     }
 
-    // MARK: - Goal Description
+    // MARK: - Load
 
-    private func goalDescription(
-        _ group:
-            SupabaseDataStore.TimeUpRemoteGroup
-    ) -> String {
+    @MainActor
+    private func loadGroup() async {
+
+        isRefreshing = true
+
+        await dataStore.loadGroupMembers(
+            groupID: group.id
+        )
+
+        await dataStore.loadDailyProgress(
+            groupID: group.id
+        )
+
+        isRefreshing = false
+    }
+
+    // MARK: - Goal
+
+    private var goalDescription: String {
 
         switch group.goalMethod {
 
@@ -380,7 +306,7 @@ struct AdminHomeView: View {
 
         case "manual":
 
-            return "יעד אישי"
+            return "יעד אישי לכל משתמש"
 
         default:
 
