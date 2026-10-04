@@ -21,9 +21,19 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingGroupMembers = false
     @Published private(set) var isLoadingDailyProgress = false
+    @Published private(set) var isSyncingScreenTime = false
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
+
+    private let appGroupID =
+        "group.com.timeup.shared"
+
+    private let reportedUsageMinutesKey =
+        "reportedUsageMinutes"
+
+    private let reportedUsageUpdatedAtKey =
+        "reportedUsageUpdatedAt"
 
     private init() {}
 
@@ -154,6 +164,31 @@ final class SupabaseDataStore: ObservableObject {
             case completedMemberCount = "completed_member_count"
             case averageUsageMinutes = "average_usage_minutes"
             case streakAfterDay = "streak_after_day"
+        }
+    }
+
+    private struct DailyResultUpsert: Encodable {
+
+        let groupID: UUID
+        let userID: UUID
+        let resultDate: String
+        let usageMinutes: Int
+        let targetMinutes: Int?
+        let achieved: Bool?
+        let isLearningDay: Bool
+        let source: String
+        let updatedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case userID = "user_id"
+            case resultDate = "result_date"
+            case usageMinutes = "usage_minutes"
+            case targetMinutes = "target_minutes"
+            case achieved
+            case isLearningDay = "is_learning_day"
+            case source
+            case updatedAt = "updated_at"
         }
     }
 
@@ -298,8 +333,7 @@ final class SupabaseDataStore: ObservableObject {
                     )
                     .eq(
                         "id",
-                        value:
-                            groupID.uuidString
+                        value: groupID.uuidString
                     )
                     .limit(1)
                     .execute()
@@ -385,8 +419,7 @@ final class SupabaseDataStore: ObservableObject {
                         )
                         .eq(
                             "id",
-                            value:
-                                membership.userID.uuidString
+                            value: membership.userID.uuidString
                         )
                         .limit(1)
                         .execute()
@@ -534,6 +567,151 @@ final class SupabaseDataStore: ObservableObject {
             dailyTargets = []
             dailyResults = []
             groupDailyResults = []
+
+            lastError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Screen Time Sync
+
+    func syncReportedScreenTime() async {
+
+        guard !isSyncingScreenTime else {
+            return
+        }
+
+        guard
+            let user = currentUser,
+            let group = activeMemberGroup
+        else {
+            return
+        }
+
+        guard
+            let defaults = UserDefaults(
+                suiteName: appGroupID
+            )
+        else {
+            return
+        }
+
+        guard
+            defaults.object(
+                forKey: reportedUsageMinutesKey
+            ) != nil
+        else {
+            return
+        }
+
+        let usageMinutes =
+            max(
+                0,
+                defaults.integer(
+                    forKey: reportedUsageMinutesKey
+                )
+            )
+
+        guard
+            let reportedAt =
+                defaults.object(
+                    forKey: reportedUsageUpdatedAtKey
+                ) as? Date
+        else {
+            return
+        }
+
+        let calendar =
+            Calendar.current
+
+        guard
+            calendar.isDate(
+                reportedAt,
+                inSameDayAs: Date()
+            )
+        else {
+            return
+        }
+
+        isSyncingScreenTime = true
+        lastError = nil
+
+        defer {
+            isSyncingScreenTime = false
+        }
+
+        let today =
+            databaseDateString(
+                from: Date()
+            )
+
+        let target =
+            dailyTargets.first {
+                $0.groupID == group.id &&
+                $0.userID == user.id &&
+                $0.targetDate == today
+            }
+
+        let existingResult =
+            dailyResults.first {
+                $0.groupID == group.id &&
+                $0.userID == user.id &&
+                $0.resultDate == today
+            }
+
+        let targetMinutes =
+            target?.targetMinutes ??
+            existingResult?.targetMinutes
+
+        let isLearningDay =
+            existingResult?.isLearningDay ??
+            (targetMinutes == nil)
+
+        let achieved: Bool?
+
+        if isLearningDay {
+
+            achieved = nil
+
+        } else if let targetMinutes {
+
+            achieved =
+                usageMinutes <= targetMinutes
+
+        } else {
+
+            achieved = nil
+        }
+
+        let payload =
+            DailyResultUpsert(
+                groupID: group.id,
+                userID: user.id,
+                resultDate: today,
+                usageMinutes: usageMinutes,
+                targetMinutes: targetMinutes,
+                achieved: achieved,
+                isLearningDay: isLearningDay,
+                source: "device_activity",
+                updatedAt: Date()
+            )
+
+        do {
+
+            try await client
+                .from("daily_results")
+                .upsert(
+                    payload,
+                    onConflict:
+                        "group_id,user_id,result_date"
+                )
+                .execute()
+
+            await loadDailyProgress(
+                groupID: group.id
+            )
+
+        } catch {
 
             lastError =
                 error.localizedDescription
@@ -758,8 +936,7 @@ final class SupabaseDataStore: ObservableObject {
             )
             .eq(
                 "id",
-                value:
-                    user.id.uuidString
+                value: user.id.uuidString
             )
             .execute()
 
@@ -835,6 +1012,7 @@ final class SupabaseDataStore: ObservableObject {
         isLoading = false
         isLoadingGroupMembers = false
         isLoadingDailyProgress = false
+        isSyncingScreenTime = false
     }
 }
 
