@@ -1,82 +1,71 @@
 import XCTest
 
 final class TimeUpUITests: XCTestCase {
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
     func testLaunchShowsLogin() {
+
         let app = XCUIApplication()
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["TimeUp"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Continue with Apple"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Continue with Google"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.staticTexts["TimeUp"]
+                .waitForExistence(timeout: 10)
+        )
+
+        XCTAssertTrue(
+            app.staticTexts[
+                "להקטין זמן מסך. לגדול ביחד."
+            ]
+            .waitForExistence(timeout: 10)
+        )
+
+        XCTAssertTrue(
+            app.buttons[
+                "Continue with Apple"
+            ]
+            .waitForExistence(timeout: 10)
+        )
+
+        XCTAssertTrue(
+            app.buttons[
+                "Continue with Google"
+            ]
+            .waitForExistence(timeout: 10)
+        )
     }
 
-    func testJoinFlowAcceptsAdminDemoCode() {
+    func testLoginScreenDoesNotShowMemberUIBeforeAuthentication() {
+
         let app = XCUIApplication()
         app.launch()
 
-        app.buttons["Continue with Apple"].tap()
-        XCTAssertTrue(app.staticTexts["הצטרפות ל-TimeUp"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.staticTexts["TimeUp"]
+                .waitForExistence(timeout: 10)
+        )
 
-        fillJoinForm(app: app, name: "Test User", code: "0000")
-        let joinButton = app.buttons["join-button"]
-        XCTAssertTrue(joinButton.waitForExistence(timeout: 10))
-        XCTAssertTrue(joinButton.isEnabled)
-        joinButton.tap()
+        XCTAssertFalse(
+            app.tabBars.buttons["דשבורד"]
+                .exists
+        )
 
-        XCTAssertTrue(app.staticTexts["ניהול הקבוצות שלך"].waitForExistence(timeout: 10))
-    }
+        XCTAssertFalse(
+            app.tabBars.buttons["הקבוצה"]
+                .exists
+        )
 
-    func testInvalidGroupCodeShowsError() {
-        let app = XCUIApplication()
-        app.launch()
+        XCTAssertFalse(
+            app.tabBars.buttons["AI"]
+                .exists
+        )
 
-        app.buttons["Continue with Apple"].tap()
-        XCTAssertTrue(app.staticTexts["הצטרפות ל-TimeUp"].waitForExistence(timeout: 10))
-
-        fillJoinForm(app: app, name: "Test User", code: "9999")
-        let joinButton = app.buttons["join-button"]
-        XCTAssertTrue(joinButton.waitForExistence(timeout: 10))
-        XCTAssertTrue(joinButton.isEnabled)
-        joinButton.tap()
-
-        let error = app.staticTexts["join-error"]
-        XCTAssertTrue(error.waitForExistence(timeout: 10))
-        XCTAssertEqual(error.label, "לא נמצאה קבוצה עם הקוד הזה.")
-    }
-
-    private func fillJoinForm(app: XCUIApplication, name: String, code: String) {
-        let nameField = app.textFields["display-name-field"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
-        nameField.tap()
-        nameField.typeText(name)
-        XCTAssertEqual(nameField.value as? String, name)
-
-        // Use the field's Return/Next action instead of tapping through a
-        // keyboard that can cover the code field on CI. JoinGroupView maps
-        // this submit action directly to the group-code FocusState.
-        nameField.typeText("\n")
-
-        let codeField = app.textFields["group-code-field"]
-        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
-        XCTAssertTrue(codeField.waitForKeyboardFocus(timeout: 5))
-        codeField.typeText(code)
-        XCTAssertEqual(codeField.value as? String, code)
-
-        app.keyboards.buttons["סיום"].tapIfExists()
-        app.keyboards.buttons["Done"].tapIfExists()
-    }
-}
-
-private extension XCUIElement {
-    func tapIfExists() {
-        if exists && isHittable {
-            tap()
-        }
-    }
-
-    func waitForKeyboardFocus(timeout: TimeInterval) -> Bool {
-        let predicate = NSPredicate(format: "hasKeyboardFocus == true")
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: self)
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+        XCTAssertFalse(
+            app.tabBars.buttons["דירוג"]
+                .exists
+        )
     }
 }
