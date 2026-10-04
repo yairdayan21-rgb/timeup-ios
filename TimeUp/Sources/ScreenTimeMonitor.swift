@@ -11,8 +11,6 @@ final class ScreenTimeMonitor {
         suiteName: "group.com.timeup.shared"
     )
 
-    private let calendar = Calendar.current
-
     private init() {}
 
     // MARK: - Monitoring
@@ -91,8 +89,6 @@ final class ScreenTimeMonitor {
                 )
         }
 
-        // שומרים את היעד ב-App Group כדי שגם
-        // ה-DeviceActivity extension יכיר אותו.
         if let normalizedTarget {
 
             sharedDefaults?.set(
@@ -137,21 +133,12 @@ final class ScreenTimeMonitor {
             return
         }
 
-        let completedUsage =
-            defaults.integer(
-                forKey: "lastCompletedDayUsageMinutes"
-            )
-
         guard
             let member =
                 TimeUpStore.shared.currentMember
         else {
             return
         }
-
-        // ה-extension כבר שומר את היום המדויק
-        // שאליו שייכים נתוני זמן המסך.
-        // לכן לא מחסירים כאן יום נוסף.
 
         if TimeUpStore.shared.progress(
             for: member.id,
@@ -164,6 +151,12 @@ final class ScreenTimeMonitor {
 
             return
         }
+
+        let completedUsage =
+            resolvedCompletedUsage(
+                completedDay: completedDay,
+                defaults: defaults
+            )
 
         let isLearningDay =
             shouldBeLearningDay(
@@ -182,14 +175,56 @@ final class ScreenTimeMonitor {
         )
     }
 
+    // MARK: - Completed Usage
+
+    private func resolvedCompletedUsage(
+        completedDay: Date,
+        defaults: UserDefaults
+    ) -> Int {
+
+        let fallbackUsage =
+            max(
+                0,
+                defaults.integer(
+                    forKey: "lastCompletedDayUsageMinutes"
+                )
+            )
+
+        guard
+            let reportUpdatedAt =
+                defaults.object(
+                    forKey: "reportedUsageUpdatedAt"
+                ) as? Date,
+            Calendar.current.isDate(
+                reportUpdatedAt,
+                inSameDayAs: completedDay
+            )
+        else {
+            return fallbackUsage
+        }
+
+        guard
+            defaults.object(
+                forKey: "reportedUsageMinutes"
+            ) != nil
+        else {
+            return fallbackUsage
+        }
+
+        return max(
+            0,
+            defaults.integer(
+                forKey: "reportedUsageMinutes"
+            )
+        )
+    }
+
     // MARK: - Learning Day
 
     private func shouldBeLearningDay(
         memberID: UUID
     ) -> Bool {
 
-        // היום הראשון שיש עליו נתוני Screen Time
-        // משמש כיום למידה.
         return TimeUpStore.shared
             .progress(for: memberID)
             .isEmpty
