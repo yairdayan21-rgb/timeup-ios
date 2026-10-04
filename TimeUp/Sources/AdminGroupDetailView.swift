@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AdminGroupDetailView: View {
 
-    let group: TimeUpRemoteGroup
+    let group: SupabaseDataStore.TimeUpRemoteGroup
 
     @StateObject private var dataStore =
         SupabaseDataStore.shared
@@ -252,7 +252,7 @@ struct AdminGroupDetailView: View {
     // MARK: - Member Card
 
     private func memberCard(
-        _ member: TimeUpRemoteUser
+        _ member: SupabaseDataStore.TimeUpRemoteUser
     ) -> some View {
 
         HStack(
@@ -298,6 +298,7 @@ struct AdminGroupDetailView: View {
                         .foregroundStyle(
                             .secondary
                         )
+
                 } else {
 
                     Text("חבר קבוצה")
