@@ -58,9 +58,7 @@ struct AppLockView: View {
 
         case .member:
 
-            MemberTabView(
-                member: member
-            )
+            MemberTabView()
         }
     }
 
@@ -217,9 +215,7 @@ struct AppLockView: View {
                     isUnlocked = false
 
                     if let authenticationError =
-                        authenticationError
-                            as? LAError
-                    {
+                        authenticationError as? LAError {
 
                         switch authenticationError.code {
 
