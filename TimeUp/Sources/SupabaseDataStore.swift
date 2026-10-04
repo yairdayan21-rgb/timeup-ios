@@ -420,7 +420,7 @@ final class SupabaseDataStore: ObservableObject {
 
         var lastCreationError: Error?
 
-        // Try several codes in the unlikely event of a collision.
+        // Try several codes in case a generated join code already exists.
         for _ in 0..<20 {
 
             let code =
@@ -440,9 +440,7 @@ final class SupabaseDataStore: ObservableObject {
                             ? nil
                             : reductionPercent,
                     journeyDays:
-                        goalMethod == "manual"
-                            ? (successDays ?? 7)
-                            : (successDays ?? 7),
+                        successDays ?? 7,
                     currentStreak: 0,
                     timezone: timezone
                 )
@@ -499,8 +497,7 @@ final class SupabaseDataStore: ObservableObject {
                         .delete()
                         .eq(
                             "id",
-                            value:
-                                createdGroup.id.uuidString
+                            value: createdGroup.id.uuidString
                         )
                         .execute()
 
@@ -741,6 +738,7 @@ final class SupabaseDataStore: ObservableObject {
                 error.localizedDescription
         }
     }
+
     // MARK: - Screen Time Sync
 
     func syncReportedScreenTime() async {
@@ -1244,8 +1242,7 @@ final class SupabaseDataStore: ObservableObject {
 
 // MARK: - Errors
 
-enum SupabaseDataStoreError:
-    LocalizedError {
+enum SupabaseDataStoreError: LocalizedError {
 
     case userNotLoaded
     case adminRequired
