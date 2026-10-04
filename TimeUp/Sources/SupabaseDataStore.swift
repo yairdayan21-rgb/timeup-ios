@@ -22,6 +22,7 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var isLoadingGroupMembers = false
     @Published private(set) var isLoadingDailyProgress = false
     @Published private(set) var isSyncingScreenTime = false
+    @Published private(set) var isCreatingGroup = false
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
@@ -196,6 +197,42 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    private struct GroupInsert: Encodable {
+
+        let name: String
+        let joinCode: String
+        let createdBy: UUID
+        let goalMethod: String
+        let reductionPercent: Int?
+        let journeyDays: Int
+        let currentStreak: Int
+        let timezone: String
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case joinCode = "join_code"
+            case createdBy = "created_by"
+            case goalMethod = "goal_method"
+            case reductionPercent = "reduction_percent"
+            case journeyDays = "journey_days"
+            case currentStreak = "current_streak"
+            case timezone
+        }
+    }
+
+    private struct MembershipInsert: Encodable {
+
+        let groupID: UUID
+        let userID: UUID
+        let membershipRole: String
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case userID = "user_id"
+            case membershipRole = "membership_role"
+        }
+    }
+
     // MARK: - Load Current Account
 
     func loadCurrentAccount() async {
@@ -346,6 +383,150 @@ final class SupabaseDataStore: ObservableObject {
             loadedGroups
     }
 
+    // MARK: - Create Group
+
+    @discardableResult
+    func createGroup(
+        name: String,
+        goalMethod: String,
+        reductionPercent: Int?,
+        successDays: Int?,
+        timezone: String = "Asia/Jerusalem"
+    ) async throws -> TimeUpRemoteGroup {
+
+        guard let user = currentUser else {
+            throw SupabaseDataStoreError.userNotLoaded
+        }
+
+        guard user.role == "admin" else {
+            throw SupabaseDataStoreError.adminRequired
+        }
+
+        let cleanName =
+            name.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanName.isEmpty else {
+            throw SupabaseDataStoreError.invalidGroupName
+        }
+
+        isCreatingGroup = true
+        lastError = nil
+
+        defer {
+            isCreatingGroup = false
+        }
+
+        var lastCreationError: Error?
+
+        // Try several codes in the unlikely event of a collision.
+        for _ in 0..<20 {
+
+            let code =
+                String(
+                    format: "%04d",
+                    Int.random(in: 1...9999)
+                )
+
+            let payload =
+                GroupInsert(
+                    name: cleanName,
+                    joinCode: code,
+                    createdBy: user.id,
+                    goalMethod: goalMethod,
+                    reductionPercent:
+                        goalMethod == "manual"
+                            ? nil
+                            : reductionPercent,
+                    journeyDays:
+                        goalMethod == "manual"
+                            ? (successDays ?? 7)
+                            : (successDays ?? 7),
+                    currentStreak: 0,
+                    timezone: timezone
+                )
+
+            do {
+
+                let createdGroups:
+                    [TimeUpRemoteGroup] =
+                    try await client
+                        .from("groups")
+                        .insert(payload)
+                        .select(
+                            """
+                            id,
+                            name,
+                            join_code,
+                            goal_method,
+                            reduction_percent,
+                            journey_days,
+                            current_streak,
+                            timezone,
+                            created_at
+                            """
+                        )
+                        .execute()
+                        .value
+
+                guard
+                    let createdGroup =
+                        createdGroups.first
+                else {
+                    throw SupabaseDataStoreError.groupCreationFailed
+                }
+
+                do {
+
+                    let membership =
+                        MembershipInsert(
+                            groupID: createdGroup.id,
+                            userID: user.id,
+                            membershipRole: "admin"
+                        )
+
+                    try await client
+                        .from("group_memberships")
+                        .insert(membership)
+                        .execute()
+
+                } catch {
+
+                    // Avoid leaving an orphan group if membership creation fails.
+                    try? await client
+                        .from("groups")
+                        .delete()
+                        .eq(
+                            "id",
+                            value:
+                                createdGroup.id.uuidString
+                        )
+                        .execute()
+
+                    throw error
+                }
+
+                await loadCurrentAccount()
+
+                return createdGroup
+
+            } catch {
+
+                lastCreationError = error
+            }
+        }
+
+        let finalError =
+            lastCreationError ??
+            SupabaseDataStoreError.groupCreationFailed
+
+        lastError =
+            finalError.localizedDescription
+
+        throw finalError
+    }
+
     // MARK: - Group Members
 
     func loadGroupMembers(
@@ -409,7 +590,8 @@ final class SupabaseDataStore: ObservableObject {
                         )
                         .eq(
                             "id",
-                            value: membership.userID.uuidString
+                            value:
+                                membership.userID.uuidString
                         )
                         .limit(1)
                         .execute()
@@ -443,7 +625,8 @@ final class SupabaseDataStore: ObservableObject {
                 error.localizedDescription
         }
     }
-        // MARK: - Daily Progress
+
+    // MARK: - Daily Progress
 
     func loadDailyProgress(
         groupID: UUID
@@ -558,7 +741,6 @@ final class SupabaseDataStore: ObservableObject {
                 error.localizedDescription
         }
     }
-
     // MARK: - Screen Time Sync
 
     func syncReportedScreenTime() async {
@@ -1056,6 +1238,7 @@ final class SupabaseDataStore: ObservableObject {
         isLoadingGroupMembers = false
         isLoadingDailyProgress = false
         isSyncingScreenTime = false
+        isCreatingGroup = false
     }
 }
 
@@ -1065,15 +1248,25 @@ enum SupabaseDataStoreError:
     LocalizedError {
 
     case userNotLoaded
+    case adminRequired
+    case invalidGroupName
+    case groupCreationFailed
 
     var errorDescription: String? {
 
         switch self {
 
         case .userNotLoaded:
+            return "TimeUp user is not loaded."
 
-            return
-                "TimeUp user is not loaded."
+        case .adminRequired:
+            return "Only a TimeUp admin can create a group."
+
+        case .invalidGroupName:
+            return "Group name cannot be empty."
+
+        case .groupCreationFailed:
+            return "TimeUp could not create the group."
         }
     }
 }
