@@ -255,6 +255,10 @@ struct MemberTabView: View {
                             )
                     )
 
+                    currentUserProgressCard(
+                        user: user
+                    )
+
                 } else {
 
                     ContentUnavailableView(
@@ -263,44 +267,128 @@ struct MemberTabView: View {
                             "person.3.sequence.fill"
                     )
                 }
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-
-                    Label(
-                        "דשבורד",
-                        systemImage:
-                            "chart.bar.fill"
-                    )
-                    .font(.headline)
-
-                    Text(
-                        "בשלב הבא נחבר לכאן את יעד זמן המסך ואת נתוני השימוש היומיים ישירות מ-Supabase."
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-                .padding()
-                .background(
-                    .thinMaterial,
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18
-                        )
-                )
             }
             .padding(20)
         }
         .navigationTitle("דשבורד")
         .navigationBarTitleDisplayMode(
             .inline
+        )
+        .task(
+            id: dataStore.activeMemberGroup?.id
+        ) {
+
+            guard let group =
+                dataStore.activeMemberGroup
+            else {
+                return
+            }
+
+            await dataStore.loadDailyProgress(
+                groupID: group.id
+            )
+        }
+        .refreshable {
+
+            guard let group =
+                dataStore.activeMemberGroup
+            else {
+                return
+            }
+
+            await dataStore.loadDailyProgress(
+                groupID: group.id
+            )
+        }
+    }
+
+    // MARK: - Current User Progress
+
+    private func currentUserProgressCard(
+        user:
+            SupabaseDataStore.TimeUpRemoteUser
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 16
+        ) {
+
+            HStack {
+
+                Label(
+                    "היום שלי",
+                    systemImage:
+                        "chart.bar.fill"
+                )
+                .font(.headline)
+
+                Spacer()
+
+                if dataStore.isLearningDay(
+                    for: user.id
+                ) {
+
+                    Text("יום למידה")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .padding(
+                            .horizontal,
+                            9
+                        )
+                        .padding(
+                            .vertical,
+                            5
+                        )
+                        .background(
+                            .thinMaterial,
+                            in: Capsule()
+                        )
+                }
+            }
+
+            HStack(spacing: 12) {
+
+                progressValue(
+                    title: "שימוש",
+                    value:
+                        formattedMinutes(
+                            dataStore
+                                .usageMinutes(
+                                    for: user.id
+                                )
+                        ),
+                    icon: "iphone"
+                )
+
+                progressValue(
+                    title: "יעד",
+                    value:
+                        formattedMinutes(
+                            dataStore
+                                .targetMinutes(
+                                    for: user.id
+                                )
+                        ),
+                    icon: "target"
+                )
+            }
+
+            statusView(
+                userID: user.id
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding()
+        .background(
+            .thinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18
+                )
         )
     }
 
@@ -351,9 +439,7 @@ struct MemberTabView: View {
 
                 Divider()
 
-                groupMembersSection(
-                    group: group
-                )
+                groupMembersSection
             }
             .frame(
                 maxWidth: .infinity,
@@ -367,27 +453,31 @@ struct MemberTabView: View {
         )
         .task(id: group.id) {
 
-            await dataStore
-                .loadGroupMembers(
-                    groupID: group.id
-                )
+            await dataStore.loadGroupMembers(
+                groupID: group.id
+            )
+
+            await dataStore.loadDailyProgress(
+                groupID: group.id
+            )
         }
         .refreshable {
 
-            await dataStore
-                .loadGroupMembers(
-                    groupID: group.id
-                )
+            await dataStore.loadGroupMembers(
+                groupID: group.id
+            )
+
+            await dataStore.loadDailyProgress(
+                groupID: group.id
+            )
         }
     }
 
     // MARK: - Group Members
 
     @ViewBuilder
-    private func groupMembersSection(
-        group:
-            SupabaseDataStore.TimeUpRemoteGroup
-    ) -> some View {
+    private var groupMembersSection:
+        some View {
 
         VStack(
             alignment: .leading,
@@ -417,14 +507,15 @@ struct MemberTabView: View {
                 }
             }
 
-            if dataStore.isLoadingGroupMembers {
+            if dataStore.isLoadingGroupMembers ||
+                dataStore.isLoadingDailyProgress {
 
                 HStack(spacing: 12) {
 
                     ProgressView()
 
                     Text(
-                        "טוען חברי קבוצה..."
+                        "טוען נתוני קבוצה..."
                     )
                     .foregroundStyle(
                         .secondary
@@ -449,7 +540,7 @@ struct MemberTabView: View {
 
             } else {
 
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
 
                     ForEach(
                         dataStore.groupMembers
@@ -473,98 +564,138 @@ struct MemberTabView: View {
             SupabaseDataStore.TimeUpRemoteUser
     ) -> some View {
 
-        HStack(spacing: 14) {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
 
-            ZStack {
+            HStack(spacing: 14) {
 
-                Circle()
-                    .fill(
-                        Color.secondary
-                            .opacity(0.12)
-                    )
-                    .frame(
-                        width: 46,
-                        height: 46
-                    )
+                ZStack {
 
-                Image(
-                    systemName:
-                        "person.fill"
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-
-                HStack(spacing: 6) {
-
-                    Text(
-                        displayName(
-                            for: member
+                    Circle()
+                        .fill(
+                            Color.secondary
+                                .opacity(0.12)
                         )
+                        .frame(
+                            width: 46,
+                            height: 46
+                        )
+
+                    Image(
+                        systemName:
+                            "person.fill"
                     )
-                    .font(.headline)
-
-                    if member.id ==
-                        dataStore.currentUser?.id {
-
-                        Text("אתה")
-                            .font(.caption)
-                            .fontWeight(
-                                .semibold
-                            )
-                            .padding(
-                                .horizontal,
-                                7
-                            )
-                            .padding(
-                                .vertical,
-                                3
-                            )
-                            .background(
-                                .thinMaterial,
-                                in: Capsule()
-                            )
-                    }
-                }
-
-                if let membership =
-                    dataStore
-                        .groupMemberships
-                        .first(
-                            where: {
-                                $0.userID ==
-                                    member.id
-                            }
-                        ),
-                   let joinedAt =
-                    membership.joinedAt {
-
-                    Text(
-                        "הצטרף \(joinedAt.formatted(date: .abbreviated, time: .omitted))"
-                    )
-                    .font(.caption)
                     .foregroundStyle(
                         .secondary
                     )
                 }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+
+                    HStack(spacing: 6) {
+
+                        Text(
+                            displayName(
+                                for: member
+                            )
+                        )
+                        .font(.headline)
+
+                        if member.id ==
+                            dataStore.currentUser?.id {
+
+                            Text("אתה")
+                                .font(.caption)
+                                .fontWeight(
+                                    .semibold
+                                )
+                                .padding(
+                                    .horizontal,
+                                    7
+                                )
+                                .padding(
+                                    .vertical,
+                                    3
+                                )
+                                .background(
+                                    .thinMaterial,
+                                    in: Capsule()
+                                )
+                        }
+                    }
+
+                    if dataStore.isLearningDay(
+                        for: member.id
+                    ) {
+
+                        Text("יום למידה")
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+
+                    } else if let membership =
+                        dataStore
+                            .groupMemberships
+                            .first(
+                                where: {
+                                    $0.userID ==
+                                        member.id
+                                }
+                            ),
+                              let joinedAt =
+                        membership.joinedAt {
+
+                        Text(
+                            "הצטרף \(joinedAt.formatted(date: .abbreviated, time: .omitted))"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+
+                Spacer()
+
+                memberStatusIcon(
+                    userID: member.id
+                )
             }
 
-            Spacer()
+            Divider()
 
-            Image(
-                systemName:
-                    "chevron.left"
-            )
-            .font(.caption.bold())
-            .foregroundStyle(
-                .tertiary
-            )
+            HStack(spacing: 12) {
+
+                progressValue(
+                    title: "שימוש",
+                    value:
+                        formattedMinutes(
+                            dataStore
+                                .usageMinutes(
+                                    for: member.id
+                                )
+                        ),
+                    icon: "iphone"
+                )
+
+                progressValue(
+                    title: "יעד",
+                    value:
+                        formattedMinutes(
+                            dataStore
+                                .targetMinutes(
+                                    for: member.id
+                                )
+                        ),
+                    icon: "target"
+                )
+            }
         }
         .padding(14)
         .background(
@@ -574,6 +705,183 @@ struct MemberTabView: View {
                     cornerRadius: 16
                 )
         )
+    }
+
+    // MARK: - Progress Components
+
+    private func progressValue(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+
+        HStack(spacing: 9) {
+
+            Image(
+                systemName: icon
+            )
+            .font(.headline)
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                Text(value)
+                    .font(.headline)
+            }
+
+            Spacer(
+                minLength: 0
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(10)
+        .background(
+            Color.secondary
+                .opacity(0.08),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 12
+                )
+        )
+    }
+
+    @ViewBuilder
+    private func memberStatusIcon(
+        userID: UUID
+    ) -> some View {
+
+        if dataStore.isLearningDay(
+            for: userID
+        ) {
+
+            Image(
+                systemName:
+                    "book.fill"
+            )
+            .font(.title3)
+
+        } else if let achieved =
+            dataStore.achieved(
+                for: userID
+            ) {
+
+            Image(
+                systemName:
+                    achieved
+                    ? "checkmark.circle.fill"
+                    : "xmark.circle.fill"
+            )
+            .font(.title2)
+            .foregroundStyle(
+                achieved
+                ? Color.green
+                : Color.red
+            )
+
+        } else {
+
+            Image(
+                systemName:
+                    "clock.fill"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                .secondary
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func statusView(
+        userID: UUID
+    ) -> some View {
+
+        if dataStore.isLearningDay(
+            for: userID
+        ) {
+
+            Label(
+                "יום למידה",
+                systemImage:
+                    "book.fill"
+            )
+            .font(.subheadline)
+            .fontWeight(.semibold)
+
+        } else if let achieved =
+            dataStore.achieved(
+                for: userID
+            ) {
+
+            Label(
+                achieved
+                    ? "עמדת ביעד"
+                    : "היעד לא הושג",
+                systemImage:
+                    achieved
+                    ? "checkmark.circle.fill"
+                    : "xmark.circle.fill"
+            )
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundStyle(
+                achieved
+                ? Color.green
+                : Color.red
+            )
+
+        } else {
+
+            Label(
+                "היום עדיין בתהליך",
+                systemImage:
+                    "clock.fill"
+            )
+            .font(.subheadline)
+            .foregroundStyle(
+                .secondary
+            )
+        }
+    }
+
+    private func formattedMinutes(
+        _ minutes: Int?
+    ) -> String {
+
+        guard let minutes else {
+            return "—"
+        }
+
+        let safeMinutes =
+            max(0, minutes)
+
+        let hours =
+            safeMinutes / 60
+
+        let remainingMinutes =
+            safeMinutes % 60
+
+        if hours == 0 {
+            return "\(remainingMinutes) דק׳"
+        }
+
+        if remainingMinutes == 0 {
+            return "\(hours) שע׳"
+        }
+
+        return
+            "\(hours) שע׳ \(remainingMinutes) דק׳"
     }
 
     // MARK: - Profile Button
