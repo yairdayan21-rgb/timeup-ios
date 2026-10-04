@@ -1,0 +1,391 @@
+import Foundation
+import Supabase
+import Combine
+
+@MainActor
+final class SupabaseDataStore: ObservableObject {
+
+    static let shared = SupabaseDataStore()
+
+    @Published private(set) var currentUser: TimeUpRemoteUser?
+    @Published private(set) var memberships: [TimeUpRemoteMembership] = []
+    @Published private(set) var groups: [TimeUpRemoteGroup] = []
+
+    @Published private(set) var isLoading = false
+    @Published private(set) var lastError: String?
+
+    private let client = SupabaseManager.shared.client
+
+    private init() {}
+
+    // MARK: - Models
+
+    struct TimeUpRemoteUser: Identifiable, Decodable {
+
+        let id: UUID
+        let authUserID: UUID
+        let email: String?
+        let displayName: String?
+        let role: String
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case authUserID = "auth_user_id"
+            case email
+            case displayName = "display_name"
+            case role
+        }
+    }
+
+    struct TimeUpRemoteMembership: Identifiable, Decodable {
+
+        let id: UUID
+        let groupID: UUID
+        let userID: UUID
+        let isActive: Bool
+        let joinedAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case groupID = "group_id"
+            case userID = "user_id"
+            case isActive = "is_active"
+            case joinedAt = "joined_at"
+        }
+    }
+
+    struct TimeUpRemoteGroup: Identifiable, Decodable {
+
+        let id: UUID
+        let name: String
+        let code: String
+        let goalMethod: String
+        let reductionPercent: Int?
+        let successDays: Int?
+        let createdAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case code
+            case goalMethod = "goal_method"
+            case reductionPercent = "reduction_percent"
+            case successDays = "success_days"
+            case createdAt = "created_at"
+        }
+    }
+
+    // MARK: - Load Current Account
+
+    func loadCurrentAccount() async {
+
+        isLoading = true
+        lastError = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+
+            let session =
+                try await client.auth.session
+
+            let authUserID =
+                session.user.id
+
+            let users: [TimeUpRemoteUser] =
+                try await client
+                    .from("users")
+                    .select(
+                        """
+                        id,
+                        auth_user_id,
+                        email,
+                        display_name,
+                        role
+                        """
+                    )
+                    .eq(
+                        "auth_user_id",
+                        value: authUserID.uuidString
+                    )
+                    .limit(1)
+                    .execute()
+                    .value
+
+            guard let user = users.first else {
+
+                currentUser = nil
+                memberships = []
+                groups = []
+
+                lastError =
+                    "TIMEUP_USER_NOT_FOUND"
+
+                return
+            }
+
+            currentUser = user
+
+            try await loadMemberships(
+                for: user.id
+            )
+
+        } catch {
+
+            currentUser = nil
+            memberships = []
+            groups = []
+
+            lastError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Memberships
+
+    private func loadMemberships(
+        for userID: UUID
+    ) async throws {
+
+        let loadedMemberships:
+            [TimeUpRemoteMembership] =
+            try await client
+                .from("group_memberships")
+                .select(
+                    """
+                    id,
+                    group_id,
+                    user_id,
+                    is_active,
+                    joined_at
+                    """
+                )
+                .eq(
+                    "user_id",
+                    value: userID.uuidString
+                )
+                .eq(
+                    "is_active",
+                    value: true
+                )
+                .execute()
+                .value
+
+        memberships =
+            loadedMemberships
+
+        let groupIDs =
+            loadedMemberships.map {
+                $0.groupID
+            }
+
+        try await loadGroups(
+            ids: groupIDs
+        )
+    }
+
+    // MARK: - Groups
+
+    private func loadGroups(
+        ids: [UUID]
+    ) async throws {
+
+        guard !ids.isEmpty else {
+
+            groups = []
+            return
+        }
+
+        var loadedGroups:
+            [TimeUpRemoteGroup] = []
+
+        for groupID in ids {
+
+            let result:
+                [TimeUpRemoteGroup] =
+                try await client
+                    .from("groups")
+                    .select(
+                        """
+                        id,
+                        name,
+                        code,
+                        goal_method,
+                        reduction_percent,
+                        success_days,
+                        created_at
+                        """
+                    )
+                    .eq(
+                        "id",
+                        value:
+                            groupID.uuidString
+                    )
+                    .limit(1)
+                    .execute()
+                    .value
+
+            if let group = result.first {
+
+                loadedGroups.append(
+                    group
+                )
+            }
+        }
+
+        groups =
+            loadedGroups
+    }
+
+    // MARK: - Join Group
+
+    @discardableResult
+    func joinGroup(
+        code: String
+    ) async throws -> UUID {
+
+        struct JoinParameters: Encodable {
+            let requestedCode: String
+
+            enum CodingKeys:
+                String,
+                CodingKey {
+
+                case requestedCode =
+                    "requested_code"
+            }
+        }
+
+        let groupID: UUID =
+            try await client
+                .rpc(
+                    "join_timeup_group",
+                    params:
+                        JoinParameters(
+                            requestedCode: code
+                        )
+                )
+                .execute()
+                .value
+
+        await loadCurrentAccount()
+
+        return groupID
+    }
+
+    // MARK: - Display Name
+
+    func updateDisplayName(
+        _ name: String
+    ) async throws {
+
+        guard let user = currentUser else {
+            throw SupabaseDataStoreError
+                .userNotLoaded
+        }
+
+        struct DisplayNameUpdate:
+            Encodable {
+
+            let displayName: String
+
+            enum CodingKeys:
+                String,
+                CodingKey {
+
+                case displayName =
+                    "display_name"
+            }
+        }
+
+        try await client
+            .from("users")
+            .update(
+                DisplayNameUpdate(
+                    displayName: name
+                )
+            )
+            .eq(
+                "id",
+                value:
+                    user.id.uuidString
+            )
+            .execute()
+
+        await loadCurrentAccount()
+    }
+
+    // MARK: - Helpers
+
+    var activeMemberGroup:
+        TimeUpRemoteGroup? {
+
+        guard
+            currentUser?.role == "member"
+        else {
+            return nil
+        }
+
+        guard
+            let membership =
+                memberships.first(
+                    where: {
+                        $0.isActive
+                    }
+                )
+        else {
+            return nil
+        }
+
+        return groups.first(
+            where: {
+                $0.id ==
+                    membership.groupID
+            }
+        )
+    }
+
+    var isAdmin: Bool {
+        currentUser?.role == "admin"
+    }
+
+    var isMember: Bool {
+        currentUser?.role == "member"
+    }
+
+    var hasActiveGroup: Bool {
+        activeMemberGroup != nil
+    }
+
+    // MARK: - Reset
+
+    func reset() {
+
+        currentUser = nil
+        memberships = []
+        groups = []
+        lastError = nil
+        isLoading = false
+    }
+}
+
+// MARK: - Errors
+
+enum SupabaseDataStoreError:
+    LocalizedError {
+
+    case userNotLoaded
+
+    var errorDescription: String? {
+
+        switch self {
+
+        case .userNotLoaded:
+
+            return
+                "TimeUp user is not loaded."
+        }
+    }
+}
