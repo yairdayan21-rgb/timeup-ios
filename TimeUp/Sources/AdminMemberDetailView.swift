@@ -5,6 +5,8 @@ struct AdminMemberDetailView: View {
     let group: SupabaseDataStore.TimeUpRemoteGroup
     let member: SupabaseDataStore.TimeUpRemoteUser
 
+    @Environment(\.dismiss) private var dismiss
+
     @StateObject private var dataStore = SupabaseDataStore.shared
 
     @State private var isLoading = false
@@ -12,6 +14,10 @@ struct AdminMemberDetailView: View {
     @State private var manualMinutes = 0
     @State private var didLoadManualTarget = false
     @State private var saveMessage: String?
+
+    @State private var showRemoveConfirmation = false
+    @State private var isRemovingMember = false
+    @State private var removeError: String?
 
     var body: some View {
 
@@ -413,6 +419,79 @@ struct AdminMemberDetailView: View {
                     RoundedRectangle(cornerRadius: 18)
                 )
 
+                // MARK: - Remove Member
+
+                if canRemoveMember {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 12
+                    ) {
+
+                        Text("ניהול משתמש")
+                            .font(.headline)
+
+                        Text(
+                            "הסרת המשתמש תוציא אותו מהקבוצה. חשבון המשתמש עצמו לא יימחק."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        Button(
+                            role: .destructive
+                        ) {
+
+                            showRemoveConfirmation = true
+
+                        } label: {
+
+                            HStack {
+
+                                Spacer()
+
+                                if isRemovingMember {
+
+                                    ProgressView()
+                                        .padding(.trailing, 4)
+
+                                    Text("מסיר...")
+
+                                } else {
+
+                                    Image(
+                                        systemName:
+                                            "person.crop.circle.badge.minus"
+                                    )
+
+                                    Text("הסר מהקבוצה")
+                                        .fontWeight(.semibold)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isRemovingMember)
+
+                        if let removeError {
+
+                            Text(removeError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .leading
+                                )
+                        }
+                    }
+                    .padding()
+                    .background(.thinMaterial)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 18)
+                    )
+                }
+
                 // MARK: - Error
 
                 if let error = dataStore.lastError {
@@ -463,6 +542,32 @@ struct AdminMemberDetailView: View {
         .task {
             await loadData()
         }
+        .alert(
+            "להסיר מהקבוצה?",
+            isPresented: $showRemoveConfirmation
+        ) {
+
+            Button(
+                "ביטול",
+                role: .cancel
+            ) {}
+
+            Button(
+                "הסר",
+                role: .destructive
+            ) {
+
+                Task {
+                    await removeMember()
+                }
+            }
+
+        } message: {
+
+            Text(
+                "\(member.displayName ?? "המשתמש") יוסר מהקבוצה \(group.name). חשבון המשתמש לא יימחק."
+            )
+        }
     }
 
     // MARK: - Data
@@ -508,7 +613,20 @@ struct AdminMemberDetailView: View {
     }
 
     private var manualTargetTotalMinutes: Int {
+
         (manualHours * 60) + manualMinutes
+    }
+
+    private var canRemoveMember: Bool {
+
+        guard let currentUser =
+                dataStore.currentUser else {
+            return false
+        }
+
+        return
+            currentUser.role == "admin" &&
+            currentUser.id != member.id
     }
 
     // MARK: - History Row
@@ -663,6 +781,38 @@ struct AdminMemberDetailView: View {
         didLoadManualTarget = true
     }
 
+    // MARK: - Remove Member
+
+    @MainActor
+    private func removeMember() async {
+
+        guard !isRemovingMember else {
+            return
+        }
+
+        isRemovingMember = true
+        removeError = nil
+
+        defer {
+            isRemovingMember = false
+        }
+
+        do {
+
+            try await dataStore.removeMemberFromGroup(
+                groupID: group.id,
+                userID: member.id
+            )
+
+            dismiss()
+
+        } catch {
+
+            removeError =
+                "לא ניתן להסיר את המשתמש: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Status Card
 
     private func statusCard(
@@ -740,13 +890,17 @@ struct AdminMemberDetailView: View {
     ) -> String {
 
         let input = DateFormatter()
+
         input.calendar =
             Calendar(identifier: .gregorian)
+
         input.locale =
             Locale(identifier: "en_US_POSIX")
+
         input.timeZone =
             TimeZone(identifier: group.timezone) ??
             .current
+
         input.dateFormat = "yyyy-MM-dd"
 
         guard
@@ -758,11 +912,14 @@ struct AdminMemberDetailView: View {
         }
 
         let output = DateFormatter()
+
         output.locale =
             Locale(identifier: "he_IL")
+
         output.timeZone =
             TimeZone(identifier: group.timezone) ??
             .current
+
         output.dateFormat = "d MMM yyyy"
 
         return output.string(from: date)
@@ -811,6 +968,7 @@ struct AdminMemberDetailView: View {
             abs(target - usage)
 
         if usage <= target {
+
             return
                 "נותרו \(formatMinutes(difference)) עד היעד"
         }
@@ -826,17 +984,21 @@ struct AdminMemberDetailView: View {
         switch group.goalMethod {
 
         case "personal_percentage":
+
             return
                 "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
 
         case "group_average_percentage":
+
             return
                 "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
 
         case "manual":
+
             return "יעד אישי"
 
         default:
+
             return "יעד קבוצה"
         }
     }
