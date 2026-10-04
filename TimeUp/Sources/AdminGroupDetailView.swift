@@ -285,7 +285,7 @@ struct AdminGroupDetailView: View {
             ) {
 
                 Text(
-                    member.displayName
+                    member.displayName ?? "משתמש"
                 )
                 .fontWeight(
                     .semibold
