@@ -291,6 +291,9 @@ struct MemberTabView: View {
             await dataStore.loadDailyProgress(
                 groupID: group.id
             )
+
+            await dataStore
+                .syncReportedScreenTime()
         }
         .refreshable {
 
@@ -303,6 +306,9 @@ struct MemberTabView: View {
             await dataStore.loadDailyProgress(
                 groupID: group.id
             )
+
+            await dataStore
+                .syncReportedScreenTime()
         }
     }
 
@@ -472,6 +478,9 @@ struct MemberTabView: View {
             await dataStore.loadDailyProgress(
                 groupID: group.id
             )
+
+            await dataStore
+                .syncReportedScreenTime()
         }
         .refreshable {
 
@@ -482,6 +491,9 @@ struct MemberTabView: View {
             await dataStore.loadDailyProgress(
                 groupID: group.id
             )
+
+            await dataStore
+                .syncReportedScreenTime()
         }
     }
 
