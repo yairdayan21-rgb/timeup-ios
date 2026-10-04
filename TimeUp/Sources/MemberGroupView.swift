@@ -2,15 +2,16 @@ import SwiftUI
 
 struct MemberGroupView: View {
 
-    let member: TimeUpMember
-
-    @ObservedObject private var store =
-        TimeUpStore.shared
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
 
     @State private var selectedSection:
         GroupSection = .overview
 
-    private enum GroupSection: String, CaseIterable {
+    private enum GroupSection:
+        String,
+        CaseIterable {
+
         case overview = "סקירה"
         case detail = "פירוט"
         case dashboard = "Dashboard"
@@ -18,88 +19,99 @@ struct MemberGroupView: View {
         case chat = "צ׳אט"
     }
 
+    private var group:
+        SupabaseDataStore.TimeUpRemoteGroup? {
+
+        dataStore.activeMemberGroup
+    }
+
+    private var currentUser:
+        SupabaseDataStore.TimeUpRemoteUser? {
+
+        dataStore.currentUser
+    }
+
     var body: some View {
 
-        VStack(spacing: 0) {
+        Group {
 
-            sectionPicker
+            if let group {
 
-            Divider()
+                VStack(spacing: 0) {
 
-            Group {
+                    sectionPicker
 
-                switch selectedSection {
+                    Divider()
 
-                case .overview:
+                    Group {
 
-                    overviewView
+                        switch selectedSection {
 
-                case .detail:
+                        case .overview:
 
-                    MemberGroupDetailView(
-                        member: currentMember
-                    )
+                            overviewView(
+                                group: group
+                            )
 
-                case .dashboard:
+                        case .detail:
 
-                    MemberGroupDashboardView(
-                        member: currentMember
-                    )
+                            groupDetailView(
+                                group: group
+                            )
 
-                case .members:
+                        case .dashboard:
 
-                    MemberGroupMembersView(
-                        member: currentMember
-                    )
+                            dashboardView(
+                                group: group
+                            )
 
-                case .chat:
+                        case .members:
 
-                    MemberGroupChatView(
-                        member: currentMember
+                            membersView(
+                                group: group
+                            )
+
+                        case .chat:
+
+                            MemberGroupChatView(
+                                group: group
+                            )
+                        }
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
                     )
                 }
+                .navigationTitle(
+                    group.name
+                )
+                .navigationBarTitleDisplayMode(
+                    .inline
+                )
+                .task {
+
+                    await loadGroup(
+                        group: group
+                    )
+                }
+                .refreshable {
+
+                    await loadGroup(
+                        group: group
+                    )
+                }
+
+            } else {
+
+                ContentUnavailableView(
+                    "לא נמצאה קבוצה",
+                    systemImage: "person.3",
+                    description: Text(
+                        "לא נמצאה חברות פעילה בקבוצה."
+                    )
+                )
             }
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
-            )
-        }
-        .navigationTitle(
-            group?.name ?? "הקבוצה"
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
-    }
-
-    // MARK: - Current Member
-
-    private var currentMember: TimeUpMember {
-
-        store.member(
-            id: member.id
-        ) ?? member
-    }
-
-    // MARK: - Group
-
-    private var group: TimeUpGroup? {
-
-        store.groups.first {
-            $0.id == currentMember.groupID
-        }
-    }
-
-    // MARK: - Members
-
-    private var groupMembers: [TimeUpMember] {
-
-        guard let group else {
-            return []
-        }
-
-        return store.members.filter {
-            $0.groupID == group.id
         }
     }
 
@@ -122,7 +134,9 @@ struct MemberGroupView: View {
                     Button {
 
                         withAnimation(
-                            .easeInOut(duration: 0.18)
+                            .easeInOut(
+                                duration: 0.18
+                            )
                         ) {
 
                             selectedSection =
@@ -131,31 +145,9 @@ struct MemberGroupView: View {
 
                     } label: {
 
-                        HStack(spacing: 6) {
-
-                            Text(section.rawValue)
-
-                            if
-                                section == .chat,
-                                unreadChatCount > 0
-                            {
-
-                                Text(
-                                    unreadChatCount > 99
-                                        ? "99+"
-                                        : "\(unreadChatCount)"
-                                )
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(.red)
-                                )
-                            }
-                        }
+                        Text(
+                            section.rawValue
+                        )
                         .font(.subheadline)
                         .fontWeight(
                             selectedSection == section
@@ -172,7 +164,8 @@ struct MemberGroupView: View {
                         )
                         .background {
 
-                            if selectedSection == section {
+                            if selectedSection ==
+                                section {
 
                                 Capsule()
                                     .fill(
@@ -197,24 +190,23 @@ struct MemberGroupView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(
+                .horizontal,
+                16
+            )
+            .padding(
+                .vertical,
+                10
+            )
         }
-    }
-
-    // MARK: - Unread Chat
-
-    private var unreadChatCount: Int {
-
-        store.unreadMessageCount(
-            in: currentMember.groupID,
-            for: currentMember.id
-        )
     }
 
     // MARK: - Overview
 
-    private var overviewView: some View {
+    private func overviewView(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
         ScrollView {
 
@@ -223,15 +215,31 @@ struct MemberGroupView: View {
                 spacing: 20
             ) {
 
-                groupHeader
+                groupHeader(
+                    group: group
+                )
 
-                groupStreakCard
+                groupStreakCard(
+                    group: group
+                )
 
-                journeyCard
+                journeyCard(
+                    group: group
+                )
 
-                todayStatusCard
+                todayStatusCard(
+                    group: group
+                )
 
-                membersPreview
+                membersPreview(
+                    group: group
+                )
+
+                if let error =
+                    dataStore.lastError {
+
+                    errorCard(error)
+                }
             }
             .padding(16)
         }
@@ -239,27 +247,29 @@ struct MemberGroupView: View {
 
     // MARK: - Header
 
-    private var groupHeader: some View {
+    private func groupHeader(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
         VStack(
             alignment: .leading,
             spacing: 6
         ) {
 
-            Text(
-                group?.name ?? "הקבוצה שלך"
-            )
-            .font(.largeTitle)
-            .fontWeight(.bold)
+            Text(group.name)
+                .font(.largeTitle)
+                .fontWeight(.bold)
 
             HStack(spacing: 6) {
 
                 Image(
-                    systemName: "person.3.fill"
+                    systemName:
+                        "person.3.fill"
                 )
 
                 Text(
-                    "\(groupMembers.count) חברים"
+                    "\(memberCount) חברים"
                 )
             }
             .font(.subheadline)
@@ -273,7 +283,10 @@ struct MemberGroupView: View {
 
     // MARK: - Group Streak
 
-    private var groupStreakCard: some View {
+    private func groupStreakCard(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
         VStack(
             alignment: .leading,
@@ -291,7 +304,7 @@ struct MemberGroupView: View {
                         .font(.headline)
 
                     Text(
-                        "\(groupStreak) ימים"
+                        "\(group.currentStreak) ימים"
                     )
                     .font(
                         .system(
@@ -314,7 +327,7 @@ struct MemberGroupView: View {
             }
 
             Text(
-                groupStreak == 0
+                group.currentStreak == 0
                     ? "הרצף מתחיל כאשר כל חברי הקבוצה עומדים ביעד."
                     : "כל חברי הקבוצה צריכים לעמוד ביעד כדי להמשיך את הרצף."
             )
@@ -337,9 +350,21 @@ struct MemberGroupView: View {
 
     // MARK: - Journey
 
-    private var journeyCard: some View {
+    private func journeyCard(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
-        VStack(
+        let successDays =
+            max(
+                group.successDays ?? 7,
+                1
+            )
+
+        let streak =
+            group.currentStreak
+
+        return VStack(
             alignment: .leading,
             spacing: 16
         ) {
@@ -355,16 +380,22 @@ struct MemberGroupView: View {
                         .font(.headline)
 
                     Text(
-                        journeySubtitle
+                        journeySubtitle(
+                            streak: streak,
+                            successDays:
+                                successDays
+                        )
                     )
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
 
                 Spacer()
 
                 Text(
-                    "\(min(groupStreak, successDays))/\(successDays)"
+                    "\(min(streak, successDays))/\(successDays)"
                 )
                 .font(.headline)
                 .monospacedDigit()
@@ -373,16 +404,74 @@ struct MemberGroupView: View {
             ProgressView(
                 value: Double(
                     min(
-                        groupStreak,
+                        streak,
                         successDays
                     )
                 ),
                 total: Double(
-                    max(successDays, 1)
+                    successDays
                 )
             )
 
-            journeyDays
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .adaptive(
+                            minimum: 42,
+                            maximum: 48
+                        ),
+                        spacing: 10
+                    )
+                ],
+                spacing: 10
+            ) {
+
+                ForEach(
+                    1...successDays,
+                    id: \.self
+                ) { day in
+
+                    ZStack {
+
+                        Circle()
+                            .fill(
+                                day <= streak
+                                    ? Color.accentColor
+                                    : Color.secondary
+                                        .opacity(0.14)
+                            )
+                            .frame(
+                                width: 42,
+                                height: 42
+                            )
+
+                        if day <= streak {
+
+                            Image(
+                                systemName:
+                                    "checkmark"
+                            )
+                            .fontWeight(.bold)
+                            .foregroundStyle(
+                                .white
+                            )
+
+                        } else {
+
+                            Text("\(day)")
+                                .font(
+                                    .subheadline
+                                )
+                                .fontWeight(
+                                    .semibold
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                        }
+                    }
+                }
+            }
         }
         .padding(18)
         .background {
@@ -398,73 +487,21 @@ struct MemberGroupView: View {
         }
     }
 
-    private var journeyDays: some View {
+    private func journeySubtitle(
+        streak: Int,
+        successDays: Int
+    ) -> String {
 
-        LazyVGrid(
-            columns: [
-                GridItem(
-                    .adaptive(
-                        minimum: 42,
-                        maximum: 48
-                    ),
-                    spacing: 10
-                )
-            ],
-            spacing: 10
-        ) {
+        if streak >= successDays {
 
-            ForEach(
-                1...successDays,
-                id: \.self
-            ) { day in
-
-                ZStack {
-
-                    Circle()
-                        .fill(
-                            day <= groupStreak
-                                ? Color.accentColor
-                                : Color.secondary
-                                    .opacity(0.14)
-                        )
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-
-                    if day <= groupStreak {
-
-                        Image(
-                            systemName: "checkmark"
-                        )
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-
-                    } else {
-
-                        Text("\(day)")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(
-                                .secondary
-                            )
-                    }
-                }
-            }
-        }
-    }
-
-    private var journeySubtitle: String {
-
-        if groupStreak >= successDays {
-
-            return "הקבוצה השלימה את היעד"
+            return
+                "הקבוצה השלימה את היעד"
 
         } else {
 
             let remaining =
                 max(
-                    successDays - groupStreak,
+                    successDays - streak,
                     0
                 )
 
@@ -475,7 +512,10 @@ struct MemberGroupView: View {
 
     // MARK: - Today
 
-    private var todayStatusCard: some View {
+    private func todayStatusCard(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
         VStack(
             alignment: .leading,
@@ -511,10 +551,12 @@ struct MemberGroupView: View {
 
                     Text("חברי קבוצה")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
 
                     Text(
-                        "\(groupMembers.count)"
+                        "\(memberCount)"
                     )
                     .font(.title2)
                     .fontWeight(.bold)
@@ -529,21 +571,54 @@ struct MemberGroupView: View {
 
                     Text("רצף נוכחי")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
 
                     Text(
-                        "\(groupStreak)"
+                        "\(group.currentStreak)"
                     )
                     .font(.title2)
                     .fontWeight(.bold)
                 }
             }
 
-            Text(
-                "היום ייחשב כחלק מהרצף רק לאחר שכל חברי הקבוצה יסיימו את היום ויעמדו ביעד שלהם."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+            if let result =
+                todayGroupResult(
+                    group: group
+                ) {
+
+                Divider()
+
+                HStack(
+                    spacing: 10
+                ) {
+
+                    Image(
+                        systemName:
+                            result.succeeded
+                                ? "checkmark.circle.fill"
+                                : "xmark.circle.fill"
+                    )
+
+                    Text(
+                        result.succeeded
+                            ? "כל חברי הקבוצה עמדו ביעד."
+                            : "הקבוצה לא עמדה היום ביעד."
+                    )
+                    .font(.footnote)
+                }
+
+            } else {
+
+                Text(
+                    "תוצאת היום תיסגר אוטומטית לאחר שכל נתוני השימוש יתקבלו."
+                )
+                .font(.footnote)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
         }
         .padding(18)
         .background {
@@ -561,7 +636,10 @@ struct MemberGroupView: View {
 
     // MARK: - Members Preview
 
-    private var membersPreview: some View {
+    private func membersPreview(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
         VStack(
             alignment: .leading,
@@ -583,22 +661,42 @@ struct MemberGroupView: View {
                 .font(.subheadline)
             }
 
-            if groupMembers.isEmpty {
+            if dataStore.groupMembers.isEmpty {
 
-                ContentUnavailableView(
-                    "אין חברים בקבוצה",
-                    systemImage: "person.3"
-                )
+                if dataStore.isLoadingGroupMembers {
+
+                    HStack {
+
+                        Spacer()
+
+                        ProgressView()
+
+                        Spacer()
+                    }
+                    .padding()
+
+                } else {
+
+                    ContentUnavailableView(
+                        "אין חברים בקבוצה",
+                        systemImage:
+                            "person.3"
+                    )
+                }
 
             } else {
 
                 ForEach(
                     Array(
-                        groupMembers.prefix(4)
+                        dataStore
+                            .groupMembers
+                            .prefix(4)
                     )
-                ) { groupMember in
+                ) { member in
 
-                    HStack(spacing: 12) {
+                    HStack(
+                        spacing: 12
+                    ) {
 
                         Image(
                             systemName:
@@ -617,16 +715,21 @@ struct MemberGroupView: View {
                         ) {
 
                             Text(
-                                groupMember.displayName
+                                member
+                                    .displayName ??
+                                "משתמש"
                             )
-                            .fontWeight(.semibold)
+                            .fontWeight(
+                                .semibold
+                            )
 
-                            if groupMember.id ==
-                                currentMember.id
-                            {
+                            if member.id ==
+                                currentUser?.id {
 
                                 Text("אתה")
-                                    .font(.caption)
+                                    .font(
+                                        .caption
+                                    )
                                     .foregroundStyle(
                                         .secondary
                                     )
@@ -636,12 +739,12 @@ struct MemberGroupView: View {
                         Spacer()
                     }
 
-                    if groupMember.id !=
-                        groupMembers
+                    if member.id !=
+                        dataStore
+                            .groupMembers
                             .prefix(4)
                             .last?
-                            .id
-                    {
+                            .id {
 
                         Divider()
                     }
@@ -662,97 +765,488 @@ struct MemberGroupView: View {
         }
     }
 
-    // MARK: - Current Group Streak
+    // MARK: - Detail
 
-    private var groupStreak: Int {
+    private func groupDetailView(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
 
-        let calendar =
-            Calendar.current
+        ScrollView {
 
-        let members =
-            groupMembers.filter {
-                $0.role == .member
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+
+                Text("פירוט קבוצתי")
+                    .font(.title2.bold())
+
+                if dataStore
+                    .dailyResults
+                    .isEmpty {
+
+                    ContentUnavailableView(
+                        "אין עדיין נתונים",
+                        systemImage:
+                            "chart.bar.doc.horizontal",
+                        description: Text(
+                            "נתוני השימוש של חברי הקבוצה יופיעו כאן."
+                        )
+                    )
+
+                } else {
+
+                    ForEach(
+                        dataStore
+                            .groupMembers
+                    ) { member in
+
+                        memberProgressCard(
+                            member: member,
+                            group: group
+                        )
+                    }
+                }
             }
-
-        guard !members.isEmpty else {
-            return 0
+            .padding(16)
         }
+    }
 
-        var streak = 0
+    // MARK: - Dashboard
 
-        var date =
-            calendar.startOfDay(
-                for:
-                    calendar.date(
-                        byAdding: .day,
-                        value: -1,
-                        to: Date()
-                    ) ?? Date()
+    private func dashboardView(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
+
+        ScrollView {
+
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
+
+                Text("Dashboard")
+                    .font(.title2.bold())
+
+                dashboardCard(
+                    title: "רצף קבוצתי",
+                    value:
+                        "\(group.currentStreak)",
+                    subtitle: "ימים"
+                )
+
+                dashboardCard(
+                    title: "חברי הקבוצה",
+                    value:
+                        "\(memberCount)",
+                    subtitle:
+                        "משתמשים"
+                )
+
+                dashboardCard(
+                    title: "ימי הצלחה",
+                    value:
+                        "\(group.successDays ?? 7)",
+                    subtitle:
+                        "יעד המסע"
+                )
+
+                if let latest =
+                    dataStore
+                        .groupDailyResults
+                        .first {
+
+                    dashboardCard(
+                        title:
+                            "ממוצע שימוש",
+                        value:
+                            formatMinutes(
+                                latest
+                                    .averageUsageMinutes ??
+                                0
+                            ),
+                        subtitle:
+                            "ביום האחרון שנסגר"
+                    )
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private func dashboardCard(
+        title: String,
+        value: String,
+        subtitle: String
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 6
+        ) {
+
+            Text(title)
+                .font(.headline)
+
+            Text(value)
+                .font(
+                    .system(
+                        size: 32,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(18)
+        .background {
+
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .fill(
+                Color.secondary
+                    .opacity(0.10)
+            )
+        }
+    }
+
+    // MARK: - Members
+
+    private func membersView(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
+
+        ScrollView {
+
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+
+                Text("חברים")
+                    .font(.title2.bold())
+
+                ForEach(
+                    dataStore.groupMembers
+                ) { member in
+
+                    memberProgressCard(
+                        member: member,
+                        group: group
+                    )
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    // MARK: - Member Progress
+
+    private func memberProgressCard(
+        member:
+            SupabaseDataStore.TimeUpRemoteUser,
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
+
+        let result =
+            todayResult(
+                for: member.id,
+                group: group
             )
 
-        while true {
+        return HStack(
+            spacing: 12
+        ) {
 
-            var allAchieved = true
+            Image(
+                systemName:
+                    "person.crop.circle.fill"
+            )
+            .font(
+                .system(size: 36)
+            )
+            .foregroundStyle(.secondary)
 
-            for groupMember in members {
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
 
-                let progress =
-                    store.dailyProgress
-                        .filter {
-                            $0.memberID ==
-                                groupMember.id
-                        }
-                        .first {
-                            calendar.isDate(
-                                $0.date,
-                                inSameDayAs: date
+                HStack(
+                    spacing: 5
+                ) {
+
+                    Text(
+                        member.displayName ??
+                        "משתמש"
+                    )
+                    .fontWeight(.semibold)
+
+                    if member.id ==
+                        currentUser?.id {
+
+                        Text("• אתה")
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
                             )
-                        }
+                    }
+                }
 
-                guard
-                    let progress,
-                    !progress.isLearningDay,
-                    progress.achieved
-                else {
+                if let result {
 
-                    allAchieved = false
-                    break
+                    if result.isLearningDay {
+
+                        Text(
+                            "\(formatMinutes(result.usageMinutes)) • יום למידה"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                    } else {
+
+                        Text(
+                            result.targetMinutes.map {
+                                "\(formatMinutes(result.usageMinutes)) / \(formatMinutes($0))"
+                            } ??
+                            formatMinutes(
+                                result.usageMinutes
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                } else {
+
+                    Text(
+                        "ממתין לנתוני היום"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
             }
 
-            guard allAchieved else {
-                break
-            }
+            Spacer()
 
-            streak += 1
+            if let result {
 
-            guard
-                let previousDay =
-                    calendar.date(
-                        byAdding: .day,
-                        value: -1,
-                        to: date
+                if result.isLearningDay {
+
+                    Image(
+                        systemName: "clock.fill"
                     )
-            else {
-                break
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                } else if
+                    result.achieved == true {
+
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        .green
+                    )
+
+                } else if
+                    result.achieved == false {
+
+                    Image(
+                        systemName:
+                            "xmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        .red
+                    )
+                }
             }
-
-            date =
-                calendar.startOfDay(
-                    for: previousDay
-                )
         }
+        .padding(14)
+        .background {
 
-        return streak
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .fill(
+                Color.secondary
+                    .opacity(0.10)
+            )
+        }
     }
 
-    // MARK: - Success Days
+    // MARK: - Data Helpers
 
-    private var successDays: Int {
+    private var memberCount: Int {
 
-        max(
-            group?.successDays ?? 7,
-            1
+        dataStore.groupMembers.count
+    }
+
+    private func todayResult(
+        for userID: UUID,
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> SupabaseDataStore.TimeUpRemoteDailyResult? {
+
+        dataStore.dailyResults.first {
+            $0.groupID == group.id &&
+            $0.userID == userID &&
+            $0.resultDate ==
+                todayDateKey(
+                    group: group
+                )
+        }
+    }
+
+    private func todayGroupResult(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> SupabaseDataStore.TimeUpRemoteGroupDailyResult? {
+
+        dataStore
+            .groupDailyResults
+            .first {
+                $0.groupID == group.id &&
+                $0.resultDate ==
+                    todayDateKey(
+                        group: group
+                    )
+            }
+    }
+
+    // MARK: - Load
+
+    @MainActor
+    private func loadGroup(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) async {
+
+        await dataStore.loadGroupMembers(
+            groupID: group.id
         )
+
+        await dataStore.loadDailyProgress(
+            groupID: group.id
+        )
+    }
+
+    // MARK: - Date
+
+    private func todayDateKey(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> String {
+
+        let formatter =
+            DateFormatter()
+
+        formatter.calendar =
+            Calendar(
+                identifier: .gregorian
+            )
+
+        formatter.locale =
+            Locale(
+                identifier:
+                    "en_US_POSIX"
+            )
+
+        formatter.timeZone =
+            TimeZone(
+                identifier:
+                    group.timezone
+            ) ??
+            TimeZone(
+                identifier:
+                    "Asia/Jerusalem"
+            ) ??
+            .current
+
+        formatter.dateFormat =
+            "yyyy-MM-dd"
+
+        return formatter.string(
+            from: Date()
+        )
+    }
+
+    // MARK: - Formatting
+
+    private func formatMinutes(
+        _ minutes: Int
+    ) -> String {
+
+        let hours =
+            minutes / 60
+
+        let remaining =
+            minutes % 60
+
+        if hours == 0 {
+
+            return
+                "\(remaining) דק׳"
+        }
+
+        if remaining == 0 {
+
+            return
+                "\(hours) שע׳"
+        }
+
+        return
+            "\(hours) שע׳ \(remaining) דק׳"
+    }
+
+    // MARK: - Error
+
+    private func errorCard(
+        _ error: String
+    ) -> some View {
+
+        Label(
+            error,
+            systemImage:
+                "exclamationmark.triangle.fill"
+        )
+        .font(.footnote)
+        .foregroundStyle(.red)
+        .padding()
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background {
+
+            RoundedRectangle(
+                cornerRadius: 14
+            )
+            .fill(
+                Color.red.opacity(0.08)
+            )
+        }
     }
 }
