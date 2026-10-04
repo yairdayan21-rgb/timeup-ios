@@ -54,15 +54,15 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
-    struct TimeUpRemoteGroup: Identifiable, Decodable {
+    public struct TimeUpRemoteGroup: Identifiable, Decodable {
 
-        let id: UUID
-        let name: String
-        let code: String
-        let goalMethod: String
-        let reductionPercent: Int?
-        let successDays: Int?
-        let createdAt: Date?
+        public let id: UUID
+        public let name: String
+        public let code: String
+        public let goalMethod: String
+        public let reductionPercent: Int?
+        public let successDays: Int?
+        public let createdAt: Date?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -247,6 +247,7 @@ final class SupabaseDataStore: ObservableObject {
     ) async throws -> UUID {
 
         struct JoinParameters: Encodable {
+
             let requestedCode: String
 
             enum CodingKeys:
