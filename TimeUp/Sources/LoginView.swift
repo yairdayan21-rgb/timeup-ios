@@ -29,6 +29,38 @@ struct LoginView: View {
         case member(UUID)
     }
 
+    private struct SupabaseTimeUpUser: Codable {
+
+        let id: UUID
+        let authUserID: UUID
+        let email: String?
+        let displayName: String?
+        let role: String
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case authUserID = "auth_user_id"
+            case email
+            case displayName = "display_name"
+            case role
+        }
+    }
+
+    private struct NewSupabaseTimeUpUser: Encodable {
+
+        let authUserID: UUID
+        let email: String?
+        let displayName: String?
+        let role: String
+
+        enum CodingKeys: String, CodingKey {
+            case authUserID = "auth_user_id"
+            case email
+            case displayName = "display_name"
+            case role
+        }
+    }
+
     var body: some View {
 
         NavigationStack {
@@ -131,8 +163,6 @@ struct LoginView: View {
             }
             .padding(.horizontal, 24)
 
-            // MARK: New Apple account
-
             .navigationDestination(
                 isPresented: $showJoinScreen
             ) {
@@ -144,8 +174,6 @@ struct LoginView: View {
                         authenticatedUserID
                 )
             }
-
-            // MARK: Existing account
 
             .navigationDestination(
                 item: $existingMemberDestination
@@ -274,16 +302,31 @@ struct LoginView: View {
 
                 do {
 
-                    _ = try await
-                        SupabaseManager.shared.client.auth
-                            .signInWithIdToken(
-                                credentials:
-                                    OpenIDConnectCredentials(
-                                        provider: .apple,
-                                        idToken: idToken,
-                                        nonce: nonce
-                                    )
-                            )
+                    let session =
+                        try await
+                            SupabaseManager.shared.client.auth
+                                .signInWithIdToken(
+                                    credentials:
+                                        OpenIDConnectCredentials(
+                                            provider: .apple,
+                                            idToken: idToken,
+                                            nonce: nonce
+                                        )
+                                )
+
+                    let displayName =
+                        appleDisplayName(
+                            from: credential
+                        )
+
+                    try await ensureSupabaseUserExists(
+                        authUserID:
+                            session.user.id,
+                        email:
+                            credential.email,
+                        displayName:
+                            displayName
+                    )
 
                     await MainActor.run {
 
@@ -331,12 +374,83 @@ struct LoginView: View {
         }
     }
 
+    // MARK: - Supabase User
+
+    private func ensureSupabaseUserExists(
+        authUserID: UUID,
+        email: String?,
+        displayName: String?
+    ) async throws {
+
+        let existingUsers:
+            [SupabaseTimeUpUser] =
+            try await
+                SupabaseManager.shared.client
+                    .from("users")
+                    .select()
+                    .eq(
+                        "auth_user_id",
+                        value:
+                            authUserID.uuidString
+                    )
+                    .limit(1)
+                    .execute()
+                    .value
+
+        if !existingUsers.isEmpty {
+            return
+        }
+
+        let newUser =
+            NewSupabaseTimeUpUser(
+                authUserID:
+                    authUserID,
+                email:
+                    email,
+                displayName:
+                    displayName,
+                role:
+                    "member"
+            )
+
+        try await
+            SupabaseManager.shared.client
+                .from("users")
+                .insert(newUser)
+                .execute()
+    }
+
+    private func appleDisplayName(
+        from credential:
+            ASAuthorizationAppleIDCredential
+    ) -> String? {
+
+        guard
+            let fullName =
+                credential.fullName
+        else {
+            return nil
+        }
+
+        let formatter =
+            PersonNameComponentsFormatter()
+
+        let name =
+            formatter.string(
+                from: fullName
+            )
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        return name.isEmpty
+            ? nil
+            : name
+    }
+
     private func continueAfterAppleSignIn(
         appleUserID: String
     ) {
-
-        // בשלב זה כבר קיימת התחברות אמיתית
-        // ל-Supabase Auth.
 
         if let existingMember =
             store.member(
@@ -408,6 +522,7 @@ struct LoginView: View {
                 )
 
             if errorCode != errSecSuccess {
+
                 fatalError(
                     "Unable to generate nonce."
                 )
