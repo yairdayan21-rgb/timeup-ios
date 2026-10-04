@@ -11,7 +11,6 @@ struct TimeUpApp: App {
         "com.timeup.app.screen-time-sync"
 
     init() {
-
         registerBackgroundTasks()
         scheduleBackgroundScreenTimeSync()
     }
@@ -22,14 +21,15 @@ struct TimeUpApp: App {
 
             RootView()
                 .environmentObject(store)
-                .onAppear {
 
+                .onAppear {
                     scheduleBackgroundScreenTimeSync()
 
                     Task {
                         await syncScreenTimeNow()
                     }
                 }
+
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for:
@@ -47,7 +47,8 @@ struct TimeUpApp: App {
         }
     }
 
-    // MARK: - Background Task Registration
+
+    // MARK: - Background Tasks
 
     private func registerBackgroundTasks() {
 
@@ -57,8 +58,9 @@ struct TimeUpApp: App {
             using: nil
         ) { task in
 
-            guard let refreshTask =
-                task as? BGAppRefreshTask
+            guard
+                let refreshTask =
+                    task as? BGAppRefreshTask
             else {
 
                 task.setTaskCompleted(
@@ -74,7 +76,6 @@ struct TimeUpApp: App {
         }
     }
 
-    // MARK: - Background Scheduling
 
     private func scheduleBackgroundScreenTimeSync() {
 
@@ -89,10 +90,6 @@ struct TimeUpApp: App {
                     screenTimeSyncTaskIdentifier
             )
 
-        // This is the earliest time at which
-        // iOS may run the task.
-        //
-        // iOS decides the actual execution time.
         request.earliestBeginDate =
             Date(
                 timeIntervalSinceNow:
@@ -114,28 +111,24 @@ struct TimeUpApp: App {
         }
     }
 
-    // MARK: - Background Execution
 
     private func handleBackgroundScreenTimeSync(
         task: BGAppRefreshTask
     ) {
 
-        // Schedule the next opportunity immediately.
-        // The system still decides when it actually runs.
         scheduleBackgroundScreenTimeSync()
 
-        let syncTask =
-            Task {
+        let syncTask = Task {
 
-                await syncScreenTimeNow()
+            await syncScreenTimeNow()
 
-                if !Task.isCancelled {
+            if !Task.isCancelled {
 
-                    task.setTaskCompleted(
-                        success: true
-                    )
-                }
+                task.setTaskCompleted(
+                    success: true
+                )
             }
+        }
 
         task.expirationHandler = {
 
@@ -147,7 +140,8 @@ struct TimeUpApp: App {
         }
     }
 
-    // MARK: - Screen Time → Supabase
+
+    // MARK: - Screen Time Sync
 
     @MainActor
     private func syncScreenTimeNow() async {
@@ -155,52 +149,80 @@ struct TimeUpApp: App {
         let dataStore =
             SupabaseDataStore.shared
 
-        // Background launch may happen before
-        // the Supabase account has been loaded.
         if dataStore.currentUser == nil {
 
-            await dataStore
-                .loadCurrentAccount()
+            await dataStore.loadCurrentAccount()
         }
 
-        guard let group =
-            dataStore.activeMemberGroup
+        guard
+            let group =
+                dataStore.activeMemberGroup
         else {
             return
         }
 
-        // Load today's target/result first so
-        // the Screen Time result is written with
-        // the correct target information.
         await dataStore.loadDailyProgress(
             groupID: group.id
         )
 
-        await dataStore
-            .syncReportedScreenTime()
+        await dataStore.syncReportedScreenTime()
     }
 }
 
+
+// MARK: - Root View
+
 private struct RootView: View {
 
-    @EnvironmentObject private var store:
-        TimeUpStore
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
+
+    @State private var didLoadAccount = false
+
 
     var body: some View {
 
         NavigationStack {
 
-            if let member =
-                store.currentMember {
+            Group {
 
-                AppLockView(
-                    member: member
-                )
+                if !didLoadAccount {
 
-            } else {
+                    ProgressView(
+                        "טוען את TimeUp..."
+                    )
 
-                LoginView()
+                } else if
+                    dataStore.currentUser == nil {
+
+                    LoginView()
+
+                } else if
+                    dataStore.isAdmin {
+
+                    AdminTabView()
+
+                } else if
+                    dataStore.hasActiveGroup {
+
+                    MemberTabView()
+
+                } else {
+
+                    JoinGroupView()
+                }
             }
+        }
+
+        .task {
+
+            guard !didLoadAccount else {
+                return
+            }
+
+            await dataStore.loadCurrentAccount()
+
+            didLoadAccount = true
         }
     }
 }
