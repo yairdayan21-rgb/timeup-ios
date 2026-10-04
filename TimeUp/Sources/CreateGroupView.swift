@@ -30,62 +30,121 @@ struct CreateGroupView: View {
                 return "person.crop.circle.badge.checkmark"
             }
         }
+
+        var databaseValue: String {
+            switch self {
+            case .previousDay:
+                return "personal_percentage"
+            case .adaptiveAverage:
+                return "group_average_percentage"
+            case .manual:
+                return "manual"
+            }
+        }
     }
 
     @Environment(\.dismiss) private var dismiss
 
-    let onGroupCreated: (TimeUpGroup) -> Void
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
 
     @State private var groupName = ""
     @State private var selectedMethod: GoalMethod = .previousDay
     @State private var reductionPercent = 5
     @State private var successDays = 7
 
+    @State private var errorMessage: String?
+    @State private var showError = false
+
     private var canCreateGroup: Bool {
-        !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !groupName
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        !dataStore.isCreatingGroup
     }
 
     var body: some View {
+
         Form {
 
             Section("פרטי הקבוצה") {
-                TextField("שם הקבוצה", text: $groupName)
+
+                TextField(
+                    "שם הקבוצה",
+                    text: $groupName
+                )
             }
 
             Section {
-                ForEach(GoalMethod.allCases) { method in
+
+                ForEach(
+                    GoalMethod.allCases
+                ) { method in
+
                     Button {
+
                         selectedMethod = method
+
                     } label: {
+
                         HStack(spacing: 14) {
 
-                            Image(systemName: method.icon)
-                                .font(.title3)
-                                .frame(width: 30)
+                            Image(
+                                systemName:
+                                    method.icon
+                            )
+                            .font(.title3)
+                            .frame(width: 30)
 
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 4
+                            ) {
+
                                 Text(method.title)
-                                    .fontWeight(.semibold)
+                                    .fontWeight(
+                                        .semibold
+                                    )
 
-                                Text(description(for: method))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                Text(
+                                    description(
+                                        for: method
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
                             }
 
                             Spacer()
 
-                            if selectedMethod == method {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.blue)
+                            if selectedMethod ==
+                                method {
+
+                                Image(
+                                    systemName:
+                                        "checkmark.circle.fill"
+                                )
+                                .foregroundStyle(
+                                    .blue
+                                )
                             }
                         }
-                        .contentShape(Rectangle())
+                        .contentShape(
+                            Rectangle()
+                        )
                     }
                     .buttonStyle(.plain)
                 }
 
             } header: {
-                Text("איך נקבע את היעדים?")
+
+                Text(
+                    "איך נקבע את היעדים?"
+                )
             }
 
             if selectedMethod != .manual {
@@ -104,89 +163,168 @@ struct CreateGroupView: View {
                         in: 1...30
                     )
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+
                         Label(
                             "יום למידה + \(successDays) ימי הצלחה",
-                            systemImage: "brain.head.profile"
+                            systemImage:
+                                "brain.head.profile"
                         )
                         .fontWeight(.medium)
 
                         Text(
-                            "יום הלמידה אינו נספר. לאחריו המשתמש צריך להשלים \(successDays) ימי הצלחה רצופים. אם הוא לא עומד ביעד, הספירה חוזרת ליום 1. לאחר השלמת התהליך, היעד האחרון הופך ליעד הקבוע."
+                            "יום הלמידה אינו נספר. לאחריו המשתמש צריך להשלים \(successDays) ימי הצלחה רצופים. אם הקבוצה לא עומדת ביעד, הספירה מתאפסת. לאחר השלמת התהליך, היעד האחרון הופך ליעד הקבוע."
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
                     }
-                    .padding(.vertical, 6)
+                    .padding(
+                        .vertical,
+                        6
+                    )
                 }
 
             } else {
 
                 Section("יעד אישי") {
+
                     Text(
                         "לאחר שמשתמש מצטרף לקבוצה, תוכל להגדיר עבורו יעד זמן מסך אישי."
                     )
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
             }
 
             Section {
+
                 Button {
-                    createGroup()
+
+                    Task {
+                        await createGroup()
+                    }
+
                 } label: {
-                    Text("צור קבוצה")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
+
+                    HStack {
+
+                        Spacer()
+
+                        if dataStore
+                            .isCreatingGroup {
+
+                            ProgressView()
+                        }
+
+                        Text(
+                            dataStore
+                                .isCreatingGroup
+                                ? "יוצר קבוצה..."
+                                : "צור קבוצה"
+                        )
+                        .fontWeight(
+                            .semibold
+                        )
+
+                        Spacer()
+                    }
                 }
-                .disabled(!canCreateGroup)
+                .disabled(
+                    !canCreateGroup
+                )
             }
         }
-        .navigationTitle("קבוצה חדשה")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func description(for method: GoalMethod) -> String {
-        switch method {
-        case .previousDay:
-            return "היעד יורד ב-X% ביחס ליום הקודם למשך Y ימי הצלחה"
-
-        case .adaptiveAverage:
-            return "היעד מחושב מהממוצע האישי פחות X% למשך Y ימי הצלחה"
-
-        case .manual:
-            return "המנהל קובע יעד נפרד לכל משתמש"
-        }
-    }
-
-    private func createGroup() {
-
-        let modelMethod: TimeUpGroup.GoalMethod
-
-        switch selectedMethod {
-        case .previousDay:
-            modelMethod = .previousDay
-
-        case .adaptiveAverage:
-            modelMethod = .adaptiveAverage
-
-        case .manual:
-            modelMethod = .manual
-        }
-
-        let newGroup = TimeUpGroup(
-            name: groupName.trimmingCharacters(in: .whitespacesAndNewlines),
-            code: generateGroupCode(),
-            goalMethod: modelMethod,
-            reductionPercent: selectedMethod == .manual ? nil : reductionPercent,
-            successDays: selectedMethod == .manual ? nil : successDays
+        .navigationTitle(
+            "קבוצה חדשה"
         )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .interactiveDismissDisabled(
+            dataStore.isCreatingGroup
+        )
+        .alert(
+            "לא ניתן ליצור את הקבוצה",
+            isPresented: $showError
+        ) {
 
-        onGroupCreated(newGroup)
-        dismiss()
+            Button(
+                "אישור",
+                role: .cancel
+            ) {}
+
+        } message: {
+
+            Text(
+                errorMessage ??
+                "אירעה שגיאה לא צפויה."
+            )
+        }
     }
 
-    private func generateGroupCode() -> String {
-        String(format: "%04d", Int.random(in: 1...9999))
+    private func description(
+        for method: GoalMethod
+    ) -> String {
+
+        switch method {
+
+        case .previousDay:
+
+            return
+                "היעד יורד ב-X% ביחס לשימוש של היום הקודם"
+
+        case .adaptiveAverage:
+
+            return
+                "לכל חברי הקבוצה נקבע יעד זהה לפי ממוצע השימוש הקבוצתי פחות X%"
+
+        case .manual:
+
+            return
+                "המנהל קובע יעד נפרד לכל משתמש"
+        }
+    }
+
+    private func createGroup() async {
+
+        do {
+
+            try await dataStore
+                .createGroup(
+                    name:
+                        groupName
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            ),
+                    goalMethod:
+                        selectedMethod
+                            .databaseValue,
+                    reductionPercent:
+                        selectedMethod == .manual
+                            ? nil
+                            : reductionPercent,
+                    successDays:
+                        selectedMethod == .manual
+                            ? nil
+                            : successDays
+                )
+
+            dismiss()
+
+        } catch {
+
+            errorMessage =
+                error.localizedDescription
+
+            showError = true
+        }
     }
 }
