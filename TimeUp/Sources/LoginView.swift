@@ -6,11 +6,12 @@ import Supabase
 
 struct LoginView: View {
 
-    @StateObject private var store = TimeUpStore.shared
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
 
     @State private var showJoinScreen = false
-    @State private var existingMemberDestination:
-        ExistingMemberDestination?
+    @State private var showMemberApp = false
+    @State private var showAdminApp = false
 
     @State private var appleSignInError = ""
 
@@ -22,12 +23,6 @@ struct LoginView: View {
 
     @State private var currentNonce:
         String?
-
-    private enum ExistingMemberDestination:
-        Hashable {
-        case admin(UUID)
-        case member(UUID)
-    }
 
     private struct SupabaseTimeUpUser: Codable {
 
@@ -173,45 +168,29 @@ struct LoginView: View {
                     externalUserID:
                         authenticatedUserID
                 )
+                .navigationBarBackButtonHidden(
+                    true
+                )
             }
 
             .navigationDestination(
-                item: $existingMemberDestination
-            ) { destination in
+                isPresented: $showMemberApp
+            ) {
 
-                switch destination {
+                MemberTabView()
+                    .navigationBarBackButtonHidden(
+                        true
+                    )
+            }
 
-                case .admin:
+            .navigationDestination(
+                isPresented: $showAdminApp
+            ) {
 
-                    AdminHomeView()
-                        .navigationBarBackButtonHidden(
-                            true
-                        )
-
-                case .member(let memberID):
-
-                    if let member =
-                        store.member(
-                            id: memberID
-                        )
-                    {
-
-                        MemberHomeView(
-                            member: member
-                        )
-                        .navigationBarBackButtonHidden(
-                            true
-                        )
-
-                    } else {
-
-                        ContentUnavailableView(
-                            "לא ניתן לפתוח את המשתמש",
-                            systemImage:
-                                "person.crop.circle.badge.exclamationmark"
-                        )
-                    }
-                }
+                AdminHomeView()
+                    .navigationBarBackButtonHidden(
+                        true
+                    )
             }
         }
     }
@@ -304,7 +283,9 @@ struct LoginView: View {
 
                     let session =
                         try await
-                            SupabaseManager.shared.client.auth
+                            SupabaseManager.shared
+                                .client
+                                .auth
                                 .signInWithIdToken(
                                     credentials:
                                         OpenIDConnectCredentials(
@@ -319,23 +300,30 @@ struct LoginView: View {
                             from: credential
                         )
 
-                    try await ensureSupabaseUserExists(
-                        authUserID:
-                            session.user.id,
-                        email:
-                            credential.email,
-                        displayName:
-                            displayName
-                    )
+                    try await
+                        ensureSupabaseUserExists(
+                            authUserID:
+                                session.user.id,
+                            email:
+                                credential.email,
+                            displayName:
+                                displayName
+                        )
+
+                    await dataStore
+                        .loadCurrentAccount()
 
                     await MainActor.run {
 
                         currentNonce = nil
 
-                        continueAfterAppleSignIn(
-                            appleUserID:
-                                appleUserID
-                        )
+                        authenticatedProvider =
+                            .apple
+
+                        authenticatedUserID =
+                            appleUserID
+
+                        routeAuthenticatedUser()
                     }
 
                 } catch {
@@ -420,6 +408,31 @@ struct LoginView: View {
                 .execute()
     }
 
+    private func routeAuthenticatedUser() {
+
+        guard dataStore.currentUser != nil else {
+
+            appleSignInError =
+                "לא ניתן היה לטעון את חשבון TimeUp."
+
+            return
+        }
+
+        if dataStore.isAdmin {
+
+            showAdminApp = true
+            return
+        }
+
+        if dataStore.hasActiveGroup {
+
+            showMemberApp = true
+            return
+        }
+
+        showJoinScreen = true
+    }
+
     private func appleDisplayName(
         from credential:
             ASAuthorizationAppleIDCredential
@@ -446,51 +459,6 @@ struct LoginView: View {
         return name.isEmpty
             ? nil
             : name
-    }
-
-    private func continueAfterAppleSignIn(
-        appleUserID: String
-    ) {
-
-        if let existingMember =
-            store.member(
-                authProvider: .apple,
-                externalUserID:
-                    appleUserID
-            )
-        {
-
-            store.setCurrentMember(
-                existingMember
-            )
-
-            switch existingMember.role {
-
-            case .admin:
-
-                existingMemberDestination =
-                    .admin(
-                        existingMember.id
-                    )
-
-            case .member:
-
-                existingMemberDestination =
-                    .member(
-                        existingMember.id
-                    )
-            }
-
-            return
-        }
-
-        authenticatedProvider =
-            .apple
-
-        authenticatedUserID =
-            appleUserID
-
-        showJoinScreen = true
     }
 
     // MARK: - Nonce
