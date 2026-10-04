@@ -111,7 +111,7 @@ struct AdminMemberDetailView: View {
                                     Text(
                                         result.achieved == true
                                         ? "עמד ביעד"
-                                        : "עדיין לא עמד ביעד"
+                                        : "לא עמד ביעד"
                                     )
                                     .fontWeight(.semibold)
 
@@ -120,8 +120,7 @@ struct AdminMemberDetailView: View {
 
                                         Text(
                                             statusDescription(
-                                                usage:
-                                                    result.usageMinutes,
+                                                usage: result.usageMinutes,
                                                 target: target
                                             )
                                         )
@@ -202,6 +201,7 @@ struct AdminMemberDetailView: View {
                             )
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+
                         } else {
 
                             Text("עדיין לא הוגדר יעד למשתמש.")
@@ -315,6 +315,56 @@ struct AdminMemberDetailView: View {
                     )
                 }
 
+                // MARK: - History
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+
+                    HStack {
+
+                        Text("היסטוריה")
+                            .font(.title3.bold())
+
+                        Spacer()
+
+                        Text(
+                            "\(memberResults.count) ימים"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if memberResults.isEmpty {
+
+                        ContentUnavailableView(
+                            "אין היסטוריה עדיין",
+                            systemImage: "calendar",
+                            description: Text(
+                                "לאחר שיתקבלו נתוני זמן מסך, הימים יופיעו כאן."
+                            )
+                        )
+                        .frame(maxWidth: .infinity)
+
+                    } else {
+
+                        ForEach(memberResults) { result in
+
+                            historyRow(result)
+
+                            if result.id != memberResults.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(.thinMaterial)
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 18)
+                )
+
                 // MARK: - Group
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -415,14 +465,26 @@ struct AdminMemberDetailView: View {
         }
     }
 
-    // MARK: - Today's Data
+    // MARK: - Data
+
+    private var memberResults:
+        [SupabaseDataStore.TimeUpRemoteDailyResult] {
+
+        dataStore.dailyResults
+            .filter {
+                $0.groupID == group.id &&
+                $0.userID == member.id
+            }
+            .sorted {
+                $0.resultDate > $1.resultDate
+            }
+    }
 
     private var todayResult:
         SupabaseDataStore.TimeUpRemoteDailyResult? {
 
-        dataStore.dailyResults.first {
-            $0.groupID == group.id &&
-            $0.userID == member.id
+        memberResults.first {
+            $0.resultDate == todayDateKey
         }
     }
 
@@ -431,7 +493,8 @@ struct AdminMemberDetailView: View {
 
         dataStore.dailyTargets.first {
             $0.groupID == group.id &&
-            $0.userID == member.id
+            $0.userID == member.id &&
+            $0.targetDate == todayDateKey
         }
     }
 
@@ -445,8 +508,98 @@ struct AdminMemberDetailView: View {
     }
 
     private var manualTargetTotalMinutes: Int {
-
         (manualHours * 60) + manualMinutes
+    }
+
+    // MARK: - History Row
+
+    private func historyRow(
+        _ result: SupabaseDataStore.TimeUpRemoteDailyResult
+    ) -> some View {
+
+        HStack(spacing: 14) {
+
+            ZStack {
+
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 44, height: 44)
+
+                Image(
+                    systemName:
+                        result.isLearningDay
+                        ? "brain.head.profile"
+                        : result.achieved == true
+                            ? "checkmark"
+                            : result.achieved == false
+                                ? "xmark"
+                                : "clock"
+                )
+                .fontWeight(.semibold)
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+
+                HStack {
+
+                    Text(
+                        displayDate(
+                            result.resultDate
+                        )
+                    )
+                    .fontWeight(.semibold)
+
+                    if result.isLearningDay {
+
+                        Text("יום למידה")
+                            .font(.caption2)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(.thinMaterial)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                HStack(spacing: 12) {
+
+                    Label(
+                        formatMinutes(
+                            result.usageMinutes
+                        ),
+                        systemImage: "iphone"
+                    )
+
+                    if let target =
+                        result.targetMinutes {
+
+                        Label(
+                            formatMinutes(target),
+                            systemImage: "target"
+                        )
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if !result.isLearningDay {
+
+                Text(
+                    result.achieved == true
+                    ? "הצלחה"
+                    : result.achieved == false
+                        ? "חריגה"
+                        : "ממתין"
+                )
+                .font(.caption.bold())
+            }
+        }
+        .padding(.vertical, 5)
     }
 
     // MARK: - Manual Target
@@ -560,6 +713,61 @@ struct AdminMemberDetailView: View {
         isLoading = false
     }
 
+    // MARK: - Date
+
+    private var todayDateKey: String {
+
+        let formatter = DateFormatter()
+
+        formatter.calendar =
+            Calendar(identifier: .gregorian)
+
+        formatter.locale =
+            Locale(identifier: "en_US_POSIX")
+
+        formatter.timeZone =
+            TimeZone(identifier: group.timezone) ??
+            TimeZone(identifier: "Asia/Jerusalem") ??
+            .current
+
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        return formatter.string(from: Date())
+    }
+
+    private func displayDate(
+        _ dateString: String
+    ) -> String {
+
+        let input = DateFormatter()
+        input.calendar =
+            Calendar(identifier: .gregorian)
+        input.locale =
+            Locale(identifier: "en_US_POSIX")
+        input.timeZone =
+            TimeZone(identifier: group.timezone) ??
+            .current
+        input.dateFormat = "yyyy-MM-dd"
+
+        guard
+            let date = input.date(
+                from: dateString
+            )
+        else {
+            return dateString
+        }
+
+        let output = DateFormatter()
+        output.locale =
+            Locale(identifier: "he_IL")
+        output.timeZone =
+            TimeZone(identifier: group.timezone) ??
+            .current
+        output.dateFormat = "d MMM yyyy"
+
+        return output.string(from: date)
+    }
+
     // MARK: - Formatting
 
     private func formatMinutes(
@@ -588,7 +796,6 @@ struct AdminMemberDetailView: View {
 
         guard let target =
                 result.targetMinutes else {
-
             return "ללא יעד"
         }
 
@@ -604,7 +811,6 @@ struct AdminMemberDetailView: View {
             abs(target - usage)
 
         if usage <= target {
-
             return
                 "נותרו \(formatMinutes(difference)) עד היעד"
         }
@@ -620,21 +826,17 @@ struct AdminMemberDetailView: View {
         switch group.goalMethod {
 
         case "personal_percentage":
-
             return
                 "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
 
         case "group_average_percentage":
-
             return
                 "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
 
         case "manual":
-
             return "יעד אישי"
 
         default:
-
             return "יעד קבוצה"
         }
     }
