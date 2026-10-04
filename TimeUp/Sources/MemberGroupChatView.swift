@@ -2,69 +2,77 @@ import SwiftUI
 
 struct MemberGroupChatView: View {
 
-    let member: TimeUpMember
+    let group: SupabaseDataStore.TimeUpRemoteGroup
 
-    @ObservedObject private var store = TimeUpStore.shared
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
+
+    @StateObject private var chatStore =
+        SupabaseChatStore.shared
 
     @State private var messageText = ""
+    @State private var sendError: String?
 
     @FocusState private var isMessageFieldFocused: Bool
 
-    private var currentMember: TimeUpMember {
-        store.member(id: member.id) ?? member
+    private var currentUser:
+        SupabaseDataStore.TimeUpRemoteUser? {
+
+        dataStore.currentUser
     }
 
-    private var group: TimeUpGroup? {
-        store.groups.first {
-            $0.id == currentMember.groupID
-        }
-    }
+    private var messages:
+        [SupabaseChatStore.ChatMessage] {
 
-    private var messages: [TimeUpChatMessage] {
-        store.messages(
-            in: currentMember.groupID
+        chatStore.messages(
+            for: group.id
         )
-    }
-
-    private var groupMembersCount: Int {
-        store.members(
-            in: currentMember.groupID
-        )
-        .filter {
-            $0.role == .member
-        }
-        .count
     }
 
     var body: some View {
 
         VStack(spacing: 0) {
 
-            if group == nil {
+            messagesArea
 
-                ContentUnavailableView(
-                    "הקבוצה לא נמצאה",
-                    systemImage: "person.3"
-                )
+            Divider()
 
-            } else {
-
-                messagesArea
-
-                Divider()
-
-                composer
-            }
+            composer
         }
         .navigationTitle("צ׳אט קבוצתי")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            markAsRead()
+        .task {
+
+            await loadChat()
         }
-        .onChange(
-            of: store.chatMessages.count
-        ) { _, _ in
-            markAsRead()
+        .refreshable {
+
+            await loadChat()
+        }
+        .alert(
+            "לא ניתן לשלוח הודעה",
+            isPresented: Binding(
+                get: {
+                    sendError != nil
+                },
+                set: { newValue in
+
+                    if !newValue {
+                        sendError = nil
+                    }
+                }
+            )
+        ) {
+
+            Button("אישור") {
+                sendError = nil
+            }
+
+        } message: {
+
+            Text(
+                sendError ?? ""
+            )
         }
     }
 
@@ -82,7 +90,15 @@ struct MemberGroupChatView: View {
 
                     chatHeader
 
-                    if messages.isEmpty {
+                    if chatStore.isLoading &&
+                        messages.isEmpty {
+
+                        ProgressView(
+                            "טוען הודעות..."
+                        )
+                        .padding(.top, 40)
+
+                    } else if messages.isEmpty {
 
                         emptyChat
 
@@ -93,6 +109,15 @@ struct MemberGroupChatView: View {
                             messageRow(message)
                                 .id(message.id)
                         }
+                    }
+
+                    if let error =
+                        chatStore.lastError {
+
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .padding()
                     }
                 }
                 .padding(.horizontal, 14)
@@ -126,23 +151,25 @@ struct MemberGroupChatView: View {
             Image(
                 systemName: "person.3.fill"
             )
-            .font(.system(size: 34))
+            .font(
+                .system(size: 34)
+            )
             .foregroundStyle(
                 Color.accentColor
             )
 
-            Text(
-                group?.name ?? "הקבוצה"
-            )
-            .font(.headline)
+            Text(group.name)
+                .font(.headline)
 
             Text(
-                "\(groupMembersCount) חברים בקבוצה"
+                "\(dataStore.groupMembers.count) חברים בקבוצה"
             )
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
+        .frame(
+            maxWidth: .infinity
+        )
         .padding(.vertical, 14)
     }
 
@@ -159,7 +186,9 @@ struct MemberGroupChatView: View {
                 systemName:
                     "bubble.left.and.bubble.right"
             )
-            .font(.system(size: 42))
+            .font(
+                .system(size: 42)
+            )
             .foregroundStyle(.secondary)
 
             Text("הצ׳אט עדיין ריק")
@@ -172,19 +201,22 @@ struct MemberGroupChatView: View {
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
+        .frame(
+            maxWidth: .infinity
+        )
     }
 
     // MARK: - Message Row
 
     @ViewBuilder
     private func messageRow(
-        _ message: TimeUpChatMessage
+        _ message:
+            SupabaseChatStore.ChatMessage
     ) -> some View {
 
         let isMine =
             message.senderID ==
-            currentMember.id
+            currentUser?.id
 
         HStack(
             alignment: .bottom,
@@ -192,11 +224,18 @@ struct MemberGroupChatView: View {
         ) {
 
             if isMine {
-                Spacer(minLength: 55)
+
+                Spacer(
+                    minLength: 55
+                )
             }
 
             if !isMine {
-                avatar(for: message)
+
+                avatar(
+                    senderID:
+                        message.senderID
+                )
             }
 
             VStack(
@@ -209,11 +248,19 @@ struct MemberGroupChatView: View {
 
                 if !isMine {
 
-                    Text(message.senderName)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+                    Text(
+                        senderName(
+                            for:
+                                message.senderID
+                        )
+                    )
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(
+                        .horizontal,
+                        4
+                    )
                 }
 
                 Text(message.text)
@@ -223,8 +270,14 @@ struct MemberGroupChatView: View {
                             ? Color.white
                             : Color.primary
                     )
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 9)
+                    .padding(
+                        .horizontal,
+                        13
+                    )
+                    .padding(
+                        .vertical,
+                        9
+                    )
                     .background {
 
                         RoundedRectangle(
@@ -240,27 +293,65 @@ struct MemberGroupChatView: View {
                     }
 
                 Text(
-                    message.sentAt.formatted(
+                    message.createdAt.formatted(
                         date: .omitted,
                         time: .shortened
                     )
                 )
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
-                .padding(.horizontal, 4)
+                .padding(
+                    .horizontal,
+                    4
+                )
             }
 
             if !isMine {
-                Spacer(minLength: 55)
+
+                Spacer(
+                    minLength: 55
+                )
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(
+            maxWidth: .infinity
+        )
+    }
+
+    // MARK: - Sender
+
+    private func senderName(
+        for senderID: UUID
+    ) -> String {
+
+        if senderID ==
+            currentUser?.id {
+
+            return
+                currentUser?
+                    .displayName ??
+                "אתה"
+        }
+
+        if let member =
+            dataStore.groupMembers.first(
+                where: {
+                    $0.id == senderID
+                }
+            ) {
+
+            return
+                member.displayName ??
+                "חבר קבוצה"
+        }
+
+        return "חבר קבוצה"
     }
 
     // MARK: - Avatar
 
     private func avatar(
-        for message: TimeUpChatMessage
+        senderID: UUID
     ) -> some View {
 
         ZStack {
@@ -277,7 +368,11 @@ struct MemberGroupChatView: View {
 
             Text(
                 initials(
-                    from: message.senderName
+                    from:
+                        senderName(
+                            for:
+                                senderID
+                        )
                 )
             )
             .font(.caption2)
@@ -291,7 +386,9 @@ struct MemberGroupChatView: View {
 
         let parts =
             name
-                .split(separator: " ")
+                .split(
+                    separator: " "
+                )
                 .prefix(2)
 
         let letters =
@@ -299,12 +396,14 @@ struct MemberGroupChatView: View {
                 $0.first
             }
 
-        if letters.isEmpty {
+        guard !letters.isEmpty
+        else {
             return "?"
         }
 
-        return String(letters)
-            .uppercased()
+        return
+            String(letters)
+                .uppercased()
     }
 
     // MARK: - Composer
@@ -326,8 +425,14 @@ struct MemberGroupChatView: View {
             .focused(
                 $isMessageFieldFocused
             )
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(
+                .horizontal,
+                14
+            )
+            .padding(
+                .vertical,
+                10
+            )
             .background {
 
                 RoundedRectangle(
@@ -341,70 +446,136 @@ struct MemberGroupChatView: View {
             }
 
             Button {
-                sendMessage()
+
+                Task {
+                    await sendMessage()
+                }
+
             } label: {
 
-                Image(
-                    systemName:
-                        "arrow.up.circle.fill"
-                )
-                .font(.system(size: 34))
-                .foregroundStyle(
-                    canSend
-                        ? Color.accentColor
-                        : Color.secondary
-                )
+                if chatStore.isSending {
+
+                    ProgressView()
+                        .frame(
+                            width: 34,
+                            height: 34
+                        )
+
+                } else {
+
+                    Image(
+                        systemName:
+                            "arrow.up.circle.fill"
+                    )
+                    .font(
+                        .system(size: 34)
+                    )
+                    .foregroundStyle(
+                        canSend
+                            ? Color.accentColor
+                            : Color.secondary
+                    )
+                }
             }
             .buttonStyle(.plain)
-            .disabled(!canSend)
+            .disabled(
+                !canSend ||
+                chatStore.isSending
+            )
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            9
+        )
         .background(.bar)
     }
 
     private var canSend: Bool {
 
-        !messageText
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            .isEmpty
+        guard currentUser != nil
+        else {
+            return false
+        }
+
+        let cleanText =
+            messageText
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        return
+            !cleanText.isEmpty &&
+            cleanText.count <= 2000
     }
 
     // MARK: - Send
 
-    private func sendMessage() {
+    @MainActor
+    private func sendMessage() async {
+
+        guard
+            let currentUser
+        else {
+
+            sendError =
+                "המשתמש לא נטען."
+
+            return
+        }
 
         let text =
             messageText
                 .trimmingCharacters(
-                    in: .whitespacesAndNewlines
+                    in:
+                        .whitespacesAndNewlines
                 )
 
-        guard !text.isEmpty else {
+        guard !text.isEmpty
+        else {
             return
         }
 
-        store.sendMessage(
-            text: text,
-            from: currentMember.id
-        )
+        do {
 
-        messageText = ""
+            try await chatStore.sendMessage(
+                groupID: group.id,
+                senderID:
+                    currentUser.id,
+                text: text
+            )
 
-        markAsRead()
+            messageText = ""
+
+        } catch {
+
+            sendError =
+                error.localizedDescription
+        }
     }
 
-    // MARK: - Read State
+    // MARK: - Load
 
-    private func markAsRead() {
+    @MainActor
+    private func loadChat() async {
 
-        store.markGroupChatAsRead(
-            groupID:
-                currentMember.groupID,
-            by:
-                currentMember.id
+        async let membersTask: Void =
+            dataStore.loadGroupMembers(
+                groupID: group.id
+            )
+
+        async let messagesTask: Void =
+            chatStore.loadMessages(
+                groupID: group.id
+            )
+
+        _ = await (
+            membersTask,
+            messagesTask
         )
     }
 
@@ -425,7 +596,9 @@ struct MemberGroupChatView: View {
         if animated {
 
             withAnimation(
-                .easeOut(duration: 0.2)
+                .easeOut(
+                    duration: 0.2
+                )
             ) {
 
                 proxy.scrollTo(
