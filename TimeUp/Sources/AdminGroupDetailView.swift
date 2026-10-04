@@ -80,13 +80,179 @@ struct AdminGroupDetailView: View {
                     }
                     .font(.subheadline)
 
-                    if group.goalMethod != "manual" {
+                    Text(
+                        "מסלול של \(group.successDays ?? 7) ימי הצלחה"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .background(.thinMaterial)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 18
+                    )
+                )
 
-                        Text(
-                            "מסלול של \(group.successDays ?? 7) ימי הצלחה"
+                // MARK: - Settings
+
+                NavigationLink {
+
+                    GroupSettingsView(
+                        group: group
+                    )
+
+                } label: {
+
+                    HStack(spacing: 14) {
+
+                        ZStack {
+
+                            Circle()
+                                .fill(.thinMaterial)
+                                .frame(
+                                    width: 46,
+                                    height: 46
+                                )
+
+                            Image(
+                                systemName: "gearshape.fill"
+                            )
+                            .foregroundStyle(.secondary)
+                        }
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+
+                            Text("הגדרות קבוצה")
+                                .fontWeight(.semibold)
+
+                            Text(
+                                "שם, שיטת יעד, אחוז הפחתה ומספר ימי הצלחה"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName: "chevron.left"
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
+                    }
+                    .padding()
+                    .background(.thinMaterial)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 16
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+
+                // MARK: - Today's Group Status
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+
+                    HStack {
+
+                        Text("מצב הקבוצה היום")
+                            .font(.title3.bold())
+
+                        Spacer()
+
+                        if isRefreshing {
+
+                            ProgressView()
+                        }
+                    }
+
+                    if let todayGroupResult {
+
+                        HStack(spacing: 12) {
+
+                            Image(
+                                systemName:
+                                    todayGroupResult.succeeded
+                                    ? "checkmark.circle.fill"
+                                    : "xmark.circle.fill"
+                            )
+                            .font(.title2)
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+
+                                Text(
+                                    todayGroupResult.succeeded
+                                    ? "הקבוצה עמדה ביעד"
+                                    : "הקבוצה לא עמדה ביעד"
+                                )
+                                .fontWeight(.semibold)
+
+                                Text(
+                                    "\(todayGroupResult.completedMemberCount) מתוך \(todayGroupResult.memberCount) חברים השלימו"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            VStack(
+                                alignment: .trailing,
+                                spacing: 3
+                            ) {
+
+                                Text(
+                                    "רצף \(todayGroupResult.streakAfterDay)"
+                                )
+                                .fontWeight(.semibold)
+
+                                if let average =
+                                    todayGroupResult.averageUsageMinutes {
+
+                                    Text(
+                                        "ממוצע \(formatMinutes(average))"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                    } else {
+
+                        HStack(spacing: 12) {
+
+                            Image(
+                                systemName: "clock.fill"
+                            )
+                            .font(.title2)
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+
+                                Text("היום עדיין לא הסתיים")
+                                    .fontWeight(.semibold)
+
+                                Text(
+                                    "התוצאה הקבוצתית תיסגר אוטומטית לאחר שכל נתוני היום יתקבלו."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -272,6 +438,60 @@ struct AdminGroupDetailView: View {
 
             Spacer()
 
+            if let result =
+                todayResult(
+                    for: member.id
+                ) {
+
+                VStack(
+                    alignment: .trailing,
+                    spacing: 3
+                ) {
+
+                    Text(
+                        formatMinutes(
+                            result.usageMinutes
+                        )
+                    )
+                    .font(.subheadline.bold())
+
+                    if result.isLearningDay {
+
+                        Text("יום למידה")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                    } else if result.achieved == true {
+
+                        Label(
+                            "עמד ביעד",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.caption)
+
+                    } else if result.achieved == false {
+
+                        Label(
+                            "חריגה",
+                            systemImage: "xmark.circle.fill"
+                        )
+                        .font(.caption)
+
+                    } else {
+
+                        Text("ממתין")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+            } else {
+
+                Text("ממתין לנתונים")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Image(
                 systemName: "chevron.left"
             )
@@ -285,6 +505,28 @@ struct AdminGroupDetailView: View {
                 cornerRadius: 16
             )
         )
+    }
+
+    // MARK: - Today's Data
+
+    private var todayGroupResult:
+        SupabaseDataStore.TimeUpRemoteGroupDailyResult? {
+
+        dataStore.groupDailyResults.first {
+            $0.groupID == group.id &&
+            $0.resultDate == todayDateKey
+        }
+    }
+
+    private func todayResult(
+        for userID: UUID
+    ) -> SupabaseDataStore.TimeUpRemoteDailyResult? {
+
+        dataStore.dailyResults.first {
+            $0.groupID == group.id &&
+            $0.userID == userID &&
+            $0.resultDate == todayDateKey
+        }
     }
 
     // MARK: - Load
@@ -305,6 +547,71 @@ struct AdminGroupDetailView: View {
         isRefreshing = false
     }
 
+    // MARK: - Date
+
+    private var todayDateKey: String {
+
+        let formatter =
+            DateFormatter()
+
+        formatter.calendar =
+            Calendar(
+                identifier: .gregorian
+            )
+
+        formatter.locale =
+            Locale(
+                identifier:
+                    "en_US_POSIX"
+            )
+
+        formatter.timeZone =
+            TimeZone(
+                identifier:
+                    group.timezone
+            ) ??
+            TimeZone(
+                identifier:
+                    "Asia/Jerusalem"
+            ) ??
+            .current
+
+        formatter.dateFormat =
+            "yyyy-MM-dd"
+
+        return formatter.string(
+            from: Date()
+        )
+    }
+
+    // MARK: - Formatting
+
+    private func formatMinutes(
+        _ minutes: Int
+    ) -> String {
+
+        let hours =
+            minutes / 60
+
+        let remainingMinutes =
+            minutes % 60
+
+        if hours == 0 {
+
+            return
+                "\(remainingMinutes) דק׳"
+        }
+
+        if remainingMinutes == 0 {
+
+            return
+                "\(hours) שע׳"
+        }
+
+        return
+            "\(hours) שע׳ \(remainingMinutes) דק׳"
+    }
+
     // MARK: - Goal
 
     private var goalDescription: String {
@@ -323,7 +630,8 @@ struct AdminGroupDetailView: View {
 
         case "manual":
 
-            return "יעד אישי לכל משתמש"
+            return
+                "יעד אישי לכל משתמש"
 
         default:
 
