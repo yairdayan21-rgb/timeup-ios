@@ -1,11 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct MemberTabView: View {
 
-    let member: TimeUpMember
-
-    @StateObject private var store =
-        TimeUpStore.shared
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
 
     @State private var selectedTab:
         MemberTab = .dashboard
@@ -21,9 +20,49 @@ struct MemberTabView: View {
 
     var body: some View {
 
-        TabView(selection: $selectedTab) {
+        Group {
 
-            // MARK: - Ranking
+            if dataStore.isLoading &&
+                dataStore.currentUser == nil
+            {
+
+                loadingView
+
+            } else if let user =
+                dataStore.currentUser
+            {
+
+                memberTabs(
+                    user: user
+                )
+
+            } else {
+
+                unavailableView
+            }
+        }
+        .task {
+
+            if dataStore.currentUser == nil {
+
+                await dataStore
+                    .loadCurrentAccount()
+            }
+        }
+    }
+
+    // MARK: - Tabs
+
+    private func memberTabs(
+        user:
+            SupabaseDataStore.TimeUpRemoteUser
+    ) -> some View {
+
+        TabView(
+            selection: $selectedTab
+        ) {
+
+            // MARK: Ranking
 
             NavigationStack {
 
@@ -38,6 +77,7 @@ struct MemberTabView: View {
                 }
             }
             .tabItem {
+
                 Label(
                     "דירוג",
                     systemImage: "trophy"
@@ -45,7 +85,7 @@ struct MemberTabView: View {
             }
             .tag(MemberTab.ranking)
 
-            // MARK: - AI
+            // MARK: AI
 
             NavigationStack {
 
@@ -60,6 +100,7 @@ struct MemberTabView: View {
                 }
             }
             .tabItem {
+
                 Label(
                     "AI",
                     systemImage: "sparkles"
@@ -67,18 +108,39 @@ struct MemberTabView: View {
             }
             .tag(MemberTab.ai)
 
-            // MARK: - Group
+            // MARK: Group
 
             NavigationStack {
 
-                MemberGroupView(
-                    member: currentMember
-                )
-                .toolbar {
-                    profileToolbar
+                if let group =
+                    dataStore.activeMemberGroup
+                {
+
+                    remoteGroupView(
+                        group: group
+                    )
+                    .toolbar {
+                        profileToolbar
+                    }
+
+                } else {
+
+                    ContentUnavailableView(
+                        "אין קבוצה פעילה",
+                        systemImage:
+                            "person.3.sequence.fill",
+                        description:
+                            Text(
+                                "החשבון אינו משויך כרגע לקבוצה פעילה."
+                            )
+                    )
+                    .toolbar {
+                        profileToolbar
+                    }
                 }
             }
             .tabItem {
+
                 Label(
                     "הקבוצה",
                     systemImage: "person.3"
@@ -86,18 +148,19 @@ struct MemberTabView: View {
             }
             .tag(MemberTab.group)
 
-            // MARK: - Dashboard
+            // MARK: Dashboard
 
             NavigationStack {
 
-                MemberHomeView(
-                    member: currentMember
+                remoteDashboardView(
+                    user: user
                 )
                 .toolbar {
                     profileToolbar
                 }
             }
             .tabItem {
+
                 Label(
                     "דשבורד",
                     systemImage:
@@ -112,20 +175,212 @@ struct MemberTabView: View {
 
             NavigationStack {
 
-                MemberProfileView(
-                    member: currentMember
+                SupabaseMemberProfileView(
+                    user: user
                 )
             }
         }
     }
 
-    // MARK: - Current Member
+    // MARK: - Remote Dashboard
 
-    private var currentMember: TimeUpMember {
+    private func remoteDashboardView(
+        user:
+            SupabaseDataStore.TimeUpRemoteUser
+    ) -> some View {
 
-        store.member(
-            id: member.id
-        ) ?? member
+        ScrollView {
+
+            VStack(
+                alignment: .leading,
+                spacing: 24
+            ) {
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+
+                    Text(
+                        "שלום \(displayName(for: user))"
+                    )
+                    .font(
+                        .largeTitle.bold()
+                    )
+
+                    Text(
+                        "הנתונים שלך מחוברים ל-TimeUp"
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+                if let group =
+                    dataStore.activeMemberGroup
+                {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+
+                        Label(
+                            "הקבוצה שלי",
+                            systemImage:
+                                "person.3.fill"
+                        )
+                        .font(.headline)
+
+                        Text(group.name)
+                            .font(.title2)
+                            .fontWeight(
+                                .semibold
+                            )
+
+                        Text(
+                            "קוד קבוצה: \(group.code)"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding()
+                    .background(
+                        .thinMaterial,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 18
+                            )
+                    )
+
+                } else {
+
+                    ContentUnavailableView(
+                        "אין קבוצה פעילה",
+                        systemImage:
+                            "person.3.sequence.fill"
+                    )
+                }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+
+                    Label(
+                        "דשבורד",
+                        systemImage:
+                            "chart.bar.fill"
+                    )
+                    .font(.headline)
+
+                    Text(
+                        "בשלב הבא נחבר לכאן את יעד זמן המסך ואת נתוני השימוש היומיים ישירות מ-Supabase."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .padding()
+                .background(
+                    .thinMaterial,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18
+                        )
+                )
+            }
+            .padding(20)
+        }
+        .navigationTitle("דשבורד")
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+    }
+
+    // MARK: - Remote Group
+
+    private func remoteGroupView(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
+
+        ScrollView {
+
+            VStack(
+                alignment: .leading,
+                spacing: 20
+            ) {
+
+                Image(
+                    systemName:
+                        "person.3.fill"
+                )
+                .font(
+                    .system(size: 52)
+                )
+
+                Text(group.name)
+                    .font(
+                        .largeTitle.bold()
+                    )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+
+                    Text(
+                        "קוד קבוצה"
+                    )
+                    .font(.headline)
+
+                    Text(group.code)
+                        .font(
+                            .system(
+                                size: 28,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                }
+
+                Divider()
+
+                Text(
+                    "פרטי הקבוצה נטענים כעת ישירות מ-Supabase."
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                Text(
+                    "בשלב הבא נחבר מחדש את סקירה, פירוט, Dashboard, חברים וצ׳אט לנתונים המרוחקים."
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .padding(20)
+        }
+        .navigationTitle("הקבוצה")
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
     }
 
     // MARK: - Profile Button
@@ -161,7 +416,9 @@ struct MemberTabView: View {
                         systemName:
                             "person.crop.circle.fill"
                     )
-                    .font(.system(size: 28))
+                    .font(
+                        .system(size: 28)
+                    )
                 }
             }
             .accessibilityLabel(
@@ -170,7 +427,48 @@ struct MemberTabView: View {
         }
     }
 
-    // MARK: - Temporary Screen
+    // MARK: - Loading
+
+    private var loadingView:
+        some View
+    {
+
+        VStack(spacing: 16) {
+
+            ProgressView()
+
+            Text(
+                "טוען את החשבון..."
+            )
+            .foregroundStyle(
+                .secondary
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
+    }
+
+    // MARK: - Unavailable
+
+    private var unavailableView:
+        some View
+    {
+
+        ContentUnavailableView(
+            "לא ניתן לטעון את החשבון",
+            systemImage:
+                "person.crop.circle.badge.exclamationmark",
+            description:
+                Text(
+                    dataStore.lastError ??
+                    "נסה להתחבר מחדש."
+                )
+        )
+    }
+
+    // MARK: - Placeholder
 
     private func placeholderView(
         title: String,
@@ -200,7 +498,10 @@ struct MemberTabView: View {
                 .multilineTextAlignment(
                     .center
                 )
-                .padding(.horizontal, 32)
+                .padding(
+                    .horizontal,
+                    32
+                )
 
             Spacer()
         }
@@ -213,26 +514,45 @@ struct MemberTabView: View {
             .inline
         )
     }
+
+    private func displayName(
+        for user:
+            SupabaseDataStore.TimeUpRemoteUser
+    ) -> String {
+
+        let name =
+            user.displayName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ) ?? ""
+
+        return name.isEmpty
+            ? "TimeUp"
+            : name
+    }
 }
 
+// MARK: - Supabase Member Profile
 
-// MARK: - Member Profile
+private struct SupabaseMemberProfileView:
+    View
+{
 
-private struct MemberProfileView: View {
-
-    let member: TimeUpMember
+    let user:
+        SupabaseDataStore.TimeUpRemoteUser
 
     @Environment(\.dismiss)
     private var dismiss
 
-    @StateObject private var store =
-        TimeUpStore.shared
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
+
+    @State private var isLoggingOut =
+        false
 
     var body: some View {
 
         List {
-
-            // MARK: Profile
 
             Section {
 
@@ -249,18 +569,32 @@ private struct MemberProfileView: View {
                         .secondary
                     )
 
-                    Text(member.displayName)
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    Text(
+                        user.displayName ??
+                        "TimeUp"
+                    )
+                    .font(.title2)
+                    .fontWeight(.bold)
 
+                    if let email =
+                        user.email
+                    {
+
+                        Text(email)
+                            .font(.footnote)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
                 }
                 .frame(
                     maxWidth: .infinity
                 )
-                .padding(.vertical, 16)
+                .padding(
+                    .vertical,
+                    16
+                )
             }
-
-            // MARK: Settings
 
             Section {
 
@@ -272,12 +606,11 @@ private struct MemberProfileView: View {
 
                     Label(
                         "הגדרות",
-                        systemImage: "gearshape"
+                        systemImage:
+                            "gearshape"
                     )
                 }
             }
-
-            // MARK: Logout
 
             Section {
 
@@ -289,12 +622,23 @@ private struct MemberProfileView: View {
 
                 } label: {
 
-                    Label(
-                        "יציאה מהחשבון",
-                        systemImage:
-                            "rectangle.portrait.and.arrow.right"
-                    )
+                    HStack {
+
+                        Label(
+                            "יציאה מהחשבון",
+                            systemImage:
+                                "rectangle.portrait.and.arrow.right"
+                        )
+
+                        Spacer()
+
+                        if isLoggingOut {
+
+                            ProgressView()
+                        }
+                    }
                 }
+                .disabled(isLoggingOut)
             }
         }
         .navigationTitle("פרופיל")
@@ -317,8 +661,32 @@ private struct MemberProfileView: View {
 
     private func logout() {
 
-        store.clearCurrentMember()
+        isLoggingOut = true
 
-        dismiss()
+        Task {
+
+            do {
+
+                try await
+                    SupabaseManager.shared
+                        .client
+                        .auth
+                        .signOut()
+
+                await MainActor.run {
+
+                    dataStore.reset()
+                    isLoggingOut = false
+                    dismiss()
+                }
+
+            } catch {
+
+                await MainActor.run {
+
+                    isLoggingOut = false
+                }
+            }
+        }
     }
 }
