@@ -1,10 +1,8 @@
 import DeviceActivity
-import ExtensionKit
 import SwiftUI
 
 @main
-struct DeviceActivityReportExtension: DeviceActivityReportExtension {
-
+struct TimeUpDeviceActivityReportExtension: DeviceActivityReportExtension {
     var body: some DeviceActivityReportScene {
         TimeUpDailyActivityReport { totalActivityDuration in
             TimeUpDailyActivityView(
@@ -15,24 +13,19 @@ struct DeviceActivityReportExtension: DeviceActivityReportExtension {
 }
 
 struct TimeUpDailyActivityReport: DeviceActivityReportScene {
-
     let context: DeviceActivityReport.Context =
         .init("timeup.daily.total")
 
-    let content:
-        (TimeInterval) -> TimeUpDailyActivityView
+    let content: (TimeInterval) -> TimeUpDailyActivityView
 
     func makeConfiguration(
-        representing data:
-            DeviceActivityResults<DeviceActivityData>
+        representing data: DeviceActivityResults<DeviceActivityData>
     ) async -> TimeInterval {
-
         var totalActivityDuration: TimeInterval = 0
 
         for await deviceData in data {
             for await segment in deviceData.activitySegments {
-                totalActivityDuration +=
-                    segment.totalActivityDuration
+                totalActivityDuration += segment.totalActivityDuration
             }
         }
 
@@ -60,7 +53,6 @@ struct TimeUpDailyActivityReport: DeviceActivityReportScene {
 }
 
 struct TimeUpDailyActivityView: View {
-
     let totalActivityDuration: TimeInterval
 
     private var totalMinutes: Int {
