@@ -1,5 +1,8 @@
 import SwiftUI
 import AuthenticationServices
+import CryptoKit
+import Security
+import Supabase
 
 struct LoginView: View {
 
@@ -15,6 +18,9 @@ struct LoginView: View {
         TimeUpAuthProvider?
 
     @State private var authenticatedUserID:
+        String?
+
+    @State private var currentNonce:
         String?
 
     private enum ExistingMemberDestination:
@@ -189,10 +195,16 @@ struct LoginView: View {
             ASAuthorizationAppleIDRequest
     ) {
 
+        let nonce = randomNonceString()
+
+        currentNonce = nonce
+
         request.requestedScopes = [
             .fullName,
             .email
         ]
+
+        request.nonce = sha256(nonce)
     }
 
     private func handleAppleResult(
@@ -219,6 +231,32 @@ struct LoginView: View {
                 return
             }
 
+            guard
+                let nonce = currentNonce
+            else {
+
+                appleSignInError =
+                    "לא ניתן היה לאמת את ההתחברות עם Apple."
+
+                return
+            }
+
+            guard
+                let identityToken =
+                    credential.identityToken,
+                let idToken =
+                    String(
+                        data: identityToken,
+                        encoding: .utf8
+                    )
+            else {
+
+                appleSignInError =
+                    "לא התקבל Apple ID Token."
+
+                return
+            }
+
             let appleUserID =
                 credential.user
 
@@ -232,50 +270,46 @@ struct LoginView: View {
 
             appleSignInError = ""
 
-            // קודם בודקים אם החשבון כבר קיים.
-            if let existingMember =
-                store.member(
-                    authProvider: .apple,
-                    externalUserID:
-                        appleUserID
-                )
-            {
+            Task {
 
-                store.setCurrentMember(
-                    existingMember
-                )
+                do {
 
-                switch existingMember.role {
+                    _ = try await
+                        SupabaseManager.shared.client.auth
+                            .signInWithIdToken(
+                                credentials:
+                                    OpenIDConnectCredentials(
+                                        provider: .apple,
+                                        idToken: idToken,
+                                        nonce: nonce
+                                    )
+                            )
 
-                case .admin:
+                    await MainActor.run {
 
-                    existingMemberDestination =
-                        .admin(
-                            existingMember.id
+                        currentNonce = nil
+
+                        continueAfterAppleSignIn(
+                            appleUserID:
+                                appleUserID
                         )
+                    }
 
-                case .member:
+                } catch {
 
-                    existingMemberDestination =
-                        .member(
-                            existingMember.id
-                        )
+                    await MainActor.run {
+
+                        currentNonce = nil
+
+                        appleSignInError =
+                            "ההתחברות ל-TimeUp לא הושלמה."
+                    }
                 }
-
-                return
             }
-
-            // חשבון Apple חדש.
-            authenticatedProvider =
-                .apple
-
-            authenticatedUserID =
-                appleUserID
-
-            showJoinScreen = true
 
         case .failure(let error):
 
+            currentNonce = nil
             authenticatedProvider = nil
             authenticatedUserID = nil
 
@@ -295,6 +329,124 @@ struct LoginView: View {
                     "ההתחברות עם Apple לא הושלמה."
             }
         }
+    }
+
+    private func continueAfterAppleSignIn(
+        appleUserID: String
+    ) {
+
+        // בשלב זה כבר קיימת התחברות אמיתית
+        // ל-Supabase Auth.
+
+        if let existingMember =
+            store.member(
+                authProvider: .apple,
+                externalUserID:
+                    appleUserID
+            )
+        {
+
+            store.setCurrentMember(
+                existingMember
+            )
+
+            switch existingMember.role {
+
+            case .admin:
+
+                existingMemberDestination =
+                    .admin(
+                        existingMember.id
+                    )
+
+            case .member:
+
+                existingMemberDestination =
+                    .member(
+                        existingMember.id
+                    )
+            }
+
+            return
+        }
+
+        authenticatedProvider =
+            .apple
+
+        authenticatedUserID =
+            appleUserID
+
+        showJoinScreen = true
+    }
+
+    // MARK: - Nonce
+
+    private func randomNonceString(
+        length: Int = 32
+    ) -> String {
+
+        precondition(length > 0)
+
+        let charset:
+            [Character] =
+            Array(
+                "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._"
+            )
+
+        var result = ""
+        var remainingLength = length
+
+        while remainingLength > 0 {
+
+            var random: UInt8 = 0
+
+            let errorCode =
+                SecRandomCopyBytes(
+                    kSecRandomDefault,
+                    1,
+                    &random
+                )
+
+            if errorCode != errSecSuccess {
+                fatalError(
+                    "Unable to generate nonce."
+                )
+            }
+
+            if random < charset.count {
+
+                result.append(
+                    charset[
+                        Int(random)
+                    ]
+                )
+
+                remainingLength -= 1
+            }
+        }
+
+        return result
+    }
+
+    private func sha256(
+        _ input: String
+    ) -> String {
+
+        let inputData =
+            Data(input.utf8)
+
+        let hashed =
+            SHA256.hash(
+                data: inputData
+            )
+
+        return hashed.map {
+            String(
+                format: "%02x",
+                $0
+            )
+        }
+        .joined()
     }
 
     // MARK: - Google
