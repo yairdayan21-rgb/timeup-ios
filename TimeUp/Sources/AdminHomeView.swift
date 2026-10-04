@@ -3,7 +3,9 @@ import SwiftUI
 struct AdminHomeView: View {
 
     @State private var showCreateGroup = false
-    @StateObject private var store = TimeUpStore.shared
+
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
 
     var body: some View {
 
@@ -15,6 +17,8 @@ struct AdminHomeView: View {
                     alignment: .leading,
                     spacing: 24
                 ) {
+
+                    // MARK: - Header
 
                     VStack(
                         alignment: .leading,
@@ -35,6 +39,8 @@ struct AdminHomeView: View {
                                 .secondary
                             )
                     }
+
+                    // MARK: - Create Group
 
                     Button {
 
@@ -82,6 +88,8 @@ struct AdminHomeView: View {
                     }
                     .buttonStyle(.plain)
 
+                    // MARK: - Groups
+
                     VStack(
                         alignment: .leading,
                         spacing: 12
@@ -92,7 +100,25 @@ struct AdminHomeView: View {
                                 .title3.bold()
                             )
 
-                        if store.groups.isEmpty {
+                        if dataStore.isLoading &&
+                            dataStore.groups.isEmpty {
+
+                            HStack {
+
+                                Spacer()
+
+                                ProgressView(
+                                    "טוען קבוצות..."
+                                )
+
+                                Spacer()
+                            }
+                            .padding(
+                                .vertical,
+                                40
+                            )
+
+                        } else if dataStore.groups.isEmpty {
 
                             ContentUnavailableView(
                                 "עדיין אין קבוצות",
@@ -114,46 +140,73 @@ struct AdminHomeView: View {
                         } else {
 
                             ForEach(
-                                store.groups
+                                dataStore.groups
                             ) { group in
 
-                                NavigationLink {
-
-                                    AdminGroupDetailView(
-                                        group:
-                                            Binding(
-                                                get: {
-                                                    store.groups.first(
-                                                        where: {
-                                                            $0.id ==
-                                                                group.id
-                                                        }
-                                                    ) ?? group
-                                                },
-                                                set: {
-                                                    updated in
-
-                                                    store.updateGroup(
-                                                        updated
-                                                    )
-                                                }
-                                            )
-                                    )
-
-                                } label: {
-
-                                    groupCard(
-                                        group: group
-                                    )
-                                }
-                                .buttonStyle(
-                                    .plain
+                                groupCard(
+                                    group: group
                                 )
                             }
                         }
                     }
+
+                    // MARK: - Error
+
+                    if let error =
+                        dataStore.lastError {
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+
+                            Label(
+                                "לא ניתן לטעון את הנתונים",
+                                systemImage:
+                                    "exclamationmark.triangle"
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
+
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+
+                            Button(
+                                "נסה שוב"
+                            ) {
+
+                                Task {
+
+                                    await dataStore
+                                        .loadCurrentAccount()
+                                }
+                            }
+                        }
+                        .padding()
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
+                        .background(
+                            .thinMaterial
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 18
+                            )
+                        )
+                    }
                 }
                 .padding(20)
+            }
+            .refreshable {
+
+                await dataStore
+                    .loadCurrentAccount()
             }
             .toolbar {
 
@@ -164,13 +217,17 @@ struct AdminHomeView: View {
 
                     Button {
 
-                        // הגדרות מנהל – נחבר בהמשך
+                        Task {
+
+                            await dataStore
+                                .loadCurrentAccount()
+                        }
 
                     } label: {
 
                         Image(
                             systemName:
-                                "gearshape"
+                                "arrow.clockwise"
                         )
                     }
                 }
@@ -182,11 +239,19 @@ struct AdminHomeView: View {
 
                 CreateGroupView()
             }
+            .task {
+
+                await dataStore
+                    .loadCurrentAccount()
+            }
         }
     }
 
+    // MARK: - Group Card
+
     private func groupCard(
-        group: TimeUpGroup
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
     ) -> some View {
 
         VStack(
@@ -213,39 +278,14 @@ struct AdminHomeView: View {
 
                 Spacer()
 
-                NavigationLink {
-
-                    GroupSettingsView(
-                        group:
-                            Binding(
-                                get: {
-                                    store.groups.first(
-                                        where: {
-                                            $0.id ==
-                                                group.id
-                                        }
-                                    ) ?? group
-                                },
-                                set: {
-                                    updated in
-
-                                    store.updateGroup(
-                                        updated
-                                    )
-                                }
-                            )
-                    )
-
-                } label: {
-
-                    Image(
-                        systemName:
-                            "gearshape"
-                    )
-                    .font(.title3)
-                    .padding(8)
-                }
-                .buttonStyle(.plain)
+                Image(
+                    systemName:
+                        "person.3.fill"
+                )
+                .font(.title3)
+                .foregroundStyle(
+                    .secondary
+                )
             }
 
             Text(group.code)
@@ -260,7 +300,9 @@ struct AdminHomeView: View {
 
             Divider()
 
-            HStack {
+            HStack(
+                spacing: 12
+            ) {
 
                 Label(
                     goalDescription(
@@ -272,36 +314,25 @@ struct AdminHomeView: View {
 
                 Spacer()
 
-                let memberCount =
-                    store.members(
-                        in: group.id
-                    ).count
-
-                Text(
-                    "\(memberCount) חברים"
+                Label(
+                    "\(group.currentStreak)",
+                    systemImage:
+                        "flame.fill"
                 )
                 .foregroundStyle(
                     .secondary
                 )
 
-                if let days =
-                    group.successDays {
+                if group.goalMethod !=
+                    "manual" {
 
                     Text(
-                        "\(days) ימים"
+                        "\(group.successDays ?? 7) ימים"
                     )
                     .foregroundStyle(
                         .secondary
                     )
                 }
-
-                Image(
-                    systemName:
-                        "chevron.left"
-                )
-                .foregroundStyle(
-                    .tertiary
-                )
             }
             .font(.subheadline)
         }
@@ -316,25 +347,32 @@ struct AdminHomeView: View {
         )
     }
 
+    // MARK: - Goal Description
+
     private func goalDescription(
-        _ group: TimeUpGroup
+        _ group:
+            SupabaseDataStore.TimeUpRemoteGroup
     ) -> String {
 
         switch group.goalMethod {
 
-        case .previousDay:
+        case "personal_percentage":
 
             return
                 "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
 
-        case .adaptiveAverage:
+        case "group_average_percentage":
 
             return
-                "\(group.reductionPercent ?? 0)% פחות מהממוצע"
+                "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
 
-        case .manual:
+        case "manual":
 
             return "יעד אישי"
+
+        default:
+
+            return "יעד קבוצה"
         }
     }
 }
