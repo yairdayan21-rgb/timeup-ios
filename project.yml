@@ -13,6 +13,8 @@ targets:
     dependencies:
       - target: TimeUpDeviceActivityMonitor
         embed: true
+      - target: TimeUpDeviceActivityReport
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.timeup.app
@@ -40,6 +42,25 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: TimeUpDeviceActivityMonitor/TimeUpDeviceActivityMonitor.entitlements
 
+  TimeUpDeviceActivityReport:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - TimeUpDeviceActivityReport/Sources
+    info:
+      path: TimeUpDeviceActivityReport/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivityui.report-extension
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).DeviceActivityReportExtension"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timeup.app.DeviceActivityReport
+        SWIFT_VERSION: 5.0
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: TimeUpDeviceActivityReport/TimeUpDeviceActivityReport.entitlements
+
   TimeUpUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -58,6 +79,7 @@ schemes:
       targets:
         TimeUp: all
         TimeUpDeviceActivityMonitor: all
+        TimeUpDeviceActivityReport: all
         TimeUpUITests: [test]
     test:
       targets:
