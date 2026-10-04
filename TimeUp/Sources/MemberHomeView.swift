@@ -3,36 +3,59 @@ import FamilyControls
 import UserNotifications
 
 struct MemberHomeView: View {
+
     let member: TimeUpMember
 
-    @StateObject private var store = TimeUpStore.shared
+    @StateObject private var store =
+        TimeUpStore.shared
 
-    @State private var statusText = "זמן המסך עדיין לא מחובר"
-    @State private var isRequestingAuthorization = false
-    @State private var estimatedUsageMinutes = 0
+    @State private var statusText =
+        "זמן המסך עדיין לא מחובר"
 
-    private let sharedDefaults = UserDefaults(
-        suiteName: "group.com.timeup.shared"
-    )
+    @State private var isRequestingAuthorization =
+        false
+
+    @State private var estimatedUsageMinutes =
+        0
+
+    private let sharedDefaults =
+        UserDefaults(
+            suiteName: "group.com.timeup.shared"
+        )
 
     var body: some View {
+
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+
+            VStack(
+                alignment: .leading,
+                spacing: 20
+            ) {
 
                 // MARK: - Header
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("שלום, \(currentMember.displayName)")
-                        .font(
-                            .system(
-                                size: 32,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
 
-                    Text("זה היום שלך ב-TimeUp")
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "שלום, \(currentMember.displayName)"
+                    )
+                    .font(
+                        .system(
+                            size: 32,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+
+                    Text(
+                        "זה היום שלך ב-TimeUp"
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
 
                 // MARK: - Daily Status
@@ -40,52 +63,72 @@ struct MemberHomeView: View {
                 HStack(spacing: 12) {
 
                     statusCard(
-                        value: "\(currentStreak)",
-                        title: "רצף",
-                        icon: "flame.fill"
+                        value:
+                            "\(currentStreak)",
+                        title:
+                            "רצף",
+                        icon:
+                            "flame.fill"
                     )
 
                     statusCard(
-                        value: yesterdayStatusText,
-                        title: "אתמול",
-                        icon: yesterdayStatusIcon
+                        value:
+                            yesterdayStatusText,
+                        title:
+                            "אתמול",
+                        icon:
+                            yesterdayStatusIcon
                     )
 
                     statusCard(
-                        value: "\(completedDaysCount)",
-                        title: "ימים",
-                        icon: "calendar"
+                        value:
+                            "\(completedDaysCount)",
+                        title:
+                            "ימים",
+                        icon:
+                            "calendar"
                     )
                 }
 
                 // MARK: - Learning Day
 
                 if isCurrentLearningPhase {
-                    VStack(alignment: .leading, spacing: 10) {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
 
                         Label(
                             "יום למידה",
-                            systemImage: "brain.head.profile"
+                            systemImage:
+                                "brain.head.profile"
                         )
                         .font(.headline)
 
                         Text(
                             "TimeUp אוסף נתוני שימוש כדי לבנות את היעד הראשון שלך."
                         )
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
 
                         Text(
                             "היום הזה לא נחשב הצלחה או כישלון ולא מאפס את הרצף."
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
                     }
                     .padding()
                     .frame(
                         maxWidth: .infinity,
                         alignment: .leading
                     )
-                    .background(.thinMaterial)
+                    .background(
+                        .thinMaterial
+                    )
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 18
@@ -95,38 +138,52 @@ struct MemberHomeView: View {
 
                 // MARK: - Screen Time
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+
                     Label(
                         "זמן מסך היום",
-                        systemImage: "hourglass"
+                        systemImage:
+                            "hourglass"
                     )
                     .font(.headline)
 
-                    Text(formattedUsage)
-                        .font(
-                            .system(
-                                size: 36,
-                                weight: .bold,
-                                design: .rounded
-                            )
+                    Text(
+                        formattedUsage
+                    )
+                    .font(
+                        .system(
+                            size: 36,
+                            weight: .bold,
+                            design: .rounded
                         )
+                    )
 
                     Text(
                         "זמן המסך מתעדכן אוטומטית במהלך היום."
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(
+                        .secondary
+                    )
 
                     Divider()
 
                     Label(
                         statusText,
-                        systemImage: authorizationIcon
+                        systemImage:
+                            authorizationIcon
                     )
-                    .foregroundStyle(authorizationColor)
+                    .foregroundStyle(
+                        authorizationColor
+                    )
                 }
                 .padding()
-                .background(.thinMaterial)
+                .background(
+                    .thinMaterial
+                )
                 .clipShape(
                     RoundedRectangle(
                         cornerRadius: 18
@@ -135,18 +192,26 @@ struct MemberHomeView: View {
 
                 // MARK: - Daily Target
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+
                     Label(
                         "היעד שלך",
-                        systemImage: "target"
+                        systemImage:
+                            "target"
                     )
                     .font(.headline)
 
                     if let target =
-                        currentMember.dailyTargetMinutes
-                    {
+                        currentMember
+                            .dailyTargetMinutes {
+
                         Text(
-                            formattedTarget(target)
+                            formattedTarget(
+                                target
+                            )
                         )
                         .font(
                             .system(
@@ -156,59 +221,86 @@ struct MemberHomeView: View {
                             )
                         )
 
-                        if estimatedUsageMinutes <= target {
+                        if estimatedUsageMinutes <=
+                            target {
 
                             Text(
                                 "נשארו \(formattedRemaining(target)) עד ליעד"
                             )
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(
+                                .secondary
+                            )
 
                         } else {
 
-                            Text("היעד היומי עבר")
-                                .foregroundStyle(.red)
-                                .fontWeight(.semibold)
+                            Text(
+                                "היעד היומי עבר"
+                            )
+                            .foregroundStyle(
+                                .red
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
                         }
 
                         ProgressView(
-                            value: Double(
-                                min(
-                                    estimatedUsageMinutes,
-                                    target
+                            value:
+                                Double(
+                                    min(
+                                        estimatedUsageMinutes,
+                                        target
+                                    )
+                                ),
+                            total:
+                                Double(
+                                    max(
+                                        target,
+                                        1
+                                    )
                                 )
-                            ),
-                            total: Double(
-                                max(target, 1)
-                            )
                         )
 
-                    } else if isCurrentLearningPhase {
+                    } else if
+                        isCurrentLearningPhase {
 
                         Text(
                             "היעד הראשון ייקבע לאחר יום הלמידה."
                         )
-                        .fontWeight(.semibold)
+                        .fontWeight(
+                            .semibold
+                        )
 
                         Text(
                             "בינתיים TimeUp מודד את זמן המסך שלך כרגיל."
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
 
                     } else {
 
-                        Text("עדיין לא נקבע יעד יומי.")
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "עדיין לא נקבע יעד יומי."
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
 
                         Text(
                             "TimeUp יתחיל למדוד את היעד ברגע שיוגדר."
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
                     }
                 }
                 .padding()
-                .background(.thinMaterial)
+                .background(
+                    .thinMaterial
+                )
                 .clipShape(
                     RoundedRectangle(
                         cornerRadius: 18
@@ -218,73 +310,110 @@ struct MemberHomeView: View {
                 // MARK: - Yesterday
 
                 if let yesterdayProgress {
-                    VStack(alignment: .leading, spacing: 12) {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 12
+                    ) {
 
                         Label(
                             "סיכום היום האחרון",
-                            systemImage: "clock.arrow.circlepath"
+                            systemImage:
+                                "clock.arrow.circlepath"
                         )
                         .font(.headline)
 
                         HStack {
-                            Text("זמן מסך")
+
+                            Text(
+                                "זמן מסך"
+                            )
 
                             Spacer()
 
                             Text(
                                 formattedMinutes(
-                                    yesterdayProgress.usageMinutes
+                                    yesterdayProgress
+                                        .usageMinutes
                                 )
                             )
-                            .fontWeight(.semibold)
+                            .fontWeight(
+                                .semibold
+                            )
                         }
 
                         if let target =
-                            yesterdayProgress.targetMinutes
-                        {
+                            yesterdayProgress
+                                .targetMinutes {
+
                             HStack {
-                                Text("יעד")
+
+                                Text(
+                                    "יעד"
+                                )
 
                                 Spacer()
 
                                 Text(
-                                    formattedMinutes(target)
+                                    formattedMinutes(
+                                        target
+                                    )
                                 )
-                                .fontWeight(.semibold)
+                                .fontWeight(
+                                    .semibold
+                                )
                             }
                         }
 
                         Divider()
 
-                        if yesterdayProgress.isLearningDay {
+                        if yesterdayProgress
+                            .isLearningDay {
 
                             Label(
                                 "יום למידה הושלם",
-                                systemImage: "brain.head.profile"
+                                systemImage:
+                                    "brain.head.profile"
                             )
-                            .fontWeight(.semibold)
+                            .fontWeight(
+                                .semibold
+                            )
 
-                        } else if yesterdayProgress.achieved {
+                        } else if
+                            yesterdayProgress
+                                .achieved {
 
                             Label(
                                 "עמדת ביעד",
-                                systemImage: "checkmark.circle.fill"
+                                systemImage:
+                                    "checkmark.circle.fill"
                             )
-                            .foregroundStyle(.green)
-                            .fontWeight(.semibold)
+                            .foregroundStyle(
+                                .green
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
 
                         } else {
 
                             Label(
                                 "היעד לא הושג",
-                                systemImage: "xmark.circle.fill"
+                                systemImage:
+                                    "xmark.circle.fill"
                             )
-                            .foregroundStyle(.red)
-                            .fontWeight(.semibold)
+                            .foregroundStyle(
+                                .red
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
                         }
                     }
                     .padding()
-                    .background(.thinMaterial)
+                    .background(
+                        .thinMaterial
+                    )
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 18
@@ -295,11 +424,17 @@ struct MemberHomeView: View {
                 // MARK: - Screen Time Connection
 
                 Button {
+
                     requestScreenTime()
 
                 } label: {
+
                     HStack {
-                        Image(systemName: "hourglass")
+
+                        Image(
+                            systemName:
+                                "hourglass"
+                        )
 
                         Text(
                             isRequestingAuthorization
@@ -308,20 +443,28 @@ struct MemberHomeView: View {
                                 ? "זמן המסך מחובר"
                                 : "חבר את זמן המסך"
                         )
-                        .fontWeight(.semibold)
+                        .fontWeight(
+                            .semibold
+                        )
 
                         Spacer()
 
                         if hasScreenTimeAuthorization {
+
                             Image(
-                                systemName: "checkmark.circle.fill"
+                                systemName:
+                                    "checkmark.circle.fill"
                             )
                         }
                     }
                     .padding()
-                    .frame(maxWidth: .infinity)
+                    .frame(
+                        maxWidth: .infinity
+                    )
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(
+                    .borderedProminent
+                )
                 .disabled(
                     isRequestingAuthorization ||
                     hasScreenTimeAuthorization
@@ -329,9 +472,15 @@ struct MemberHomeView: View {
 
                 // MARK: - Group
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("הקבוצה שלך")
-                        .font(.headline)
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+
+                    Text(
+                        "הקבוצה שלך"
+                    )
+                    .font(.headline)
 
                     Text(
                         "קוד קבוצה: \(groupCode)"
@@ -339,13 +488,18 @@ struct MemberHomeView: View {
                     .font(
                         .system(
                             .body,
-                            design: .monospaced
+                            design:
+                                .monospaced
                         )
                     )
-                    .fontWeight(.bold)
+                    .fontWeight(
+                        .bold
+                    )
                 }
                 .padding()
-                .background(.thinMaterial)
+                .background(
+                    .thinMaterial
+                )
                 .clipShape(
                     RoundedRectangle(
                         cornerRadius: 18
@@ -355,25 +509,30 @@ struct MemberHomeView: View {
             .padding(20)
         }
         .background {
+
             if hasScreenTimeAuthorization {
+
                 ScreenTimeReportView()
             }
         }
-        .navigationTitle("TimeUp")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(
+            "TimeUp"
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
 
         // MARK: - Screen Lifecycle
 
         .onAppear {
 
-            ScreenTimeMonitor.shared
-                .syncCompletedDayIfNeeded()
-
             refreshAuthorizationStatus()
             refreshUsageEstimate()
 
             if hasScreenTimeAuthorization {
+
                 requestNotificationAuthorization()
+
                 startScreenTimeMonitoring()
             }
         }
@@ -381,6 +540,7 @@ struct MemberHomeView: View {
         // MARK: - Live Usage Refresh
 
         .task {
+
             while !Task.isCancelled {
 
                 try? await Task.sleep(
@@ -394,10 +554,13 @@ struct MemberHomeView: View {
         // MARK: - Target Changes
 
         .onChange(
-            of: currentMember.dailyTargetMinutes
+            of:
+                currentMember
+                    .dailyTargetMinutes
         ) { _, _ in
 
             if hasScreenTimeAuthorization {
+
                 startScreenTimeMonitoring()
             }
         }
@@ -405,7 +568,9 @@ struct MemberHomeView: View {
 
     // MARK: - Member
 
-    private var currentMember: TimeUpMember {
+    private var currentMember:
+        TimeUpMember {
+
         store.member(
             id: member.id
         ) ?? member
@@ -413,34 +578,48 @@ struct MemberHomeView: View {
 
     // MARK: - Progress
 
-    private var memberProgress: [TimeUpDailyProgress] {
+    private var memberProgress:
+        [TimeUpDailyProgress] {
+
         store.progress(
             for: currentMember.id
         )
     }
 
-    private var completedDaysCount: Int {
+    private var completedDaysCount:
+        Int {
+
         memberProgress.count
     }
 
-    private var currentStreak: Int {
+    private var currentStreak:
+        Int {
+
         store.currentStreak(
             for: currentMember.id
         )
     }
 
-    private var yesterdayProgress: TimeUpDailyProgress? {
+    private var yesterdayProgress:
+        TimeUpDailyProgress? {
+
         store.previousProgress(
             for: currentMember.id
         )
     }
 
-    private var isCurrentLearningPhase: Bool {
+    private var isCurrentLearningPhase:
+        Bool {
+
         memberProgress.isEmpty
     }
 
-    private var yesterdayStatusText: String {
-        guard let progress = yesterdayProgress else {
+    private var yesterdayStatusText:
+        String {
+
+        guard let progress =
+            yesterdayProgress
+        else {
             return "—"
         }
 
@@ -453,13 +632,19 @@ struct MemberHomeView: View {
             : "לא הושג"
     }
 
-    private var yesterdayStatusIcon: String {
-        guard let progress = yesterdayProgress else {
+    private var yesterdayStatusIcon:
+        String {
+
+        guard let progress =
+            yesterdayProgress
+        else {
             return "minus.circle"
         }
 
         if progress.isLearningDay {
-            return "brain.head.profile"
+
+            return
+                "brain.head.profile"
         }
 
         return progress.achieved
@@ -469,17 +654,22 @@ struct MemberHomeView: View {
 
     // MARK: - Group
 
-    private var groupCode: String {
+    private var groupCode:
+        String {
+
         store.groups.first(
             where: {
-                $0.id == currentMember.groupID
+                $0.id ==
+                    currentMember.groupID
             }
         )?.code ?? "—"
     }
 
     // MARK: - Formatting
 
-    private var formattedUsage: String {
+    private var formattedUsage:
+        String {
+
         formattedMinutes(
             estimatedUsageMinutes
         )
@@ -488,17 +678,22 @@ struct MemberHomeView: View {
     private func formattedTarget(
         _ minutes: Int
     ) -> String {
-        formattedMinutes(minutes)
+
+        formattedMinutes(
+            minutes
+        )
     }
 
     private func formattedRemaining(
         _ target: Int
     ) -> String {
 
-        let remaining = max(
-            0,
-            target - estimatedUsageMinutes
-        )
+        let remaining =
+            max(
+                0,
+                target -
+                    estimatedUsageMinutes
+            )
 
         return formattedMinutes(
             remaining
@@ -509,18 +704,27 @@ struct MemberHomeView: View {
         _ minutes: Int
     ) -> String {
 
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
+        let hours =
+            minutes / 60
 
-        if hours > 0 && remainingMinutes > 0 {
-            return "\(hours) ש׳ \(remainingMinutes) דק׳"
+        let remainingMinutes =
+            minutes % 60
+
+        if hours > 0 &&
+            remainingMinutes > 0 {
+
+            return
+                "\(hours) ש׳ \(remainingMinutes) דק׳"
         }
 
         if hours > 0 {
-            return "\(hours) ש׳"
+
+            return
+                "\(hours) ש׳"
         }
 
-        return "\(remainingMinutes) דק׳"
+        return
+            "\(remainingMinutes) דק׳"
     }
 
     // MARK: - Status Card
@@ -531,23 +735,38 @@ struct MemberHomeView: View {
         icon: String
     ) -> some View {
 
-        VStack(spacing: 7) {
+        VStack(
+            spacing: 7
+        ) {
 
-            Image(systemName: icon)
-                .font(.title3)
+            Image(
+                systemName: icon
+            )
+            .font(.title3)
 
             Text(value)
                 .font(.headline)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(
+                    0.7
+                )
 
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(
+                    .secondary
+                )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(.thinMaterial)
+        .frame(
+            maxWidth: .infinity
+        )
+        .padding(
+            .vertical,
+            14
+        )
+        .background(
+            .thinMaterial
+        )
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 16
@@ -557,7 +776,8 @@ struct MemberHomeView: View {
 
     // MARK: - Screen Time Authorization
 
-    private var hasScreenTimeAuthorization: Bool {
+    private var hasScreenTimeAuthorization:
+        Bool {
 
         let status =
             AuthorizationCenter.shared
@@ -567,39 +787,51 @@ struct MemberHomeView: View {
             return true
         }
 
-        if #available(iOS 26.4, *),
-           status == .approvedWithDataAccess
-        {
+        if #available(
+            iOS 26.4,
+            *
+        ),
+           status ==
+            .approvedWithDataAccess {
+
             return true
         }
 
         return false
     }
 
-    private var authorizationIcon: String {
+    private var authorizationIcon:
+        String {
 
         if hasScreenTimeAuthorization {
-            return "checkmark.circle.fill"
+
+            return
+                "checkmark.circle.fill"
         }
 
         if AuthorizationCenter.shared
-            .authorizationStatus == .denied
-        {
-            return "xmark.circle.fill"
+            .authorizationStatus ==
+            .denied {
+
+            return
+                "xmark.circle.fill"
         }
 
         return "circle"
     }
 
-    private var authorizationColor: Color {
+    private var authorizationColor:
+        Color {
 
         if hasScreenTimeAuthorization {
+
             return .green
         }
 
         if AuthorizationCenter.shared
-            .authorizationStatus == .denied
-        {
+            .authorizationStatus ==
+            .denied {
+
             return .red
         }
 
@@ -613,16 +845,18 @@ struct MemberHomeView: View {
             statusText =
                 "זמן המסך מחובר ✓"
 
-        } else if AuthorizationCenter.shared
-            .authorizationStatus == .denied
-        {
+        } else if
+            AuthorizationCenter.shared
+                .authorizationStatus ==
+            .denied {
 
             statusText =
                 "הגישה לזמן המסך נדחתה"
 
-        } else if AuthorizationCenter.shared
-            .authorizationStatus == .notDetermined
-        {
+        } else if
+            AuthorizationCenter.shared
+                .authorizationStatus ==
+            .notDetermined {
 
             statusText =
                 "נדרש אישור לזמן מסך"
@@ -640,18 +874,24 @@ struct MemberHomeView: View {
 
         if let reportedUsage =
             sharedDefaults?.object(
-                forKey: "reportedUsageMinutes"
+                forKey:
+                    "reportedUsageMinutes"
             ) as? Int {
 
             estimatedUsageMinutes =
-                max(0, reportedUsage)
+                max(
+                    0,
+                    reportedUsage
+                )
 
         } else {
 
             estimatedUsageMinutes =
-                sharedDefaults?.integer(
-                    forKey: "estimatedUsageMinutes"
-                ) ?? 0
+                sharedDefaults?
+                    .integer(
+                        forKey:
+                            "estimatedUsageMinutes"
+                    ) ?? 0
         }
     }
 
@@ -660,10 +900,12 @@ struct MemberHomeView: View {
     private func startScreenTimeMonitoring() {
 
         do {
+
             try ScreenTimeMonitor.shared
                 .startMonitoring(
                     targetMinutes:
-                        currentMember.dailyTargetMinutes
+                        currentMember
+                            .dailyTargetMinutes
                 )
 
         } catch {
@@ -691,27 +933,37 @@ struct MemberHomeView: View {
 
     private func requestScreenTime() {
 
-        guard !isRequestingAuthorization else {
+        guard
+            !isRequestingAuthorization
+        else {
             return
         }
 
-        isRequestingAuthorization = true
+        isRequestingAuthorization =
+            true
 
         Task {
 
             do {
-                try await AuthorizationCenter.shared
-                    .requestAuthorization(
-                        for: .individual
-                    )
+
+                try await
+                    AuthorizationCenter.shared
+                        .requestAuthorization(
+                            for: .individual
+                        )
 
                 await MainActor.run {
+
                     refreshAuthorizationStatus()
                     refreshUsageEstimate()
-                    isRequestingAuthorization = false
+
+                    isRequestingAuthorization =
+                        false
 
                     if hasScreenTimeAuthorization {
+
                         requestNotificationAuthorization()
+
                         startScreenTimeMonitoring()
                     }
                 }
@@ -719,8 +971,11 @@ struct MemberHomeView: View {
             } catch {
 
                 await MainActor.run {
+
                     refreshAuthorizationStatus()
-                    isRequestingAuthorization = false
+
+                    isRequestingAuthorization =
+                        false
                 }
             }
         }
