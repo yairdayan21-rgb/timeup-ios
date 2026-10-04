@@ -60,8 +60,6 @@ struct MemberTabView: View {
             selection: $selectedTab
         ) {
 
-            // MARK: Ranking
-
             NavigationStack {
 
                 placeholderView(
@@ -83,8 +81,6 @@ struct MemberTabView: View {
             }
             .tag(MemberTab.ranking)
 
-            // MARK: AI
-
             NavigationStack {
 
                 placeholderView(
@@ -105,8 +101,6 @@ struct MemberTabView: View {
                 )
             }
             .tag(MemberTab.ai)
-
-            // MARK: Group
 
             NavigationStack {
 
@@ -145,8 +139,6 @@ struct MemberTabView: View {
             }
             .tag(MemberTab.group)
 
-            // MARK: Dashboard
-
             NavigationStack {
 
                 remoteDashboardView(
@@ -179,7 +171,7 @@ struct MemberTabView: View {
         }
     }
 
-    // MARK: - Remote Dashboard
+    // MARK: - Dashboard
 
     private func remoteDashboardView(
         user:
@@ -221,12 +213,24 @@ struct MemberTabView: View {
                         spacing: 10
                     ) {
 
-                        Label(
-                            "הקבוצה שלי",
-                            systemImage:
-                                "person.3.fill"
-                        )
-                        .font(.headline)
+                        HStack {
+
+                            Label(
+                                "הקבוצה שלי",
+                                systemImage:
+                                    "person.3.fill"
+                            )
+                            .font(.headline)
+
+                            Spacer()
+
+                            Label(
+                                "\(dataStore.currentGroupStreak)",
+                                systemImage:
+                                    "flame.fill"
+                            )
+                            .font(.headline)
+                        }
 
                         Text(group.name)
                             .font(.title2)
@@ -392,7 +396,7 @@ struct MemberTabView: View {
         )
     }
 
-    // MARK: - Remote Group
+    // MARK: - Group
 
     private func remoteGroupView(
         group:
@@ -406,36 +410,44 @@ struct MemberTabView: View {
                 spacing: 20
             ) {
 
-                Image(
-                    systemName:
-                        "person.3.fill"
-                )
-                .font(
-                    .system(size: 52)
-                )
-
-                Text(group.name)
-                    .font(
-                        .largeTitle.bold()
-                    )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 8
+                HStack(
+                    alignment: .center,
+                    spacing: 16
                 ) {
 
-                    Text("קוד קבוצה")
-                        .font(.headline)
+                    Image(
+                        systemName:
+                            "person.3.fill"
+                    )
+                    .font(
+                        .system(size: 46)
+                    )
 
-                    Text(group.code)
-                        .font(
-                            .system(
-                                size: 28,
-                                weight: .bold,
-                                design: .rounded
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+
+                        Text(group.name)
+                            .font(
+                                .largeTitle.bold()
                             )
+
+                        Text(
+                            "קוד קבוצה: \(group.code)"
                         )
+                        .font(.footnote)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
                 }
+
+                groupStreakCard
+
+                todayGroupStatusCard
 
                 Divider()
 
@@ -471,6 +483,240 @@ struct MemberTabView: View {
                 groupID: group.id
             )
         }
+    }
+
+    // MARK: - Group Streak
+
+    private var groupStreakCard:
+        some View {
+
+        HStack(spacing: 16) {
+
+            ZStack {
+
+                Circle()
+                    .fill(
+                        Color.secondary
+                            .opacity(0.12)
+                    )
+                    .frame(
+                        width: 58,
+                        height: 58
+                    )
+
+                Image(
+                    systemName:
+                        "flame.fill"
+                )
+                .font(
+                    .system(size: 28)
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+
+                Text("רצף קבוצתי")
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                Text(
+                    "\(dataStore.currentGroupStreak) ימים"
+                )
+                .font(.title2.bold())
+            }
+
+            Spacer()
+        }
+        .padding()
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            .thinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18
+                )
+        )
+    }
+
+    // MARK: - Today's Group Status
+
+    @ViewBuilder
+    private var todayGroupStatusCard:
+        some View {
+
+        if let result =
+            dataStore.groupResult() {
+
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+
+                HStack {
+
+                    Label(
+                        "מצב הקבוצה היום",
+                        systemImage:
+                            "chart.bar.fill"
+                    )
+                    .font(.headline)
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            result.succeeded
+                            ? "checkmark.circle.fill"
+                            : "xmark.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        result.succeeded
+                        ? Color.green
+                        : Color.red
+                    )
+                }
+
+                HStack(spacing: 12) {
+
+                    groupMetric(
+                        title: "השלימו",
+                        value:
+                            "\(result.completedMemberCount)/\(result.memberCount)",
+                        icon:
+                            "person.2.fill"
+                    )
+
+                    groupMetric(
+                        title: "ממוצע",
+                        value:
+                            formattedMinutes(
+                                result.averageUsageMinutes
+                            ),
+                        icon:
+                            "chart.bar.xaxis"
+                    )
+                }
+
+                Label(
+                    result.succeeded
+                    ? "הקבוצה עמדה ביעד"
+                    : "הקבוצה עדיין לא השלימה את היעד",
+                    systemImage:
+                        result.succeeded
+                        ? "checkmark.circle.fill"
+                        : "clock.fill"
+                )
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(
+                    result.succeeded
+                    ? Color.green
+                    : Color.secondary
+                )
+            }
+            .padding()
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .background(
+                .thinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18
+                    )
+            )
+
+        } else {
+
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+
+                Label(
+                    "מצב הקבוצה היום",
+                    systemImage:
+                        "clock.fill"
+                )
+                .font(.headline)
+
+                Text(
+                    "התוצאה הקבוצתית של היום עדיין לא נקבעה."
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+            .padding()
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .background(
+                .thinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18
+                    )
+            )
+        }
+    }
+
+    private func groupMetric(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+
+        HStack(spacing: 9) {
+
+            Image(
+                systemName: icon
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                Text(value)
+                    .font(.headline)
+            }
+
+            Spacer(
+                minLength: 0
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(10)
+        .background(
+            Color.secondary
+                .opacity(0.08),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 12
+                )
+        )
     }
 
     // MARK: - Group Members
@@ -884,7 +1130,7 @@ struct MemberTabView: View {
             "\(hours) שע׳ \(remainingMinutes) דק׳"
     }
 
-    // MARK: - Profile Button
+    // MARK: - Profile
 
     @ToolbarContentBuilder
     private var profileToolbar:
@@ -927,7 +1173,7 @@ struct MemberTabView: View {
         }
     }
 
-    // MARK: - Loading
+    // MARK: - States
 
     private var loadingView:
         some View {
@@ -949,8 +1195,6 @@ struct MemberTabView: View {
         )
     }
 
-    // MARK: - Unavailable
-
     private var unavailableView:
         some View {
 
@@ -965,8 +1209,6 @@ struct MemberTabView: View {
                 )
         )
     }
-
-    // MARK: - Placeholder
 
     private func placeholderView(
         title: String,
