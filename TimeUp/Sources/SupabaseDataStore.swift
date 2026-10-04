@@ -11,7 +11,11 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var memberships: [TimeUpRemoteMembership] = []
     @Published private(set) var groups: [TimeUpRemoteGroup] = []
 
+    @Published private(set) var groupMemberships: [TimeUpRemoteMembership] = []
+    @Published private(set) var groupMembers: [TimeUpRemoteUser] = []
+
     @Published private(set) var isLoading = false
+    @Published private(set) var isLoadingGroupMembers = false
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
@@ -119,6 +123,8 @@ final class SupabaseDataStore: ObservableObject {
                 currentUser = nil
                 memberships = []
                 groups = []
+                groupMemberships = []
+                groupMembers = []
 
                 lastError =
                     "TIMEUP_USER_NOT_FOUND"
@@ -137,6 +143,8 @@ final class SupabaseDataStore: ObservableObject {
             currentUser = nil
             memberships = []
             groups = []
+            groupMemberships = []
+            groupMembers = []
 
             lastError =
                 error.localizedDescription
@@ -237,6 +245,113 @@ final class SupabaseDataStore: ObservableObject {
 
         groups =
             loadedGroups
+    }
+
+    // MARK: - Group Members
+
+    func loadGroupMembers(
+        groupID: UUID
+    ) async {
+
+        isLoadingGroupMembers = true
+        lastError = nil
+
+        defer {
+            isLoadingGroupMembers = false
+        }
+
+        do {
+
+            let loadedMemberships:
+                [TimeUpRemoteMembership] =
+                try await client
+                    .from("group_memberships")
+                    .select(
+                        """
+                        id,
+                        group_id,
+                        user_id,
+                        is_active,
+                        joined_at
+                        """
+                    )
+                    .eq(
+                        "group_id",
+                        value: groupID.uuidString
+                    )
+                    .eq(
+                        "is_active",
+                        value: true
+                    )
+                    .execute()
+                    .value
+
+            groupMemberships =
+                loadedMemberships
+
+            guard !loadedMemberships.isEmpty else {
+
+                groupMembers = []
+                return
+            }
+
+            var loadedUsers:
+                [TimeUpRemoteUser] = []
+
+            for membership in loadedMemberships {
+
+                let users:
+                    [TimeUpRemoteUser] =
+                    try await client
+                        .from("users")
+                        .select(
+                            """
+                            id,
+                            auth_user_id,
+                            email,
+                            display_name,
+                            role
+                            """
+                        )
+                        .eq(
+                            "id",
+                            value:
+                                membership.userID.uuidString
+                        )
+                        .limit(1)
+                        .execute()
+                        .value
+
+                if let user = users.first {
+
+                    loadedUsers.append(
+                        user
+                    )
+                }
+            }
+
+            groupMembers =
+                loadedUsers.sorted {
+
+                    let firstName =
+                        $0.displayName ?? ""
+
+                    let secondName =
+                        $1.displayName ?? ""
+
+                    return firstName.localizedCompare(
+                        secondName
+                    ) == .orderedAscending
+                }
+
+        } catch {
+
+            groupMemberships = []
+            groupMembers = []
+
+            lastError =
+                error.localizedDescription
+        }
     }
 
     // MARK: - Join Group
@@ -367,8 +482,12 @@ final class SupabaseDataStore: ObservableObject {
         currentUser = nil
         memberships = []
         groups = []
+        groupMemberships = []
+        groupMembers = []
+
         lastError = nil
         isLoading = false
+        isLoadingGroupMembers = false
     }
 }
 
