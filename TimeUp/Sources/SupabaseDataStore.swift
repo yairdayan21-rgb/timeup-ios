@@ -23,6 +23,7 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var isLoadingDailyProgress = false
     @Published private(set) var isSyncingScreenTime = false
     @Published private(set) var isCreatingGroup = false
+    @Published private(set) var isSavingManualTarget = false
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
@@ -197,6 +198,23 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    private struct DailyTargetUpsert: Encodable {
+
+        let groupID: UUID
+        let userID: UUID
+        let targetDate: String
+        let targetMinutes: Int
+        let goalMethod: String
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case userID = "user_id"
+            case targetDate = "target_date"
+            case targetMinutes = "target_minutes"
+            case goalMethod = "goal_method"
+        }
+    }
+
     private struct GroupInsert: Encodable {
 
         let name: String
@@ -288,9 +306,7 @@ final class SupabaseDataStore: ObservableObject {
         } catch {
 
             clearLoadedData()
-
-            lastError =
-                error.localizedDescription
+            lastError = error.localizedDescription
         }
     }
 
@@ -320,8 +336,7 @@ final class SupabaseDataStore: ObservableObject {
                 .execute()
                 .value
 
-        memberships =
-            loadedMemberships
+        memberships = loadedMemberships
 
         let groupIDs =
             loadedMemberships.map {
@@ -379,8 +394,7 @@ final class SupabaseDataStore: ObservableObject {
             }
         }
 
-        groups =
-            loadedGroups
+        groups = loadedGroups
     }
 
     // MARK: - Create Group
@@ -420,7 +434,6 @@ final class SupabaseDataStore: ObservableObject {
 
         var lastCreationError: Error?
 
-        // Try several codes in case a generated join code already exists.
         for _ in 0..<20 {
 
             let code =
@@ -491,7 +504,6 @@ final class SupabaseDataStore: ObservableObject {
 
                 } catch {
 
-                    // Avoid leaving an orphan group if membership creation fails.
                     try? await client
                         .from("groups")
                         .delete()
@@ -736,6 +748,76 @@ final class SupabaseDataStore: ObservableObject {
 
             lastError =
                 error.localizedDescription
+        }
+    }
+
+    // MARK: - Manual Target
+
+    func setManualTarget(
+        group: TimeUpRemoteGroup,
+        userID: UUID,
+        targetMinutes: Int
+    ) async throws {
+
+        guard let currentUser else {
+            throw SupabaseDataStoreError.userNotLoaded
+        }
+
+        guard currentUser.role == "admin" else {
+            throw SupabaseDataStoreError.adminRequired
+        }
+
+        guard group.goalMethod == "manual" else {
+            throw SupabaseDataStoreError.manualGroupRequired
+        }
+
+        guard targetMinutes > 0 else {
+            throw SupabaseDataStoreError.invalidTargetMinutes
+        }
+
+        isSavingManualTarget = true
+        lastError = nil
+
+        defer {
+            isSavingManualTarget = false
+        }
+
+        let targetDate =
+            databaseDateString(
+                from: Date(),
+                group: group
+            )
+
+        let payload =
+            DailyTargetUpsert(
+                groupID: group.id,
+                userID: userID,
+                targetDate: targetDate,
+                targetMinutes: targetMinutes,
+                goalMethod: "manual"
+            )
+
+        do {
+
+            try await client
+                .from("daily_targets")
+                .upsert(
+                    payload,
+                    onConflict:
+                        "group_id,user_id,target_date"
+                )
+                .execute()
+
+            await loadDailyProgress(
+                groupID: group.id
+            )
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+
+            throw error
         }
     }
 
@@ -1237,6 +1319,7 @@ final class SupabaseDataStore: ObservableObject {
         isLoadingDailyProgress = false
         isSyncingScreenTime = false
         isCreatingGroup = false
+        isSavingManualTarget = false
     }
 }
 
@@ -1248,6 +1331,8 @@ enum SupabaseDataStoreError: LocalizedError {
     case adminRequired
     case invalidGroupName
     case groupCreationFailed
+    case manualGroupRequired
+    case invalidTargetMinutes
 
     var errorDescription: String? {
 
@@ -1257,13 +1342,19 @@ enum SupabaseDataStoreError: LocalizedError {
             return "TimeUp user is not loaded."
 
         case .adminRequired:
-            return "Only a TimeUp admin can create a group."
+            return "Only a TimeUp admin can perform this action."
 
         case .invalidGroupName:
             return "Group name cannot be empty."
 
         case .groupCreationFailed:
             return "TimeUp could not create the group."
+
+        case .manualGroupRequired:
+            return "Manual targets can only be changed in a manual group."
+
+        case .invalidTargetMinutes:
+            return "Target minutes must be greater than zero."
         }
     }
 }
