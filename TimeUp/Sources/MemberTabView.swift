@@ -23,14 +23,12 @@ struct MemberTabView: View {
         Group {
 
             if dataStore.isLoading &&
-                dataStore.currentUser == nil
-            {
+                dataStore.currentUser == nil {
 
                 loadingView
 
             } else if let user =
-                dataStore.currentUser
-            {
+                dataStore.currentUser {
 
                 memberTabs(
                     user: user
@@ -113,8 +111,7 @@ struct MemberTabView: View {
             NavigationStack {
 
                 if let group =
-                    dataStore.activeMemberGroup
-                {
+                    dataStore.activeMemberGroup {
 
                     remoteGroupView(
                         group: group
@@ -217,8 +214,7 @@ struct MemberTabView: View {
                 }
 
                 if let group =
-                    dataStore.activeMemberGroup
-                {
+                    dataStore.activeMemberGroup {
 
                     VStack(
                         alignment: .leading,
@@ -340,10 +336,8 @@ struct MemberTabView: View {
                     spacing: 8
                 ) {
 
-                    Text(
-                        "קוד קבוצה"
-                    )
-                    .font(.headline)
+                    Text("קוד קבוצה")
+                        .font(.headline)
 
                     Text(group.code)
                         .font(
@@ -357,18 +351,8 @@ struct MemberTabView: View {
 
                 Divider()
 
-                Text(
-                    "פרטי הקבוצה נטענים כעת ישירות מ-Supabase."
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-
-                Text(
-                    "בשלב הבא נחבר מחדש את סקירה, פירוט, Dashboard, חברים וצ׳אט לנתונים המרוחקים."
-                )
-                .foregroundStyle(
-                    .secondary
+                groupMembersSection(
+                    group: group
                 )
             }
             .frame(
@@ -381,14 +365,222 @@ struct MemberTabView: View {
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .task(id: group.id) {
+
+            await dataStore
+                .loadGroupMembers(
+                    groupID: group.id
+                )
+        }
+        .refreshable {
+
+            await dataStore
+                .loadGroupMembers(
+                    groupID: group.id
+                )
+        }
+    }
+
+    // MARK: - Group Members
+
+    @ViewBuilder
+    private func groupMembersSection(
+        group:
+            SupabaseDataStore.TimeUpRemoteGroup
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+
+            HStack {
+
+                Label(
+                    "חברים",
+                    systemImage:
+                        "person.2.fill"
+                )
+                .font(.title2.bold())
+
+                Spacer()
+
+                if !dataStore.groupMembers.isEmpty {
+
+                    Text(
+                        "\(dataStore.groupMembers.count)"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+
+            if dataStore.isLoadingGroupMembers {
+
+                HStack(spacing: 12) {
+
+                    ProgressView()
+
+                    Text(
+                        "טוען חברי קבוצה..."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .padding(
+                    .vertical,
+                    8
+                )
+
+            } else if dataStore.groupMembers.isEmpty {
+
+                ContentUnavailableView(
+                    "אין חברים להצגה",
+                    systemImage:
+                        "person.2.slash",
+                    description:
+                        Text(
+                            "לא נמצאו חברים פעילים בקבוצה."
+                        )
+                )
+
+            } else {
+
+                VStack(spacing: 10) {
+
+                    ForEach(
+                        dataStore.groupMembers
+                    ) { member in
+
+                        groupMemberRow(
+                            member: member
+                        )
+                    }
+                }
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
+
+    private func groupMemberRow(
+        member:
+            SupabaseDataStore.TimeUpRemoteUser
+    ) -> some View {
+
+        HStack(spacing: 14) {
+
+            ZStack {
+
+                Circle()
+                    .fill(
+                        Color.secondary
+                            .opacity(0.12)
+                    )
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+
+                Image(
+                    systemName:
+                        "person.fill"
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+
+                HStack(spacing: 6) {
+
+                    Text(
+                        displayName(
+                            for: member
+                        )
+                    )
+                    .font(.headline)
+
+                    if member.id ==
+                        dataStore.currentUser?.id {
+
+                        Text("אתה")
+                            .font(.caption)
+                            .fontWeight(
+                                .semibold
+                            )
+                            .padding(
+                                .horizontal,
+                                7
+                            )
+                            .padding(
+                                .vertical,
+                                3
+                            )
+                            .background(
+                                .thinMaterial,
+                                in: Capsule()
+                            )
+                    }
+                }
+
+                if let membership =
+                    dataStore
+                        .groupMemberships
+                        .first(
+                            where: {
+                                $0.userID ==
+                                    member.id
+                            }
+                        ),
+                   let joinedAt =
+                    membership.joinedAt {
+
+                    Text(
+                        "הצטרף \(joinedAt.formatted(date: .abbreviated, time: .omitted))"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.left"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                .tertiary
+            )
+        }
+        .padding(14)
+        .background(
+            .thinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16
+                )
+        )
     }
 
     // MARK: - Profile Button
 
     @ToolbarContentBuilder
     private var profileToolbar:
-        some ToolbarContent
-    {
+        some ToolbarContent {
 
         ToolbarItem(
             placement: .topBarTrailing
@@ -430,8 +622,7 @@ struct MemberTabView: View {
     // MARK: - Loading
 
     private var loadingView:
-        some View
-    {
+        some View {
 
         VStack(spacing: 16) {
 
@@ -453,8 +644,7 @@ struct MemberTabView: View {
     // MARK: - Unavailable
 
     private var unavailableView:
-        some View
-    {
+        some View {
 
         ContentUnavailableView(
             "לא ניתן לטעון את החשבון",
@@ -535,8 +725,7 @@ struct MemberTabView: View {
 // MARK: - Supabase Member Profile
 
 private struct SupabaseMemberProfileView:
-    View
-{
+    View {
 
     let user:
         SupabaseDataStore.TimeUpRemoteUser
@@ -577,8 +766,7 @@ private struct SupabaseMemberProfileView:
                     .fontWeight(.bold)
 
                     if let email =
-                        user.email
-                    {
+                        user.email {
 
                         Text(email)
                             .font(.footnote)
