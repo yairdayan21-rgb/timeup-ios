@@ -16,6 +16,7 @@ final class SupabaseDataStore: ObservableObject {
 
     @Published private(set) var dailyTargets: [TimeUpRemoteDailyTarget] = []
     @Published private(set) var dailyResults: [TimeUpRemoteDailyResult] = []
+    @Published private(set) var groupDailyResults: [TimeUpRemoteGroupDailyResult] = []
 
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingGroupMembers = false
@@ -133,6 +134,29 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    public struct TimeUpRemoteGroupDailyResult: Identifiable, Decodable {
+
+        public let id: UUID
+        public let groupID: UUID
+        public let resultDate: String
+        public let succeeded: Bool
+        public let memberCount: Int
+        public let completedMemberCount: Int
+        public let averageUsageMinutes: Int?
+        public let streakAfterDay: Int
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case groupID = "group_id"
+            case resultDate = "result_date"
+            case succeeded
+            case memberCount = "member_count"
+            case completedMemberCount = "completed_member_count"
+            case averageUsageMinutes = "average_usage_minutes"
+            case streakAfterDay = "streak_after_day"
+        }
+    }
+
     // MARK: - Load Current Account
 
     func loadCurrentAccount() async {
@@ -174,13 +198,7 @@ final class SupabaseDataStore: ObservableObject {
 
             guard let user = users.first else {
 
-                currentUser = nil
-                memberships = []
-                groups = []
-                groupMemberships = []
-                groupMembers = []
-                dailyTargets = []
-                dailyResults = []
+                clearLoadedData()
 
                 lastError =
                     "TIMEUP_USER_NOT_FOUND"
@@ -196,13 +214,7 @@ final class SupabaseDataStore: ObservableObject {
 
         } catch {
 
-            currentUser = nil
-            memberships = []
-            groups = []
-            groupMemberships = []
-            groupMembers = []
-            dailyTargets = []
-            dailyResults = []
+            clearLoadedData()
 
             lastError =
                 error.localizedDescription
@@ -475,12 +487,37 @@ final class SupabaseDataStore: ObservableObject {
                     .execute()
                     .value
 
+            async let groupResultsRequest:
+                [TimeUpRemoteGroupDailyResult] =
+                client
+                    .from("group_daily_results")
+                    .select(
+                        """
+                        id,
+                        group_id,
+                        result_date,
+                        succeeded,
+                        member_count,
+                        completed_member_count,
+                        average_usage_minutes,
+                        streak_after_day
+                        """
+                    )
+                    .eq(
+                        "group_id",
+                        value: groupID.uuidString
+                    )
+                    .execute()
+                    .value
+
             let (
                 loadedTargets,
-                loadedResults
+                loadedResults,
+                loadedGroupResults
             ) = try await (
                 targetsRequest,
-                resultsRequest
+                resultsRequest,
+                groupResultsRequest
             )
 
             dailyTargets =
@@ -489,10 +526,14 @@ final class SupabaseDataStore: ObservableObject {
             dailyResults =
                 loadedResults
 
+            groupDailyResults =
+                loadedGroupResults
+
         } catch {
 
             dailyTargets = []
             dailyResults = []
+            groupDailyResults = []
 
             lastError =
                 error.localizedDescription
@@ -531,6 +572,35 @@ final class SupabaseDataStore: ObservableObject {
             $0.userID == userID &&
             $0.resultDate == dateKey
         }
+    }
+
+    func groupResult(
+        on date: Date = Date()
+    ) -> TimeUpRemoteGroupDailyResult? {
+
+        let dateKey =
+            databaseDateString(
+                from: date
+            )
+
+        return groupDailyResults.first {
+            $0.resultDate == dateKey
+        }
+    }
+
+    func latestGroupResult()
+        -> TimeUpRemoteGroupDailyResult? {
+
+        groupDailyResults.max {
+            $0.resultDate <
+            $1.resultDate
+        }
+    }
+
+    var currentGroupStreak: Int {
+
+        latestGroupResult()?
+            .streakAfterDay ?? 0
     }
 
     func targetMinutes(
@@ -660,6 +730,7 @@ final class SupabaseDataStore: ObservableObject {
     ) async throws {
 
         guard let user = currentUser else {
+
             throw SupabaseDataStoreError
                 .userNotLoaded
         }
@@ -737,9 +808,9 @@ final class SupabaseDataStore: ObservableObject {
         activeMemberGroup != nil
     }
 
-    // MARK: - Reset
+    // MARK: - Clear Data
 
-    func reset() {
+    private func clearLoadedData() {
 
         currentUser = nil
         memberships = []
@@ -750,6 +821,14 @@ final class SupabaseDataStore: ObservableObject {
 
         dailyTargets = []
         dailyResults = []
+        groupDailyResults = []
+    }
+
+    // MARK: - Reset
+
+    func reset() {
+
+        clearLoadedData()
 
         lastError = nil
 
