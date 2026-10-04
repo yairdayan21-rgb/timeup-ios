@@ -131,10 +131,8 @@ struct FaceIDSetupView: View {
 
         case .member:
 
-            MemberTabView(
-                member: member
-            )
-            .navigationBarBackButtonHidden(true)
+            MemberTabView()
+                .navigationBarBackButtonHidden(true)
         }
     }
 
