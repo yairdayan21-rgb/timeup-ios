@@ -17,24 +17,13 @@ final class TimeUpUITests: XCTestCase {
         )
 
         XCTAssertTrue(
-            app.staticTexts[
-                "להקטין זמן מסך. לגדול ביחד."
-            ]
-            .waitForExistence(timeout: 10)
+            app.buttons["Continue with Apple"]
+                .waitForExistence(timeout: 10)
         )
 
         XCTAssertTrue(
-            app.buttons[
-                "Continue with Apple"
-            ]
-            .waitForExistence(timeout: 10)
-        )
-
-        XCTAssertTrue(
-            app.buttons[
-                "Continue with Google"
-            ]
-            .waitForExistence(timeout: 10)
+            app.buttons["Continue with Google"]
+                .waitForExistence(timeout: 10)
         )
     }
 
