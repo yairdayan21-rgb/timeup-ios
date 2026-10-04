@@ -8,6 +8,10 @@ struct AdminMemberDetailView: View {
     @StateObject private var dataStore = SupabaseDataStore.shared
 
     @State private var isLoading = false
+    @State private var manualHours = 0
+    @State private var manualMinutes = 0
+    @State private var didLoadManualTarget = false
+    @State private var saveMessage: String?
 
     var body: some View {
 
@@ -48,7 +52,6 @@ struct AdminMemberDetailView: View {
                         Spacer()
 
                         if isLoading {
-
                             ProgressView()
                         }
                     }
@@ -67,9 +70,7 @@ struct AdminMemberDetailView: View {
 
                             statusCard(
                                 title: "יעד",
-                                value: targetText(
-                                    result
-                                ),
+                                value: targetText(result),
                                 icon: "target"
                             )
                         }
@@ -80,8 +81,7 @@ struct AdminMemberDetailView: View {
 
                             Label(
                                 "יום למידה",
-                                systemImage:
-                                    "brain.head.profile"
+                                systemImage: "brain.head.profile"
                             )
                             .font(.headline)
 
@@ -122,14 +122,11 @@ struct AdminMemberDetailView: View {
                                             statusDescription(
                                                 usage:
                                                     result.usageMinutes,
-                                                target:
-                                                    target
+                                                target: target
                                             )
                                         )
                                         .font(.caption)
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
+                                        .foregroundStyle(.secondary)
                                     }
                                 }
 
@@ -160,8 +157,7 @@ struct AdminMemberDetailView: View {
 
                         Label(
                             "ממתין לנתוני זמן מסך",
-                            systemImage:
-                                "clock.arrow.circlepath"
+                            systemImage: "clock.arrow.circlepath"
                         )
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -180,10 +176,144 @@ struct AdminMemberDetailView: View {
                 .padding()
                 .background(.thinMaterial)
                 .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 18
-                    )
+                    RoundedRectangle(cornerRadius: 18)
                 )
+
+                // MARK: - Manual Target Editor
+
+                if group.goalMethod == "manual" {
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
+
+                        Label(
+                            "יעד אישי",
+                            systemImage:
+                                "person.crop.circle.badge.checkmark"
+                        )
+                        .font(.headline)
+
+                        if let currentTargetMinutes {
+
+                            Text(
+                                "היעד הנוכחי: \(formatMinutes(currentTargetMinutes))"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        } else {
+
+                            Text("עדיין לא הוגדר יעד למשתמש.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Divider()
+
+                        Text("הגדרת יעד")
+                            .fontWeight(.semibold)
+
+                        HStack(spacing: 16) {
+
+                            VStack(spacing: 6) {
+
+                                Text("שעות")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Stepper(
+                                    value: $manualHours,
+                                    in: 0...23
+                                ) {
+                                    Text("\(manualHours)")
+                                        .font(.title3.bold())
+                                        .monospacedDigit()
+                                }
+                            }
+
+                            Divider()
+                                .frame(height: 45)
+
+                            VStack(spacing: 6) {
+
+                                Text("דקות")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Stepper(
+                                    value: $manualMinutes,
+                                    in: 0...59
+                                ) {
+                                    Text("\(manualMinutes)")
+                                        .font(.title3.bold())
+                                        .monospacedDigit()
+                                }
+                            }
+                        }
+
+                        Text(
+                            "יעד חדש: \(formatMinutes(manualTargetTotalMinutes))"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+
+                        Button {
+
+                            Task {
+                                await saveManualTarget()
+                            }
+
+                        } label: {
+
+                            HStack {
+
+                                Spacer()
+
+                                if dataStore.isSavingManualTarget {
+
+                                    ProgressView()
+                                        .padding(.trailing, 4)
+
+                                    Text("שומר...")
+
+                                } else {
+
+                                    Image(
+                                        systemName: "checkmark.circle.fill"
+                                    )
+
+                                    Text("שמירת יעד")
+                                        .fontWeight(.semibold)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(
+                            manualTargetTotalMinutes <= 0 ||
+                            dataStore.isSavingManualTarget
+                        )
+
+                        if let saveMessage {
+
+                            Text(saveMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .center
+                                )
+                        }
+                    }
+                    .padding()
+                    .background(.thinMaterial)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 18)
+                    )
+                }
 
                 // MARK: - Group
 
@@ -230,63 +360,8 @@ struct AdminMemberDetailView: View {
                 .padding()
                 .background(.thinMaterial)
                 .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 18
-                    )
+                    RoundedRectangle(cornerRadius: 18)
                 )
-
-                // MARK: - Manual Goal
-
-                if group.goalMethod == "manual" {
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-
-                        Label(
-                            "יעד אישי",
-                            systemImage:
-                                "person.crop.circle.badge.checkmark"
-                        )
-                        .font(.headline)
-
-                        if let target = todayTarget {
-
-                            Text(
-                                "היעד הנוכחי: \(formatMinutes(target.targetMinutes))"
-                            )
-
-                        } else if let result = todayResult,
-                                  let target =
-                                    result.targetMinutes {
-
-                            Text(
-                                "היעד הנוכחי: \(formatMinutes(target))"
-                            )
-
-                        } else {
-
-                            Text(
-                                "עדיין לא הוגדר יעד למשתמש."
-                            )
-                            .foregroundStyle(.secondary)
-                        }
-
-                        Text(
-                            "בשלב הבא נחבר כאן את האפשרות של המנהל לקבוע ולשנות את היעד האישי."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                    .background(.thinMaterial)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18
-                        )
-                    )
-                }
 
                 // MARK: - Error
 
@@ -298,7 +373,7 @@ struct AdminMemberDetailView: View {
                     ) {
 
                         Label(
-                            "לא ניתן לטעון את הנתונים",
+                            "לא ניתן להשלים את הפעולה",
                             systemImage:
                                 "exclamationmark.triangle"
                         )
@@ -322,9 +397,7 @@ struct AdminMemberDetailView: View {
                     )
                     .background(.thinMaterial)
                     .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18
-                        )
+                        RoundedRectangle(cornerRadius: 18)
                     )
                 }
             }
@@ -335,11 +408,9 @@ struct AdminMemberDetailView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
-
             await loadData()
         }
         .task {
-
             await loadData()
         }
     }
@@ -350,6 +421,7 @@ struct AdminMemberDetailView: View {
         SupabaseDataStore.TimeUpRemoteDailyResult? {
 
         dataStore.dailyResults.first {
+            $0.groupID == group.id &&
             $0.userID == member.id
         }
     }
@@ -358,8 +430,84 @@ struct AdminMemberDetailView: View {
         SupabaseDataStore.TimeUpRemoteDailyTarget? {
 
         dataStore.dailyTargets.first {
+            $0.groupID == group.id &&
             $0.userID == member.id
         }
+    }
+
+    private var currentTargetMinutes: Int? {
+
+        if let target = todayTarget {
+            return target.targetMinutes
+        }
+
+        return todayResult?.targetMinutes
+    }
+
+    private var manualTargetTotalMinutes: Int {
+
+        (manualHours * 60) + manualMinutes
+    }
+
+    // MARK: - Manual Target
+
+    @MainActor
+    private func saveManualTarget() async {
+
+        guard manualTargetTotalMinutes > 0 else {
+            return
+        }
+
+        saveMessage = nil
+
+        do {
+
+            try await dataStore.setManualTarget(
+                group: group,
+                userID: member.id,
+                targetMinutes:
+                    manualTargetTotalMinutes
+            )
+
+            saveMessage = "היעד נשמר בהצלחה"
+
+            loadManualTargetIntoEditor(
+                force: true
+            )
+
+        } catch {
+
+            saveMessage =
+                "שמירת היעד נכשלה: \(error.localizedDescription)"
+        }
+    }
+
+    private func loadManualTargetIntoEditor(
+        force: Bool = false
+    ) {
+
+        guard
+            force || !didLoadManualTarget
+        else {
+            return
+        }
+
+        guard
+            let targetMinutes =
+                currentTargetMinutes
+        else {
+
+            didLoadManualTarget = true
+            return
+        }
+
+        manualHours =
+            targetMinutes / 60
+
+        manualMinutes =
+            targetMinutes % 60
+
+        didLoadManualTarget = true
     }
 
     // MARK: - Status Card
@@ -390,13 +538,9 @@ struct AdminMemberDetailView: View {
             maxWidth: .infinity,
             alignment: .leading
         )
-        .background(
-            .ultraThinMaterial
-        )
+        .background(.ultraThinMaterial)
         .clipShape(
-            RoundedRectangle(
-                cornerRadius: 14
-            )
+            RoundedRectangle(cornerRadius: 14)
         )
     }
 
@@ -410,6 +554,8 @@ struct AdminMemberDetailView: View {
         await dataStore.loadDailyProgress(
             groupID: group.id
         )
+
+        loadManualTargetIntoEditor()
 
         isLoading = false
     }
@@ -431,7 +577,8 @@ struct AdminMemberDetailView: View {
             return "\(hours) שע׳"
         }
 
-        return "\(hours) שע׳ \(remainingMinutes) דק׳"
+        return
+            "\(hours) שע׳ \(remainingMinutes) דק׳"
     }
 
     private func targetText(
