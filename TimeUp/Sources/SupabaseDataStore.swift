@@ -20,13 +20,13 @@ final class SupabaseDataStore: ObservableObject {
 
     // MARK: - Models
 
-    struct TimeUpRemoteUser: Identifiable, Decodable {
+    public struct TimeUpRemoteUser: Identifiable, Decodable {
 
-        let id: UUID
-        let authUserID: UUID
-        let email: String?
-        let displayName: String?
-        let role: String
+        public let id: UUID
+        public let authUserID: UUID
+        public let email: String?
+        public let displayName: String?
+        public let role: String
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -37,13 +37,13 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
-    struct TimeUpRemoteMembership: Identifiable, Decodable {
+    public struct TimeUpRemoteMembership: Identifiable, Decodable {
 
-        let id: UUID
-        let groupID: UUID
-        let userID: UUID
-        let isActive: Bool
-        let joinedAt: Date?
+        public let id: UUID
+        public let groupID: UUID
+        public let userID: UUID
+        public let isActive: Bool
+        public let joinedAt: Date?
 
         enum CodingKeys: String, CodingKey {
             case id
