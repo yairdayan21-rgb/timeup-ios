@@ -173,6 +173,8 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    // MARK: - Payloads
+
     private struct DailyResultUpsert: Encodable {
 
         let groupID: UUID
@@ -731,14 +733,9 @@ final class SupabaseDataStore: ObservableObject {
                 groupResultsRequest
             )
 
-            dailyTargets =
-                loadedTargets
-
-            dailyResults =
-                loadedResults
-
-            groupDailyResults =
-                loadedGroupResults
+            dailyTargets = loadedTargets
+            dailyResults = loadedResults
+            groupDailyResults = loadedGroupResults
 
         } catch {
 
@@ -1205,6 +1202,59 @@ final class SupabaseDataStore: ObservableObject {
         return groupID
     }
 
+    // MARK: - Remove Group Member
+
+    func removeMemberFromGroup(
+        groupID: UUID,
+        userID: UUID
+    ) async throws {
+
+        guard let currentUser else {
+            throw SupabaseDataStoreError.userNotLoaded
+        }
+
+        guard currentUser.role == "admin" else {
+            throw SupabaseDataStoreError.adminRequired
+        }
+
+        guard currentUser.id != userID else {
+            throw SupabaseDataStoreError.cannotRemoveSelf
+        }
+
+        lastError = nil
+
+        do {
+
+            try await client
+                .from("group_memberships")
+                .delete()
+                .eq(
+                    "group_id",
+                    value: groupID.uuidString
+                )
+                .eq(
+                    "user_id",
+                    value: userID.uuidString
+                )
+                .execute()
+
+            await loadGroupMembers(
+                groupID: groupID
+            )
+
+            await loadDailyProgress(
+                groupID: groupID
+            )
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+
+            throw error
+        }
+    }
+
     // MARK: - Display Name
 
     func updateDisplayName(
@@ -1333,6 +1383,7 @@ enum SupabaseDataStoreError: LocalizedError {
     case groupCreationFailed
     case manualGroupRequired
     case invalidTargetMinutes
+    case cannotRemoveSelf
 
     var errorDescription: String? {
 
@@ -1355,6 +1406,9 @@ enum SupabaseDataStoreError: LocalizedError {
 
         case .invalidTargetMinutes:
             return "Target minutes must be greater than zero."
+
+        case .cannotRemoveSelf:
+            return "An admin cannot remove themselves from the group."
         }
     }
 }
