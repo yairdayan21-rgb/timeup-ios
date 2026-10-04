@@ -692,7 +692,7 @@ final class SupabaseDataStore: ObservableObject {
                 targetMinutes: targetMinutes,
                 achieved: achieved,
                 isLearningDay: isLearningDay,
-                source: "device_activity",
+                source: "screen_time",
                 updatedAt: Date()
             )
 
