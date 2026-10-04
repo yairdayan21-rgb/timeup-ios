@@ -2,129 +2,106 @@ import SwiftUI
 
 struct AdminGroupDetailView: View {
 
-    @Binding var group: TimeUpGroup
-    @StateObject private var store = TimeUpStore.shared
+    let group: TimeUpRemoteGroup
 
-    @State private var editingMemberID: UUID?
-    @State private var targetHours = 0
-    @State private var targetMinutes = 0
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
+
+    @State private var isRefreshing = false
 
     var body: some View {
+
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+
+            VStack(
+                alignment: .leading,
+                spacing: 24
+            ) {
 
                 // MARK: - Group Header
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(group.name)
-                        .font(
-                            .system(
-                                size: 32,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-
-                    HStack(spacing: 8) {
-                        Text("קוד קבוצה")
-
-                        Text(group.code)
-                            .font(
-                                .system(
-                                    .body,
-                                    design: .monospaced
-                                )
-                            )
-                            .fontWeight(.bold)
-                    }
-                    .foregroundStyle(.secondary)
-                }
-
-                // MARK: - Group Statistics
-
-                HStack(spacing: 12) {
-
-                    statCard(
-                        value: "\(groupMembers.count)",
-                        title: "חברים",
-                        icon: "person.2.fill"
-                    )
-
-                    statCard(
-                        value: "\(membersSucceededLastDay)",
-                        title: "הצליחו",
-                        icon: "checkmark.circle.fill"
-                    )
-
-                    statCard(
-                        value: "\(groupStreak)",
-                        title: "רצף קבוצתי",
-                        icon: "flame.fill"
-                    )
-                }
-
-                // MARK: - Goal
-
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
 
                     HStack {
-                        Label(
-                            "שיטת היעד",
-                            systemImage: "target"
-                        )
-                        .font(.headline)
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+
+                            Text(group.name)
+                                .font(
+                                    .system(
+                                        size: 30,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+
+                            Text("קוד קבוצה")
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                        }
 
                         Spacer()
 
-                        NavigationLink {
-                            GroupSettingsView(
-                                group: $group
-                            )
-                        } label: {
-                            Image(
-                                systemName: "gearshape.fill"
-                            )
-                        }
+                        Image(
+                            systemName:
+                                "person.3.fill"
+                        )
+                        .font(.title2)
                     }
 
-                    Text(goalTitle)
-                        .font(.title3.bold())
-
-                    if group.goalMethod != .manual {
-
-                        HStack {
-                            Label(
-                                "\(group.reductionPercent ?? 0)% הפחתה",
-                                systemImage: "arrow.down.right"
+                    Text(group.code)
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .bold,
+                                design: .monospaced
                             )
+                        )
+                        .tracking(5)
 
-                            Spacer()
+                    Divider()
 
-                            Label(
-                                "\(group.successDays ?? 0) ימי הצלחה",
-                                systemImage: "calendar"
-                            )
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack {
+
+                        Label(
+                            goalDescription,
+                            systemImage:
+                                "target"
+                        )
+
+                        Spacer()
+
+                        Label(
+                            "\(group.currentStreak)",
+                            systemImage:
+                                "flame.fill"
+                        )
+                    }
+                    .font(.subheadline)
+
+                    if group.goalMethod != "manual" {
 
                         Text(
-                            "יום למידה + \(group.successDays ?? 0) ימי הצלחה רצופים"
+                            "מסלול של \(group.successDays ?? 7) ימי הצלחה"
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    } else {
-
-                        Text(
-                            "לחץ על חבר כדי להגדיר או לשנות את היעד היומי שלו."
+                        .foregroundStyle(
+                            .secondary
                         )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     }
                 }
                 .padding()
-                .background(.thinMaterial)
+                .background(
+                    .thinMaterial
+                )
                 .clipShape(
                     RoundedRectangle(
                         cornerRadius: 18
@@ -133,801 +110,267 @@ struct AdminGroupDetailView: View {
 
                 // MARK: - Members
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
 
                     HStack {
+
                         Text("חברי הקבוצה")
-                            .font(.title3.bold())
+                            .font(
+                                .title3.bold()
+                            )
 
                         Spacer()
 
                         Text(
-                            "\(groupMembers.count) חברים"
+                            "\(dataStore.groupMembers.count) חברים"
                         )
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
                     }
 
-                    if groupMembers.isEmpty {
+                    if isRefreshing &&
+                        dataStore.groupMembers.isEmpty {
+
+                        HStack {
+
+                            Spacer()
+
+                            ProgressView(
+                                "טוען חברים..."
+                            )
+
+                            Spacer()
+                        }
+                        .padding(
+                            .vertical,
+                            30
+                        )
+
+                    } else if dataStore.groupMembers.isEmpty {
 
                         ContentUnavailableView(
-                            "עדיין אין חברים",
-                            systemImage: "person.3",
-                            description: Text(
-                                "שתף את קוד הקבוצה \(group.code) כדי שמשתמשים יוכלו להצטרף."
-                            )
+                            "אין חברים בקבוצה",
+                            systemImage:
+                                "person.3",
+                            description:
+                                Text(
+                                    "כאשר משתמשים יצטרפו לקבוצה הם יופיעו כאן."
+                                )
                         )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            20
+                        )
 
                     } else {
 
-                        ForEach(groupMembers) { member in
+                        ForEach(
+                            dataStore.groupMembers
+                        ) { member in
 
-                            memberRow(member)
-
-                            Divider()
+                            memberCard(
+                                member
+                            )
                         }
                     }
                 }
 
-                // MARK: - Group Progress
+                // MARK: - Error
 
-                if !groupMembers.isEmpty {
+                if let error =
+                    dataStore.lastError {
 
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
 
                         Label(
-                            "מצב הקבוצה",
-                            systemImage: "chart.bar.fill"
+                            "לא ניתן לטעון את נתוני הקבוצה",
+                            systemImage:
+                                "exclamationmark.triangle"
                         )
-                        .font(.headline)
+                        .fontWeight(
+                            .semibold
+                        )
 
-                        HStack {
-                            Text("הצליחו ביום האחרון")
-
-                            Spacer()
-
-                            Text(
-                                "\(membersSucceededLastDay) מתוך \(membersWithCompletedDay)"
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
                             )
-                            .fontWeight(.semibold)
-                        }
 
-                        HStack {
-                            Text("ביום למידה")
+                        Button(
+                            "נסה שוב"
+                        ) {
 
-                            Spacer()
+                            Task {
 
-                            Text(
-                                "\(membersInLearningPhase)"
-                            )
-                            .fontWeight(.semibold)
-                        }
-
-                        HStack {
-                            Text("עם יעד פעיל")
-
-                            Spacer()
-
-                            Text(
-                                "\(membersWithTarget) מתוך \(groupMembers.count)"
-                            )
-                            .fontWeight(.semibold)
+                                await loadGroup()
+                            }
                         }
                     }
                     .padding()
-                    .background(.thinMaterial)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .background(
+                        .thinMaterial
+                    )
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 18
                         )
                     )
                 }
-
-                // MARK: - Analytics
-
-                Button {
-                    // Analytics מפורט נחבר בהמשך.
-                } label: {
-                    HStack {
-                        Image(
-                            systemName: "chart.xyaxis.line"
-                        )
-
-                        Text("Analytics")
-                            .fontWeight(.semibold)
-
-                        Spacer()
-
-                        Image(
-                            systemName: "chevron.left"
-                        )
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(.thinMaterial)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18
-                        )
-                    )
-                }
-                .buttonStyle(.plain)
             }
             .padding(20)
         }
-        .navigationTitle("ניהול קבוצה")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(group.name)
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .refreshable {
 
-        .sheet(
-            isPresented: Binding(
-                get: {
-                    editingMemberID != nil
-                },
-                set: { newValue in
-                    if !newValue {
-                        editingMemberID = nil
-                    }
-                }
-            )
-        ) {
-            targetEditor
+            await loadGroup()
+        }
+        .task {
+
+            await loadGroup()
         }
     }
 
-    // MARK: - Members
+    // MARK: - Member Card
 
-    private var groupMembers: [TimeUpMember] {
-        store.members(
-            in: group.id
-        )
-    }
-
-    @ViewBuilder
-    private func memberRow(
-        _ member: TimeUpMember
+    private func memberCard(
+        _ member: TimeUpRemoteUser
     ) -> some View {
 
-        Button {
-
-            guard group.goalMethod == .manual else {
-                return
-            }
-
-            openTargetEditor(
-                for: member
-            )
-
-        } label: {
-
-            HStack(spacing: 12) {
-
-                // MARK: Member Icon
-
-                ZStack {
-
-                    Image(
-                        systemName: "person.circle.fill"
-                    )
-                    .font(.title2)
-
-                    if let progress =
-                        lastProgress(for: member)
-                    {
-                        Circle()
-                            .fill(
-                                progressStatusColor(
-                                    progress
-                                )
-                            )
-                            .frame(
-                                width: 9,
-                                height: 9
-                            )
-                            .offset(
-                                x: 10,
-                                y: 10
-                            )
-                    }
-                }
-
-                // MARK: Member Information
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-
-                    Text(member.displayName)
-                        .fontWeight(.semibold)
-
-                    Text(
-                        memberStatusText(member)
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        memberStatusColor(member)
-                    )
-
-                    Text(
-                        "הצטרף \(member.joinedAt.formatted(date: .abbreviated, time: .omitted))"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                // MARK: Member Streak
-
-                if memberStreak(member) > 0 {
-
-                    VStack(spacing: 3) {
-
-                        HStack(spacing: 3) {
-                            Image(
-                                systemName: "flame.fill"
-                            )
-
-                            Text(
-                                "\(memberStreak(member))"
-                            )
-                            .fontWeight(.bold)
-                        }
-
-                        Text("רצף")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                // MARK: Member Target
-
-                if let target =
-                    member.dailyTargetMinutes
-                {
-
-                    VStack(
-                        alignment: .trailing,
-                        spacing: 3
-                    ) {
-
-                        Text(
-                            formattedTarget(target)
-                        )
-                        .fontWeight(.semibold)
-
-                        Text("יעד יומי")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                } else if group.goalMethod == .manual {
-
-                    Text("הגדר יעד")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                }
-
-                if group.goalMethod == .manual {
-
-                    Image(
-                        systemName: "chevron.left"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Member Progress
-
-    private func lastProgress(
-        for member: TimeUpMember
-    ) -> TimeUpDailyProgress? {
-
-        store.progress(
-            for: member.id
-        )
-        .last
-    }
-
-    private func memberStreak(
-        _ member: TimeUpMember
-    ) -> Int {
-
-        store.currentStreak(
-            for: member.id
-        )
-    }
-
-    private func memberStatusText(
-        _ member: TimeUpMember
-    ) -> String {
-
-        guard let progress =
-            lastProgress(for: member)
-        else {
-            return "יום למידה / ממתין לנתונים"
-        }
-
-        if progress.isLearningDay {
-            return "יום למידה הושלם"
-        }
-
-        if progress.achieved {
-            return "עמד ביעד האחרון"
-        }
-
-        return "לא עמד ביעד האחרון"
-    }
-
-    private func memberStatusColor(
-        _ member: TimeUpMember
-    ) -> Color {
-
-        guard let progress =
-            lastProgress(for: member)
-        else {
-            return .secondary
-        }
-
-        if progress.isLearningDay {
-            return .secondary
-        }
-
-        return progress.achieved
-            ? .green
-            : .red
-    }
-
-    private func progressStatusColor(
-        _ progress: TimeUpDailyProgress
-    ) -> Color {
-
-        if progress.isLearningDay {
-            return .orange
-        }
-
-        return progress.achieved
-            ? .green
-            : .red
-    }
-
-    // MARK: - Group Statistics
-
-    private var membersWithTarget: Int {
-
-        groupMembers
-            .filter {
-                $0.dailyTargetMinutes != nil
-            }
-            .count
-    }
-
-    private var membersWithCompletedDay: Int {
-
-        groupMembers
-            .filter {
-                lastProgress(for: $0) != nil
-            }
-            .count
-    }
-
-    private var membersSucceededLastDay: Int {
-
-        groupMembers
-            .compactMap {
-                lastProgress(for: $0)
-            }
-            .filter {
-                !$0.isLearningDay &&
-                $0.achieved
-            }
-            .count
-    }
-
-    private var membersInLearningPhase: Int {
-
-        groupMembers
-            .filter { member in
-
-                let history =
-                    store.progress(
-                        for: member.id
-                    )
-
-                if history.isEmpty {
-                    return true
-                }
-
-                return history.last?
-                    .isLearningDay == true &&
-                    history.count == 1
-            }
-            .count
-    }
-
-// MARK: - Group Streak
-
-private var groupStreak: Int {
-
-    let members = groupMembers
-
-    guard !members.isEmpty else {
-        return 0
-    }
-
-    let calendar = Calendar.current
-
-    var progressByMember:
-        [UUID: [Date: TimeUpDailyProgress]] = [:]
-
-    for member in members {
-
-        var days:
-            [Date: TimeUpDailyProgress] = [:]
-
-        for progress in store.progress(
-            for: member.id
+        HStack(
+            spacing: 14
         ) {
 
-            guard !progress.isLearningDay else {
-                continue
-            }
+            ZStack {
 
-            let day =
-                calendar.startOfDay(
-                    for: progress.date
+                Circle()
+                    .fill(
+                        .thinMaterial
+                    )
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+
+                Image(
+                    systemName:
+                        "person.fill"
                 )
-
-            days[day] = progress
-        }
-
-        progressByMember[
-            member.id
-        ] = days
-    }
-
-    let allDates =
-        Set(
-            progressByMember
-                .values
-                .flatMap {
-                    $0.keys
-                }
-        )
-        .sorted(by: >)
-
-    guard !allDates.isEmpty else {
-        return 0
-    }
-
-    var streak = 0
-    var expectedDay: Date?
-
-    for day in allDates {
-
-        if let expectedDay {
-
-            guard calendar.isDate(
-                day,
-                inSameDayAs: expectedDay
-            ) else {
-                break
-            }
-        }
-
-        let allSucceeded =
-            members.allSatisfy { member in
-
-                guard
-                    let progress =
-                        progressByMember[
-                            member.id
-                        ]?[day]
-                else {
-                    return false
-                }
-
-                return progress.achieved
+                .foregroundStyle(
+                    .secondary
+                )
             }
 
-        guard allSucceeded else {
-            break
-        }
-
-        streak += 1
-
-        expectedDay =
-            calendar.date(
-                byAdding: .day,
-                value: -1,
-                to: day
-            )
-    }
-
-    return streak
-}
-
-    // MARK: - Target Editor
-
-    private var targetEditor: some View {
-
-        NavigationStack {
-
-            VStack(spacing: 24) {
-
-                VStack(spacing: 6) {
-
-                    Text("יעד זמן מסך יומי")
-                        .font(.title2.bold())
-
-                    if let member =
-                        editingMember
-                    {
-                        Text(
-                            member.displayName
-                        )
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                HStack(spacing: 12) {
-
-                    VStack {
-
-                        Text("שעות")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Picker(
-                            "שעות",
-                            selection: $targetHours
-                        ) {
-
-                            ForEach(
-                                0...23,
-                                id: \.self
-                            ) { hour in
-
-                                Text("\(hour)")
-                                    .tag(hour)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                    }
-
-                    VStack {
-
-                        Text("דקות")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Picker(
-                            "דקות",
-                            selection: $targetMinutes
-                        ) {
-
-                            ForEach(
-                                0..<60,
-                                id: \.self
-                            ) { minute in
-
-                                Text("\(minute)")
-                                    .tag(minute)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                    }
-                }
-                .frame(height: 190)
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
 
                 Text(
-                    "יעד: \(formattedTarget(selectedTargetMinutes))"
+                    member.displayName
                 )
-                .font(.title3.bold())
-
-                Spacer()
-
-                Button {
-                    saveTarget()
-
-                } label: {
-
-                    Text("שמור יעד")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    selectedTargetMinutes <= 0
+                .fontWeight(
+                    .semibold
                 )
 
-                if editingMember?
-                    .dailyTargetMinutes != nil
-                {
+                if member.role == "admin" {
 
-                    Button(
-                        role: .destructive
-                    ) {
-                        removeTarget()
+                    Text("מנהל")
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                } else {
 
-                    } label: {
-
-                        Text("הסר יעד")
-                            .frame(
-                                maxWidth: .infinity
-                            )
-                    }
+                    Text("חבר קבוצה")
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
                 }
             }
-            .padding(24)
-            .navigationTitle("הגדרת יעד")
-            .navigationBarTitleDisplayMode(.inline)
 
-            .toolbar {
+            Spacer()
 
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-
-                    Button("סגור") {
-                        editingMemberID = nil
-                    }
-                }
-            }
+            Image(
+                systemName:
+                    "chevron.left"
+            )
+            .font(.caption)
+            .foregroundStyle(
+                .tertiary
+            )
         }
-        .presentationDetents(
-            [.medium, .large]
+        .padding()
+        .background(
+            .thinMaterial
         )
-    }
-
-    // MARK: - Target Logic
-
-    private var editingMember: TimeUpMember? {
-
-        guard let editingMemberID else {
-            return nil
-        }
-
-        return store.member(
-            id: editingMemberID
-        )
-    }
-
-    private var selectedTargetMinutes: Int {
-
-        (targetHours * 60) +
-        targetMinutes
-    }
-
-    private func openTargetEditor(
-        for member: TimeUpMember
-    ) {
-
-        let currentTarget =
-            member.dailyTargetMinutes ?? 0
-
-        targetHours =
-            currentTarget / 60
-
-        targetMinutes =
-            currentTarget % 60
-
-        editingMemberID =
-            member.id
-    }
-
-    private func saveTarget() {
-
-        guard let memberID =
-            editingMemberID
-        else {
-            return
-        }
-
-        store.setDailyTarget(
-            selectedTargetMinutes,
-            for: memberID
-        )
-
-        editingMemberID = nil
-    }
-
-    private func removeTarget() {
-
-        guard let memberID =
-            editingMemberID
-        else {
-            return
-        }
-
-        store.setDailyTarget(
-            nil,
-            for: memberID
-        )
-
-        editingMemberID = nil
-    }
-
-    // MARK: - Formatting
-
-    private func formattedTarget(
-        _ minutes: Int
-    ) -> String {
-
-        let hours =
-            minutes / 60
-
-        let remainingMinutes =
-            minutes % 60
-
-        if hours > 0 &&
-            remainingMinutes > 0
-        {
-            return "\(hours) ש׳ \(remainingMinutes) דק׳"
-        }
-
-        if hours > 0 {
-            return "\(hours) ש׳"
-        }
-
-        return "\(remainingMinutes) דק׳"
-    }
-
-    // MARK: - Goal
-
-    private var goalTitle: String {
-
-        switch group.goalMethod {
-
-        case .previousDay:
-            return "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
-
-        case .adaptiveAverage:
-            return "\(group.reductionPercent ?? 0)% פחות מהממוצע"
-
-        case .manual:
-            return "יעד אישי לכל משתמש"
-        }
-    }
-
-    // MARK: - Stat Card
-
-    private func statCard(
-        value: String,
-        title: String,
-        icon: String
-    ) -> some View {
-
-        VStack(spacing: 8) {
-
-            Image(systemName: icon)
-                .font(.title3)
-
-            Text(value)
-                .font(.title2.bold())
-
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(.thinMaterial)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 16
             )
         )
+    }
+
+    // MARK: - Load
+
+    @MainActor
+    private func loadGroup() async {
+
+        isRefreshing = true
+
+        await dataStore.loadGroupMembers(
+            groupID: group.id
+        )
+
+        await dataStore.loadDailyProgress(
+            groupID: group.id
+        )
+
+        isRefreshing = false
+    }
+
+    // MARK: - Goal
+
+    private var goalDescription: String {
+
+        switch group.goalMethod {
+
+        case "personal_percentage":
+
+            return
+                "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
+
+        case "group_average_percentage":
+
+            return
+                "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
+
+        case "manual":
+
+            return "יעד אישי לכל משתמש"
+
+        default:
+
+            return "יעד קבוצה"
+        }
     }
 }
