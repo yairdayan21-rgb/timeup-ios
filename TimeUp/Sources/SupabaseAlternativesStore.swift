@@ -22,6 +22,12 @@ final class SupabaseAlternativesStore: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
+    // MARK: - Realtime
+
+    private var realtimeChannel: RealtimeChannelV2?
+    private var realtimeTask: Task<Void, Never>?
+    private var subscribedGroupID: UUID?
+
     private init() {}
 
     // MARK: - Models
@@ -82,6 +88,7 @@ final class SupabaseAlternativesStore: ObservableObject {
     // MARK: - RPC Parameters
 
     private struct GetAlternativesParameters: Encodable {
+
         let groupID: UUID
         let limit: Int
 
@@ -92,6 +99,7 @@ final class SupabaseAlternativesStore: ObservableObject {
     }
 
     private struct CompleteAlternativeParameters: Encodable {
+
         let groupID: UUID
         let alternativeID: Int64
 
@@ -102,6 +110,7 @@ final class SupabaseAlternativesStore: ObservableObject {
     }
 
     private struct GroupFeedParameters: Encodable {
+
         let groupID: UUID
 
         enum CodingKeys: String, CodingKey {
@@ -114,6 +123,10 @@ final class SupabaseAlternativesStore: ObservableObject {
     func load(
         groupID: UUID
     ) async {
+
+        startRealtime(
+            groupID: groupID
+        )
 
         async let alternativesTask: Void =
             loadAlternatives(
@@ -150,10 +163,11 @@ final class SupabaseAlternativesStore: ObservableObject {
                 try await client
                     .rpc(
                         "get_timeup_alternatives",
-                        params: GetAlternativesParameters(
-                            groupID: groupID,
-                            limit: 5
-                        )
+                        params:
+                            GetAlternativesParameters(
+                                groupID: groupID,
+                                limit: 5
+                            )
                     )
                     .execute()
                     .value
@@ -175,9 +189,10 @@ final class SupabaseAlternativesStore: ObservableObject {
     ) async {
 
         guard
-            !completingAlternativeIDs.contains(
-                alternative.alternativeID
-            )
+            !completingAlternativeIDs
+                .contains(
+                    alternative.alternativeID
+                )
         else {
             return
         }
@@ -189,6 +204,7 @@ final class SupabaseAlternativesStore: ObservableObject {
         alternativesError = nil
 
         defer {
+
             completingAlternativeIDs.remove(
                 alternative.alternativeID
             )
@@ -200,41 +216,48 @@ final class SupabaseAlternativesStore: ObservableObject {
                 try await client
                     .rpc(
                         "complete_timeup_alternative",
-                        params: CompleteAlternativeParameters(
-                            groupID: groupID,
-                            alternativeID: alternative.alternativeID
-                        )
+                        params:
+                            CompleteAlternativeParameters(
+                                groupID: groupID,
+                                alternativeID:
+                                    alternative.alternativeID
+                            )
                     )
                     .execute()
                     .value
 
-            // Remove the completed item immediately.
+            // Remove completed alternative immediately.
+
             alternatives.removeAll {
                 $0.alternativeID ==
                     alternative.alternativeID
             }
 
-            // Ask Supabase for ONE fresh random replacement.
+            // Get one fresh random replacement.
+
             let replacements: [Alternative] =
                 try await client
                     .rpc(
                         "get_timeup_alternatives",
-                        params: GetAlternativesParameters(
-                            groupID: groupID,
-                            limit: 1
-                        )
+                        params:
+                            GetAlternativesParameters(
+                                groupID: groupID,
+                                limit: 1
+                            )
                     )
                     .execute()
                     .value
 
-            if let replacement = replacements.first {
+            if let replacement =
+                replacements.first {
 
-                if !alternatives.contains(
-                    where: {
+                let alreadyExists =
+                    alternatives.contains {
                         $0.alternativeID ==
                             replacement.alternativeID
                     }
-                ) {
+
+                if !alreadyExists {
 
                     alternatives.append(
                         replacement
@@ -242,7 +265,10 @@ final class SupabaseAlternativesStore: ObservableObject {
                 }
             }
 
-            // Refresh the group activity feed.
+            // Immediate refresh for the member
+            // who completed the alternative.
+            // Realtime updates the other members.
+
             await loadGroupFeed(
                 groupID: groupID
             )
@@ -254,7 +280,7 @@ final class SupabaseAlternativesStore: ObservableObject {
         }
     }
 
-    // MARK: - Load Group Feed
+    // MARK: - Group Feed
 
     func loadGroupFeed(
         groupID: UUID
@@ -273,9 +299,10 @@ final class SupabaseAlternativesStore: ObservableObject {
                 try await client
                     .rpc(
                         "get_timeup_group_alternatives_feed",
-                        params: GroupFeedParameters(
-                            groupID: groupID
-                        )
+                        params:
+                            GroupFeedParameters(
+                                groupID: groupID
+                            )
                     )
                     .execute()
                     .value
@@ -289,7 +316,106 @@ final class SupabaseAlternativesStore: ObservableObject {
         }
     }
 
-    // MARK: - State Helpers
+    func refreshFeed(
+        groupID: UUID
+    ) async {
+
+        await loadGroupFeed(
+            groupID: groupID
+        )
+    }
+
+    // MARK: - Realtime
+
+    func startRealtime(
+        groupID: UUID
+    ) {
+
+        // Already listening to this group.
+        if subscribedGroupID == groupID,
+           realtimeChannel != nil {
+            return
+        }
+
+        stopRealtime()
+
+        subscribedGroupID = groupID
+
+        let channel =
+            client.realtimeV2.channel(
+                "timeup-alternatives-\(groupID.uuidString)"
+            )
+
+        realtimeChannel = channel
+
+        let changes =
+            channel.postgresChange(
+                AnyAction.self,
+                schema: "public",
+                table: "alternative_completions",
+                filter:
+                    "group_id=eq.\(groupID.uuidString)"
+            )
+
+        realtimeTask = Task { [weak self] in
+
+            guard let self else {
+                return
+            }
+
+            do {
+
+                await channel.subscribe()
+
+                for await _ in changes {
+
+                    guard
+                        !Task.isCancelled
+                    else {
+                        break
+                    }
+
+                    await self.loadGroupFeed(
+                        groupID: groupID
+                    )
+                }
+
+            } catch {
+
+                guard
+                    !Task.isCancelled
+                else {
+                    return
+                }
+
+                await MainActor.run {
+
+                    self.feedError =
+                        error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func stopRealtime() {
+
+        realtimeTask?.cancel()
+        realtimeTask = nil
+
+        if let channel =
+            realtimeChannel {
+
+            Task {
+
+                await channel.unsubscribe()
+            }
+        }
+
+        realtimeChannel = nil
+        subscribedGroupID = nil
+    }
+
+    // MARK: - Helpers
 
     func isCompleting(
         _ alternative: Alternative
@@ -300,20 +426,11 @@ final class SupabaseAlternativesStore: ObservableObject {
         )
     }
 
-    // MARK: - Refresh
-
-    func refreshFeed(
-        groupID: UUID
-    ) async {
-
-        await loadGroupFeed(
-            groupID: groupID
-        )
-    }
-
     // MARK: - Clear
 
     func clear() {
+
+        stopRealtime()
 
         alternatives = []
         groupFeed = []
