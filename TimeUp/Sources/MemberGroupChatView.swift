@@ -42,23 +42,21 @@ struct MemberGroupChatView: View {
         .navigationTitle("צ׳אט קבוצתי")
         .navigationBarTitleDisplayMode(.inline)
 
-        // MARK: Load + Realtime
+        // MARK: - Load + Read State + Realtime
 
         .task {
 
-            await loadChat()
-
-            await chatStore.startRealtime(
-                groupID: group.id
-            )
+            await openChat()
         }
+
+        // MARK: - Pull To Refresh
 
         .refreshable {
 
-            await loadChat()
+            await refreshChat()
         }
 
-        // MARK: Stop Realtime
+        // MARK: - Stop Realtime
 
         .onDisappear {
 
@@ -68,7 +66,7 @@ struct MemberGroupChatView: View {
             }
         }
 
-        // MARK: Send Error
+        // MARK: - Send Error
 
         .alert(
             "לא ניתן לשלוח הודעה",
@@ -86,6 +84,7 @@ struct MemberGroupChatView: View {
         ) {
 
             Button("אישור") {
+
                 sendError = nil
             }
 
@@ -615,6 +614,14 @@ struct MemberGroupChatView: View {
 
             messageText = ""
 
+            await chatStore
+                .markChatAsRead(
+                    groupID:
+                        group.id,
+                    userID:
+                        currentUser.id
+                )
+
         } catch {
 
             sendError =
@@ -622,10 +629,10 @@ struct MemberGroupChatView: View {
         }
     }
 
-    // MARK: - Load
+    // MARK: - Open Chat
 
     @MainActor
-    private func loadChat() async {
+    private func openChat() async {
 
         async let membersTask: Void =
             dataStore
@@ -645,6 +652,54 @@ struct MemberGroupChatView: View {
             membersTask,
             messagesTask
         )
+
+        guard let currentUser
+        else {
+            return
+        }
+
+        await chatStore
+            .markChatAsRead(
+                groupID:
+                    group.id,
+                userID:
+                    currentUser.id
+            )
+
+        await chatStore
+            .startRealtime(
+                groupID:
+                    group.id,
+                currentUserID:
+                    currentUser.id,
+                markIncomingAsRead:
+                    true
+            )
+    }
+
+    // MARK: - Refresh
+
+    @MainActor
+    private func refreshChat() async {
+
+        await chatStore
+            .loadMessages(
+                groupID:
+                    group.id
+            )
+
+        guard let currentUser
+        else {
+            return
+        }
+
+        await chatStore
+            .markChatAsRead(
+                groupID:
+                    group.id,
+                userID:
+                    currentUser.id
+            )
     }
 
     // MARK: - Scroll
