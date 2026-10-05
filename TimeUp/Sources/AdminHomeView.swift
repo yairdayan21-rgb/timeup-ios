@@ -3,7 +3,7 @@ import SwiftUI
 struct AdminHomeView: View {
 
     @State private var showCreateGroup = false
-    @State private var showGroupRanking = false
+    @State private var showRanking = false
 
     @StateObject private var dataStore =
         SupabaseDataStore.shared
@@ -48,7 +48,7 @@ struct AdminHomeView: View {
 
                     Button {
 
-                        showGroupRanking = true
+                        showRanking = true
 
                     } label: {
 
@@ -67,15 +67,13 @@ struct AdminHomeView: View {
                                 spacing: 3
                             ) {
 
-                                Text(
-                                    "דירוג"
-                                )
-                                .fontWeight(
-                                    .semibold
-                                )
+                                Text("דירוג")
+                                    .fontWeight(
+                                        .semibold
+                                    )
 
                                 Text(
-                                    "דירוג הקבוצות"
+                                    "קבוצות ומשתמשים"
                                 )
                                 .font(.caption)
                                 .foregroundStyle(
@@ -278,7 +276,7 @@ struct AdminHomeView: View {
                     .loadCurrentAccount()
 
                 await rankingStore
-                    .loadGroupRankings()
+                    .loadAllRankings()
             }
             .toolbar {
 
@@ -295,7 +293,7 @@ struct AdminHomeView: View {
                                 .loadCurrentAccount()
 
                             await rankingStore
-                                .loadGroupRankings()
+                                .loadAllRankings()
                         }
 
                     } label: {
@@ -316,10 +314,10 @@ struct AdminHomeView: View {
             }
             .navigationDestination(
                 isPresented:
-                    $showGroupRanking
+                    $showRanking
             ) {
 
-                AdminGroupRankingView()
+                AdminRankingView()
             }
             .task {
 
@@ -327,7 +325,7 @@ struct AdminHomeView: View {
                     .loadCurrentAccount()
 
                 await rankingStore
-                    .loadGroupRankings()
+                    .loadAllRankings()
             }
         }
     }
@@ -462,9 +460,25 @@ struct AdminHomeView: View {
     }
 }
 
-// MARK: - Admin Group Ranking
+// MARK: - Admin Ranking View
 
-private struct AdminGroupRankingView: View {
+private struct AdminRankingView: View {
+
+    private enum RankingTab:
+        String,
+        CaseIterable,
+        Identifiable {
+
+        case groups = "קבוצות"
+        case users = "משתמשים"
+
+        var id: String {
+            rawValue
+        }
+    }
+
+    @State private var selectedTab:
+        RankingTab = .groups
 
     @StateObject private var rankingStore =
         SupabaseRankingStore.shared
@@ -474,67 +488,49 @@ private struct AdminGroupRankingView: View {
 
     var body: some View {
 
-        Group {
+        VStack(
+            spacing: 16
+        ) {
 
-            if rankingStore.isLoading &&
-                rankingStore.groupRankings.isEmpty {
+            Picker(
+                "סוג דירוג",
+                selection:
+                    $selectedTab
+            ) {
 
-                VStack(
-                    spacing: 16
-                ) {
+                ForEach(
+                    RankingTab.allCases
+                ) { tab in
 
-                    ProgressView()
-
-                    Text(
-                        "טוען דירוג קבוצות..."
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    Text(tab.rawValue)
+                        .tag(tab)
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
-                )
+            }
+            .pickerStyle(
+                .segmented
+            )
+            .padding(
+                .horizontal,
+                20
+            )
+            .padding(
+                .top,
+                12
+            )
 
-            } else if
-                rankingStore.groupRankings.isEmpty {
+            switch selectedTab {
 
-                ContentUnavailableView(
-                    "אין עדיין דירוג",
-                    systemImage:
-                        "trophy",
-                    description:
-                        Text(
-                            rankingStore.lastError ??
-                            "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
-                        )
-                )
+            case .groups:
 
-            } else {
+                groupRankingContent
 
-                ScrollView {
+            case .users:
 
-                    LazyVStack(
-                        spacing: 12
-                    ) {
-
-                        ForEach(
-                            rankingStore
-                                .groupRankings
-                        ) { ranking in
-
-                            rankingRow(
-                                ranking
-                            )
-                        }
-                    }
-                    .padding(20)
-                }
+                userRankingContent
             }
         }
         .navigationTitle(
-            "דירוג קבוצות"
+            "דירוג"
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -542,59 +538,157 @@ private struct AdminGroupRankingView: View {
         .task {
 
             await rankingStore
-                .loadGroupRankings()
-        }
-        .refreshable {
-
-            await rankingStore
-                .loadGroupRankings()
+                .loadAllRankings()
         }
     }
 
-    private func rankingRow(
+    // MARK: - Group Ranking Content
+
+    @ViewBuilder
+    private var groupRankingContent:
+        some View {
+
+        if rankingStore.isLoading &&
+            rankingStore.groupRankings.isEmpty {
+
+            loadingView(
+                text:
+                    "טוען דירוג קבוצות..."
+            )
+
+        } else if
+            rankingStore.groupRankings.isEmpty {
+
+            ContentUnavailableView(
+                "אין עדיין דירוג קבוצות",
+                systemImage:
+                    "trophy",
+                description:
+                    Text(
+                        rankingStore.lastError ??
+                        "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
+                    )
+            )
+
+        } else {
+
+            ScrollView {
+
+                LazyVStack(
+                    spacing: 12
+                ) {
+
+                    ForEach(
+                        rankingStore
+                            .groupRankings
+                    ) { ranking in
+
+                        groupRankingRow(
+                            ranking
+                        )
+                    }
+                }
+                .padding(
+                    .horizontal,
+                    20
+                )
+                .padding(
+                    .bottom,
+                    20
+                )
+            }
+            .refreshable {
+
+                await rankingStore
+                    .loadGroupRankings()
+            }
+        }
+    }
+
+    // MARK: - User Ranking Content
+
+    @ViewBuilder
+    private var userRankingContent:
+        some View {
+
+        if rankingStore.isLoadingUsers &&
+            rankingStore.userRankings.isEmpty {
+
+            loadingView(
+                text:
+                    "טוען דירוג משתמשים..."
+            )
+
+        } else if
+            rankingStore.userRankings.isEmpty {
+
+            ContentUnavailableView(
+                "אין עדיין דירוג משתמשים",
+                systemImage:
+                    "person.2",
+                description:
+                    Text(
+                        rankingStore.userRankingError ??
+                        "הדירוג יופיע כאשר יהיו נתוני שימוש למשתמשים."
+                    )
+            )
+
+        } else {
+
+            ScrollView {
+
+                LazyVStack(
+                    spacing: 12
+                ) {
+
+                    ForEach(
+                        rankingStore
+                            .userRankings
+                    ) { ranking in
+
+                        userRankingRow(
+                            ranking
+                        )
+                    }
+                }
+                .padding(
+                    .horizontal,
+                    20
+                )
+                .padding(
+                    .bottom,
+                    20
+                )
+            }
+            .refreshable {
+
+                await rankingStore
+                    .loadUserRankings()
+            }
+        }
+    }
+
+    // MARK: - Group Row
+
+    private func groupRankingRow(
         _ ranking:
             SupabaseRankingStore.GroupRanking
     ) -> some View {
 
         let isMyGroup =
             dataStore.groups.contains {
-                $0.id == ranking.groupID
+                $0.id ==
+                    ranking.groupID
             }
 
         return HStack(
             spacing: 14
         ) {
 
-            ZStack {
-
-                Circle()
-                    .fill(
-                        Color.secondary
-                            .opacity(0.12)
-                    )
-                    .frame(
-                        width: 48,
-                        height: 48
-                    )
-
-                if ranking.rankingPosition <= 3 {
-
-                    Image(
-                        systemName:
-                            ranking.rankingPosition == 1
-                            ? "trophy.fill"
-                            : "medal.fill"
-                    )
-                    .font(.title3)
-
-                } else {
-
-                    Text(
-                        "\(ranking.rankingPosition)"
-                    )
-                    .font(.headline)
-                }
-            }
+            positionIcon(
+                position:
+                    ranking.rankingPosition
+            )
 
             VStack(
                 alignment: .leading,
@@ -612,25 +706,26 @@ private struct AdminGroupRankingView: View {
 
                     if isMyGroup {
 
-                        Text(
-                            "שלי"
-                        )
-                        .font(.caption2)
-                        .fontWeight(
-                            .semibold
-                        )
-                        .padding(
-                            .horizontal,
-                            7
-                        )
-                        .padding(
-                            .vertical,
-                            3
-                        )
-                        .background(
-                            .thinMaterial,
-                            in: Capsule()
-                        )
+                        Text("שלי")
+                            .font(
+                                .caption2
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
+                            .padding(
+                                .horizontal,
+                                7
+                            )
+                            .padding(
+                                .vertical,
+                                3
+                            )
+                            .background(
+                                .thinMaterial,
+                                in:
+                                    Capsule()
+                            )
                     }
                 }
 
@@ -689,6 +784,150 @@ private struct AdminGroupRankingView: View {
                 )
         )
     }
+
+    // MARK: - User Row
+
+    private func userRankingRow(
+        _ ranking:
+            SupabaseRankingStore.UserRanking
+    ) -> some View {
+
+        HStack(
+            spacing: 14
+        ) {
+
+            positionIcon(
+                position:
+                    ranking.rankingPosition
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+
+                Text(
+                    ranking.displayName ??
+                    "משתמש"
+                )
+                .font(.headline)
+
+                HStack(
+                    spacing: 14
+                ) {
+
+                    Label(
+                        "\(ranking.personalStreak) ימים",
+                        systemImage:
+                            "flame.fill"
+                    )
+
+                    if let average =
+                        ranking
+                            .averageUsageMinutes {
+
+                        Label(
+                            formattedMinutes(
+                                average
+                            ),
+                            systemImage:
+                                "iphone"
+                        )
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+
+            Text(
+                "#\(ranking.rankingPosition)"
+            )
+            .font(
+                .title3.bold()
+            )
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            Color.secondary
+                .opacity(0.06),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16
+                )
+        )
+    }
+
+    // MARK: - Position Icon
+
+    @ViewBuilder
+    private func positionIcon(
+        position: Int
+    ) -> some View {
+
+        ZStack {
+
+            Circle()
+                .fill(
+                    Color.secondary
+                        .opacity(0.12)
+                )
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+
+            if position <= 3 {
+
+                Image(
+                    systemName:
+                        position == 1
+                        ? "trophy.fill"
+                        : "medal.fill"
+                )
+                .font(.title3)
+
+            } else {
+
+                Text(
+                    "\(position)"
+                )
+                .font(.headline)
+            }
+        }
+    }
+
+    // MARK: - Loading
+
+    private func loadingView(
+        text: String
+    ) -> some View {
+
+        VStack(
+            spacing: 16
+        ) {
+
+            ProgressView()
+
+            Text(text)
+                .foregroundStyle(
+                    .secondary
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
+    }
+
+    // MARK: - Time Format
 
     private func formattedMinutes(
         _ minutes: Double
