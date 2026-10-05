@@ -1,0 +1,329 @@
+import Foundation
+import Supabase
+import Combine
+
+@MainActor
+final class SupabaseAlternativesStore: ObservableObject {
+
+    static let shared = SupabaseAlternativesStore()
+
+    // MARK: - Published State
+
+    @Published private(set) var alternatives: [Alternative] = []
+    @Published private(set) var groupFeed: [GroupFeedItem] = []
+
+    @Published private(set) var isLoading = false
+    @Published private(set) var isLoadingFeed = false
+
+    @Published private(set) var completingAlternativeIDs: Set<Int64> = []
+
+    @Published private(set) var alternativesError: String?
+    @Published private(set) var feedError: String?
+
+    private let client = SupabaseManager.shared.client
+
+    private init() {}
+
+    // MARK: - Models
+
+    struct Alternative: Identifiable, Decodable, Equatable {
+
+        let alternativeID: Int64
+        let textHE: String
+
+        var id: Int64 {
+            alternativeID
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case alternativeID = "alternative_id"
+            case textHE = "text_he"
+        }
+    }
+
+    struct GroupFeedItem: Identifiable, Decodable, Equatable {
+
+        let completionID: UUID
+        let userID: UUID
+        let displayName: String
+        let alternativeID: Int64
+        let alternativeText: String
+        let completedAt: Date
+
+        var id: UUID {
+            completionID
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case completionID = "completion_id"
+            case userID = "user_id"
+            case displayName = "display_name"
+            case alternativeID = "alternative_id"
+            case alternativeText = "alternative_text"
+            case completedAt = "completed_at"
+        }
+    }
+
+    struct CompletionResult: Decodable {
+
+        let completionID: UUID
+        let alternativeID: Int64
+        let alternativeText: String
+        let completedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case completionID = "completion_id"
+            case alternativeID = "alternative_id"
+            case alternativeText = "alternative_text"
+            case completedAt = "completed_at"
+        }
+    }
+
+    // MARK: - RPC Parameters
+
+    private struct GetAlternativesParameters: Encodable {
+        let groupID: UUID
+        let limit: Int
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "p_group_id"
+            case limit = "p_limit"
+        }
+    }
+
+    private struct CompleteAlternativeParameters: Encodable {
+        let groupID: UUID
+        let alternativeID: Int64
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "p_group_id"
+            case alternativeID = "p_alternative_id"
+        }
+    }
+
+    private struct GroupFeedParameters: Encodable {
+        let groupID: UUID
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "p_group_id"
+        }
+    }
+
+    // MARK: - Initial Load
+
+    func load(
+        groupID: UUID
+    ) async {
+
+        async let alternativesTask: Void =
+            loadAlternatives(
+                groupID: groupID
+            )
+
+        async let feedTask: Void =
+            loadGroupFeed(
+                groupID: groupID
+            )
+
+        _ = await (
+            alternativesTask,
+            feedTask
+        )
+    }
+
+    // MARK: - Load Alternatives
+
+    func loadAlternatives(
+        groupID: UUID
+    ) async {
+
+        isLoading = true
+        alternativesError = nil
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+
+            let result: [Alternative] =
+                try await client
+                    .rpc(
+                        "get_timeup_alternatives",
+                        params: GetAlternativesParameters(
+                            groupID: groupID,
+                            limit: 5
+                        )
+                    )
+                    .execute()
+                    .value
+
+            alternatives = result
+
+        } catch {
+
+            alternativesError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Complete Alternative
+
+    func complete(
+        _ alternative: Alternative,
+        groupID: UUID
+    ) async {
+
+        guard
+            !completingAlternativeIDs.contains(
+                alternative.alternativeID
+            )
+        else {
+            return
+        }
+
+        completingAlternativeIDs.insert(
+            alternative.alternativeID
+        )
+
+        alternativesError = nil
+
+        defer {
+            completingAlternativeIDs.remove(
+                alternative.alternativeID
+            )
+        }
+
+        do {
+
+            let _: [CompletionResult] =
+                try await client
+                    .rpc(
+                        "complete_timeup_alternative",
+                        params: CompleteAlternativeParameters(
+                            groupID: groupID,
+                            alternativeID: alternative.alternativeID
+                        )
+                    )
+                    .execute()
+                    .value
+
+            // Remove the completed item immediately.
+            alternatives.removeAll {
+                $0.alternativeID ==
+                    alternative.alternativeID
+            }
+
+            // Ask Supabase for ONE fresh random replacement.
+            let replacements: [Alternative] =
+                try await client
+                    .rpc(
+                        "get_timeup_alternatives",
+                        params: GetAlternativesParameters(
+                            groupID: groupID,
+                            limit: 1
+                        )
+                    )
+                    .execute()
+                    .value
+
+            if let replacement = replacements.first {
+
+                if !alternatives.contains(
+                    where: {
+                        $0.alternativeID ==
+                            replacement.alternativeID
+                    }
+                ) {
+
+                    alternatives.append(
+                        replacement
+                    )
+                }
+            }
+
+            // Refresh the group activity feed.
+            await loadGroupFeed(
+                groupID: groupID
+            )
+
+        } catch {
+
+            alternativesError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Load Group Feed
+
+    func loadGroupFeed(
+        groupID: UUID
+    ) async {
+
+        isLoadingFeed = true
+        feedError = nil
+
+        defer {
+            isLoadingFeed = false
+        }
+
+        do {
+
+            let result: [GroupFeedItem] =
+                try await client
+                    .rpc(
+                        "get_timeup_group_alternatives_feed",
+                        params: GroupFeedParameters(
+                            groupID: groupID
+                        )
+                    )
+                    .execute()
+                    .value
+
+            groupFeed = result
+
+        } catch {
+
+            feedError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - State Helpers
+
+    func isCompleting(
+        _ alternative: Alternative
+    ) -> Bool {
+
+        completingAlternativeIDs.contains(
+            alternative.alternativeID
+        )
+    }
+
+    // MARK: - Refresh
+
+    func refreshFeed(
+        groupID: UUID
+    ) async {
+
+        await loadGroupFeed(
+            groupID: groupID
+        )
+    }
+
+    // MARK: - Clear
+
+    func clear() {
+
+        alternatives = []
+        groupFeed = []
+
+        completingAlternativeIDs = []
+
+        alternativesError = nil
+        feedError = nil
+
+        isLoading = false
+        isLoadingFeed = false
+    }
+}
