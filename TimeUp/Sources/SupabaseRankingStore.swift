@@ -142,6 +142,9 @@ final class SupabaseRankingStore: ObservableObject {
     }
 
     // MARK: - Load User Rankings
+    // Admin only.
+    // Supabase RPC verifies is_timeup_admin()
+    // before returning individual ranking data.
 
     func loadUserRankings() async {
 
@@ -156,21 +159,8 @@ final class SupabaseRankingStore: ObservableObject {
 
             let rankings: [UserRanking] =
                 try await client
-                    .from(
-                        "user_rankings"
-                    )
-                    .select(
-                        """
-                        user_id,
-                        display_name,
-                        personal_streak,
-                        average_usage_minutes,
-                        ranking_position
-                        """
-                    )
-                    .order(
-                        "ranking_position",
-                        ascending: true
+                    .rpc(
+                        "get_admin_user_rankings"
                     )
                     .execute()
                     .value
