@@ -3,9 +3,13 @@ import SwiftUI
 struct AdminHomeView: View {
 
     @State private var showCreateGroup = false
+    @State private var showGroupRanking = false
 
     @StateObject private var dataStore =
         SupabaseDataStore.shared
+
+    @StateObject private var rankingStore =
+        SupabaseRankingStore.shared
 
     var body: some View {
 
@@ -39,6 +43,70 @@ struct AdminHomeView: View {
                                 .secondary
                             )
                     }
+
+                    // MARK: - Ranking
+
+                    Button {
+
+                        showGroupRanking = true
+
+                    } label: {
+
+                        HStack(
+                            spacing: 14
+                        ) {
+
+                            Image(
+                                systemName:
+                                    "trophy.fill"
+                            )
+                            .font(.title2)
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+
+                                Text(
+                                    "דירוג"
+                                )
+                                .fontWeight(
+                                    .semibold
+                                )
+
+                                Text(
+                                    "דירוג הקבוצות"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "chevron.left"
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                        .padding()
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .background(
+                            .thinMaterial
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 18
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
 
                     // MARK: - Create Group
 
@@ -118,7 +186,8 @@ struct AdminHomeView: View {
                                 40
                             )
 
-                        } else if dataStore.groups.isEmpty {
+                        } else if
+                            dataStore.groups.isEmpty {
 
                             ContentUnavailableView(
                                 "עדיין אין קבוצות",
@@ -207,6 +276,9 @@ struct AdminHomeView: View {
 
                 await dataStore
                     .loadCurrentAccount()
+
+                await rankingStore
+                    .loadGroupRankings()
             }
             .toolbar {
 
@@ -221,6 +293,9 @@ struct AdminHomeView: View {
 
                             await dataStore
                                 .loadCurrentAccount()
+
+                            await rankingStore
+                                .loadGroupRankings()
                         }
 
                     } label: {
@@ -239,10 +314,20 @@ struct AdminHomeView: View {
 
                 CreateGroupView()
             }
+            .navigationDestination(
+                isPresented:
+                    $showGroupRanking
+            ) {
+
+                AdminGroupRankingView()
+            }
             .task {
 
                 await dataStore
                     .loadCurrentAccount()
+
+                await rankingStore
+                    .loadGroupRankings()
             }
         }
     }
@@ -374,5 +459,268 @@ struct AdminHomeView: View {
 
             return "יעד קבוצה"
         }
+    }
+}
+
+// MARK: - Admin Group Ranking
+
+private struct AdminGroupRankingView: View {
+
+    @StateObject private var rankingStore =
+        SupabaseRankingStore.shared
+
+    @StateObject private var dataStore =
+        SupabaseDataStore.shared
+
+    var body: some View {
+
+        Group {
+
+            if rankingStore.isLoading &&
+                rankingStore.groupRankings.isEmpty {
+
+                VStack(
+                    spacing: 16
+                ) {
+
+                    ProgressView()
+
+                    Text(
+                        "טוען דירוג קבוצות..."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+
+            } else if
+                rankingStore.groupRankings.isEmpty {
+
+                ContentUnavailableView(
+                    "אין עדיין דירוג",
+                    systemImage:
+                        "trophy",
+                    description:
+                        Text(
+                            rankingStore.lastError ??
+                            "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
+                        )
+                )
+
+            } else {
+
+                ScrollView {
+
+                    LazyVStack(
+                        spacing: 12
+                    ) {
+
+                        ForEach(
+                            rankingStore
+                                .groupRankings
+                        ) { ranking in
+
+                            rankingRow(
+                                ranking
+                            )
+                        }
+                    }
+                    .padding(20)
+                }
+            }
+        }
+        .navigationTitle(
+            "דירוג קבוצות"
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .task {
+
+            await rankingStore
+                .loadGroupRankings()
+        }
+        .refreshable {
+
+            await rankingStore
+                .loadGroupRankings()
+        }
+    }
+
+    private func rankingRow(
+        _ ranking:
+            SupabaseRankingStore.GroupRanking
+    ) -> some View {
+
+        let isMyGroup =
+            dataStore.groups.contains {
+                $0.id == ranking.groupID
+            }
+
+        return HStack(
+            spacing: 14
+        ) {
+
+            ZStack {
+
+                Circle()
+                    .fill(
+                        Color.secondary
+                            .opacity(0.12)
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+
+                if ranking.rankingPosition <= 3 {
+
+                    Image(
+                        systemName:
+                            ranking.rankingPosition == 1
+                            ? "trophy.fill"
+                            : "medal.fill"
+                    )
+                    .font(.title3)
+
+                } else {
+
+                    Text(
+                        "\(ranking.rankingPosition)"
+                    )
+                    .font(.headline)
+                }
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+
+                HStack(
+                    spacing: 7
+                ) {
+
+                    Text(
+                        ranking.groupName
+                    )
+                    .font(.headline)
+
+                    if isMyGroup {
+
+                        Text(
+                            "שלי"
+                        )
+                        .font(.caption2)
+                        .fontWeight(
+                            .semibold
+                        )
+                        .padding(
+                            .horizontal,
+                            7
+                        )
+                        .padding(
+                            .vertical,
+                            3
+                        )
+                        .background(
+                            .thinMaterial,
+                            in: Capsule()
+                        )
+                    }
+                }
+
+                HStack(
+                    spacing: 14
+                ) {
+
+                    Label(
+                        "\(ranking.currentStreak) ימים",
+                        systemImage:
+                            "flame.fill"
+                    )
+
+                    if let average =
+                        ranking
+                            .averageUsageMinutes {
+
+                        Label(
+                            formattedMinutes(
+                                average
+                            ),
+                            systemImage:
+                                "iphone"
+                        )
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+
+            Text(
+                "#\(ranking.rankingPosition)"
+            )
+            .font(
+                .title3.bold()
+            )
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            isMyGroup
+            ? Color.secondary
+                .opacity(0.12)
+            : Color.secondary
+                .opacity(0.06),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16
+                )
+        )
+    }
+
+    private func formattedMinutes(
+        _ minutes: Double
+    ) -> String {
+
+        let totalMinutes =
+            max(
+                0,
+                Int(
+                    minutes.rounded()
+                )
+            )
+
+        let hours =
+            totalMinutes / 60
+
+        let remainingMinutes =
+            totalMinutes % 60
+
+        if hours == 0 {
+
+            return
+                "\(remainingMinutes) דק׳"
+        }
+
+        if remainingMinutes == 0 {
+
+            return
+                "\(hours) שע׳"
+        }
+
+        return
+            "\(hours) שע׳ \(remainingMinutes) דק׳"
     }
 }
