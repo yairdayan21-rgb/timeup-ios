@@ -5,6 +5,9 @@ struct MemberGroupView: View {
     @StateObject private var dataStore =
         SupabaseDataStore.shared
 
+    @StateObject private var chatStore =
+        SupabaseChatStore.shared
+
     @State private var selectedSection:
         GroupSection = .overview
 
@@ -29,6 +32,17 @@ struct MemberGroupView: View {
         SupabaseDataStore.TimeUpRemoteUser? {
 
         dataStore.currentUser
+    }
+
+    private var unreadChatCount: Int {
+
+        guard let group else {
+            return 0
+        }
+
+        return chatStore.unreadCount(
+            for: group.id
+        )
     }
 
     var body: some View {
@@ -145,9 +159,43 @@ struct MemberGroupView: View {
 
                     } label: {
 
-                        Text(
-                            section.rawValue
-                        )
+                        HStack(spacing: 6) {
+
+                            Text(
+                                section.rawValue
+                            )
+
+                            if section == .chat &&
+                                unreadChatCount > 0 {
+
+                                Text(
+                                    unreadChatCount > 99
+                                        ? "99+"
+                                        : "\(unreadChatCount)"
+                                )
+                                .font(
+                                    .caption2.bold()
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .padding(
+                                    .horizontal,
+                                    6
+                                )
+                                .padding(
+                                    .vertical,
+                                    2
+                                )
+                                .background {
+
+                                    Capsule()
+                                        .fill(
+                                            Color.red
+                                        )
+                                }
+                            }
+                        }
                         .font(.subheadline)
                         .fontWeight(
                             selectedSection == section
@@ -1150,6 +1198,15 @@ struct MemberGroupView: View {
 
         await dataStore.loadDailyProgress(
             groupID: group.id
+        )
+
+        guard let currentUser else {
+            return
+        }
+
+        await chatStore.loadUnreadCount(
+            groupID: group.id,
+            userID: currentUser.id
         )
     }
 
