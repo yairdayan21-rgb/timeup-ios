@@ -6,6 +6,9 @@ struct MemberTabView: View {
     @StateObject private var dataStore =
         SupabaseDataStore.shared
 
+    @StateObject private var rankingStore =
+        SupabaseRankingStore.shared
+
     @State private var selectedTab:
         MemberTab = .dashboard
 
@@ -62,15 +65,10 @@ struct MemberTabView: View {
 
             NavigationStack {
 
-                placeholderView(
-                    title: "דירוג",
-                    icon: "trophy.fill",
-                    message:
-                        "כאן יוצג הדירוג הגלובלי של הקבוצות הפעילות."
-                )
-                .toolbar {
-                    profileToolbar
-                }
+                rankingView
+                    .toolbar {
+                        profileToolbar
+                    }
             }
             .tabItem {
 
@@ -169,6 +167,257 @@ struct MemberTabView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Ranking
+
+    private var rankingView: some View {
+
+        Group {
+
+            if rankingStore.isLoading &&
+                rankingStore.groupRankings.isEmpty {
+
+                VStack(spacing: 16) {
+
+                    ProgressView()
+
+                    Text(
+                        "טוען דירוג קבוצות..."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+
+            } else if
+                rankingStore.groupRankings.isEmpty {
+
+                ContentUnavailableView(
+                    "אין עדיין דירוג",
+                    systemImage: "trophy",
+                    description:
+                        Text(
+                            rankingStore.lastError ??
+                            "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
+                        )
+                )
+
+            } else {
+
+                ScrollView {
+
+                    LazyVStack(
+                        spacing: 12
+                    ) {
+
+                        ForEach(
+                            rankingStore
+                                .groupRankings
+                        ) { ranking in
+
+                            rankingRow(
+                                ranking
+                            )
+                        }
+                    }
+                    .padding(20)
+                }
+            }
+        }
+        .navigationTitle(
+            "דירוג קבוצות"
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .task {
+
+            await rankingStore
+                .loadGroupRankings()
+        }
+        .refreshable {
+
+            await rankingStore
+                .loadGroupRankings()
+        }
+    }
+
+    private func rankingRow(
+        _ ranking:
+            SupabaseRankingStore.GroupRanking
+    ) -> some View {
+
+        let isMyGroup =
+            dataStore.groups.contains {
+                $0.id == ranking.groupID
+            }
+
+        return HStack(
+            spacing: 14
+        ) {
+
+            ZStack {
+
+                Circle()
+                    .fill(
+                        Color.secondary
+                            .opacity(0.12)
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+
+                if ranking.rankingPosition <= 3 {
+
+                    Image(
+                        systemName:
+                            ranking.rankingPosition == 1
+                            ? "trophy.fill"
+                            : "medal.fill"
+                    )
+                    .font(.title3)
+
+                } else {
+
+                    Text(
+                        "\(ranking.rankingPosition)"
+                    )
+                    .font(.headline)
+                }
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+
+                HStack(
+                    spacing: 7
+                ) {
+
+                    Text(
+                        ranking.groupName
+                    )
+                    .font(.headline)
+
+                    if isMyGroup {
+
+                        Text(
+                            "הקבוצה שלי"
+                        )
+                        .font(.caption2)
+                        .fontWeight(
+                            .semibold
+                        )
+                        .padding(
+                            .horizontal,
+                            7
+                        )
+                        .padding(
+                            .vertical,
+                            3
+                        )
+                        .background(
+                            .thinMaterial,
+                            in: Capsule()
+                        )
+                    }
+                }
+
+                HStack(
+                    spacing: 14
+                ) {
+
+                    Label(
+                        "\(ranking.currentStreak) ימים",
+                        systemImage:
+                            "flame.fill"
+                    )
+
+                    if let average =
+                        ranking
+                            .averageUsageMinutes {
+
+                        Label(
+                            formattedRankingMinutes(
+                                average
+                            ),
+                            systemImage:
+                                "iphone"
+                        )
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+
+            Text(
+                "#\(ranking.rankingPosition)"
+            )
+            .font(
+                .title3.bold()
+            )
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            isMyGroup
+                ? Color.secondary
+                    .opacity(0.12)
+                : Color.secondary
+                    .opacity(0.06),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16
+                )
+        )
+    }
+
+    private func formattedRankingMinutes(
+        _ minutes: Double
+    ) -> String {
+
+        let roundedMinutes =
+            max(
+                0,
+                Int(
+                    minutes.rounded()
+                )
+            )
+
+        let hours =
+            roundedMinutes / 60
+
+        let remainingMinutes =
+            roundedMinutes % 60
+
+        if hours == 0 {
+
+            return
+                "\(remainingMinutes) דק׳"
+        }
+
+        if remainingMinutes == 0 {
+
+            return
+                "\(hours) שע׳"
+        }
+
+        return
+            "\(hours) שע׳ \(remainingMinutes) דק׳"
     }
 
     // MARK: - Dashboard
@@ -274,12 +523,17 @@ struct MemberTabView: View {
             }
             .padding(20)
         }
-        .navigationTitle("דשבורד")
+        .navigationTitle(
+            "דשבורד"
+        )
         .navigationBarTitleDisplayMode(
             .inline
         )
         .task(
-            id: dataStore.activeMemberGroup?.id
+            id:
+                dataStore
+                    .activeMemberGroup?
+                    .id
         ) {
 
             guard let group =
@@ -288,9 +542,10 @@ struct MemberTabView: View {
                 return
             }
 
-            await dataStore.loadDailyProgress(
-                groupID: group.id
-            )
+            await dataStore
+                .loadDailyProgress(
+                    groupID: group.id
+                )
 
             await dataStore
                 .syncReportedScreenTime()
@@ -303,9 +558,10 @@ struct MemberTabView: View {
                 return
             }
 
-            await dataStore.loadDailyProgress(
-                groupID: group.id
-            )
+            await dataStore
+                .loadDailyProgress(
+                    groupID: group.id
+                )
 
             await dataStore
                 .syncReportedScreenTime()
@@ -339,25 +595,31 @@ struct MemberTabView: View {
                     for: user.id
                 ) {
 
-                    Text("יום למידה")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .padding(
-                            .horizontal,
-                            9
-                        )
-                        .padding(
-                            .vertical,
-                            5
-                        )
-                        .background(
-                            .thinMaterial,
-                            in: Capsule()
-                        )
+                    Text(
+                        "יום למידה"
+                    )
+                    .font(.caption)
+                    .fontWeight(
+                        .semibold
+                    )
+                    .padding(
+                        .horizontal,
+                        9
+                    )
+                    .padding(
+                        .vertical,
+                        5
+                    )
+                    .background(
+                        .thinMaterial,
+                        in: Capsule()
+                    )
                 }
             }
 
-            HStack(spacing: 12) {
+            HStack(
+                spacing: 12
+            ) {
 
                 progressValue(
                     title: "שימוש",
@@ -365,7 +627,8 @@ struct MemberTabView: View {
                         formattedMinutes(
                             dataStore
                                 .usageMinutes(
-                                    for: user.id
+                                    for:
+                                        user.id
                                 )
                         ),
                     icon: "iphone"
@@ -377,7 +640,8 @@ struct MemberTabView: View {
                         formattedMinutes(
                             dataStore
                                 .targetMinutes(
-                                    for: user.id
+                                    for:
+                                        user.id
                                 )
                         ),
                     icon: "target"
@@ -426,7 +690,9 @@ struct MemberTabView: View {
                             "person.3.fill"
                     )
                     .font(
-                        .system(size: 46)
+                        .system(
+                            size: 46
+                        )
                     )
 
                     VStack(
@@ -434,10 +700,12 @@ struct MemberTabView: View {
                         spacing: 4
                     ) {
 
-                        Text(group.name)
-                            .font(
-                                .largeTitle.bold()
-                            )
+                        Text(
+                            group.name
+                        )
+                        .font(
+                            .largeTitle.bold()
+                        )
 
                         Text(
                             "קוד קבוצה: \(group.code)"
@@ -465,32 +733,40 @@ struct MemberTabView: View {
             )
             .padding(20)
         }
-        .navigationTitle("הקבוצה")
+        .navigationTitle(
+            "הקבוצה"
+        )
         .navigationBarTitleDisplayMode(
             .inline
         )
-        .task(id: group.id) {
+        .task(
+            id: group.id
+        ) {
 
-            await dataStore.loadGroupMembers(
-                groupID: group.id
-            )
+            await dataStore
+                .loadGroupMembers(
+                    groupID: group.id
+                )
 
-            await dataStore.loadDailyProgress(
-                groupID: group.id
-            )
+            await dataStore
+                .loadDailyProgress(
+                    groupID: group.id
+                )
 
             await dataStore
                 .syncReportedScreenTime()
         }
         .refreshable {
 
-            await dataStore.loadGroupMembers(
-                groupID: group.id
-            )
+            await dataStore
+                .loadGroupMembers(
+                    groupID: group.id
+                )
 
-            await dataStore.loadDailyProgress(
-                groupID: group.id
-            )
+            await dataStore
+                .loadDailyProgress(
+                    groupID: group.id
+                )
 
             await dataStore
                 .syncReportedScreenTime()
@@ -502,7 +778,9 @@ struct MemberTabView: View {
     private var groupStreakCard:
         some View {
 
-        HStack(spacing: 16) {
+        HStack(
+            spacing: 16
+        ) {
 
             ZStack {
 
@@ -521,7 +799,9 @@ struct MemberTabView: View {
                         "flame.fill"
                 )
                 .font(
-                    .system(size: 28)
+                    .system(
+                        size: 28
+                    )
                 )
             }
 
@@ -530,16 +810,20 @@ struct MemberTabView: View {
                 spacing: 3
             ) {
 
-                Text("רצף קבוצתי")
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                Text(
+                    "רצף קבוצתי"
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    .secondary
+                )
 
                 Text(
                     "\(dataStore.currentGroupStreak) ימים"
                 )
-                .font(.title2.bold())
+                .font(
+                    .title2.bold()
+                )
             }
 
             Spacer()
@@ -592,12 +876,14 @@ struct MemberTabView: View {
                     .font(.title2)
                     .foregroundStyle(
                         result.succeeded
-                        ? Color.green
-                        : Color.red
+                            ? Color.green
+                            : Color.red
                     )
                 }
 
-                HStack(spacing: 12) {
+                HStack(
+                    spacing: 12
+                ) {
 
                     groupMetric(
                         title: "השלימו",
@@ -611,7 +897,8 @@ struct MemberTabView: View {
                         title: "ממוצע",
                         value:
                             formattedMinutes(
-                                result.averageUsageMinutes
+                                result
+                                    .averageUsageMinutes
                             ),
                         icon:
                             "chart.bar.xaxis"
@@ -620,19 +907,21 @@ struct MemberTabView: View {
 
                 Label(
                     result.succeeded
-                    ? "הקבוצה עמדה ביעד"
-                    : "הקבוצה עדיין לא השלימה את היעד",
+                        ? "הקבוצה עמדה ביעד"
+                        : "הקבוצה עדיין לא השלימה את היעד",
                     systemImage:
                         result.succeeded
                         ? "checkmark.circle.fill"
                         : "clock.fill"
                 )
                 .font(.subheadline)
-                .fontWeight(.semibold)
+                .fontWeight(
+                    .semibold
+                )
                 .foregroundStyle(
                     result.succeeded
-                    ? Color.green
-                    : Color.secondary
+                        ? Color.green
+                        : Color.secondary
                 )
             }
             .padding()
@@ -691,7 +980,9 @@ struct MemberTabView: View {
         icon: String
     ) -> some View {
 
-        HStack(spacing: 9) {
+        HStack(
+            spacing: 9
+        ) {
 
             Image(
                 systemName: icon
@@ -749,11 +1040,15 @@ struct MemberTabView: View {
                     systemImage:
                         "person.2.fill"
                 )
-                .font(.title2.bold())
+                .font(
+                    .title2.bold()
+                )
 
                 Spacer()
 
-                if !dataStore.groupMembers.isEmpty {
+                if !dataStore
+                    .groupMembers
+                    .isEmpty {
 
                     Text(
                         "\(dataStore.groupMembers.count)"
@@ -765,10 +1060,14 @@ struct MemberTabView: View {
                 }
             }
 
-            if dataStore.isLoadingGroupMembers ||
-                dataStore.isLoadingDailyProgress {
+            if dataStore
+                .isLoadingGroupMembers ||
+                dataStore
+                    .isLoadingDailyProgress {
 
-                HStack(spacing: 12) {
+                HStack(
+                    spacing: 12
+                ) {
 
                     ProgressView()
 
@@ -784,7 +1083,10 @@ struct MemberTabView: View {
                     8
                 )
 
-            } else if dataStore.groupMembers.isEmpty {
+            } else if
+                dataStore
+                    .groupMembers
+                    .isEmpty {
 
                 ContentUnavailableView(
                     "אין חברים להצגה",
@@ -798,14 +1100,18 @@ struct MemberTabView: View {
 
             } else {
 
-                VStack(spacing: 12) {
+                VStack(
+                    spacing: 12
+                ) {
 
                     ForEach(
-                        dataStore.groupMembers
+                        dataStore
+                            .groupMembers
                     ) { member in
 
                         groupMemberRow(
-                            member: member
+                            member:
+                                member
                         )
                     }
                 }
@@ -827,14 +1133,18 @@ struct MemberTabView: View {
             spacing: 12
         ) {
 
-            HStack(spacing: 14) {
+            HStack(
+                spacing: 14
+            ) {
 
                 ZStack {
 
                     Circle()
                         .fill(
                             Color.secondary
-                                .opacity(0.12)
+                                .opacity(
+                                    0.12
+                                )
                         )
                         .frame(
                             width: 46,
@@ -855,59 +1165,73 @@ struct MemberTabView: View {
                     spacing: 3
                 ) {
 
-                    HStack(spacing: 6) {
+                    HStack(
+                        spacing: 6
+                    ) {
 
                         Text(
                             displayName(
-                                for: member
+                                for:
+                                    member
                             )
                         )
                         .font(.headline)
 
                         if member.id ==
-                            dataStore.currentUser?.id {
+                            dataStore
+                                .currentUser?
+                                .id {
 
-                            Text("אתה")
-                                .font(.caption)
-                                .fontWeight(
-                                    .semibold
-                                )
-                                .padding(
-                                    .horizontal,
-                                    7
-                                )
-                                .padding(
-                                    .vertical,
-                                    3
-                                )
-                                .background(
-                                    .thinMaterial,
-                                    in: Capsule()
-                                )
+                            Text(
+                                "אתה"
+                            )
+                            .font(.caption)
+                            .fontWeight(
+                                .semibold
+                            )
+                            .padding(
+                                .horizontal,
+                                7
+                            )
+                            .padding(
+                                .vertical,
+                                3
+                            )
+                            .background(
+                                .thinMaterial,
+                                in:
+                                    Capsule()
+                            )
                         }
                     }
 
-                    if dataStore.isLearningDay(
-                        for: member.id
-                    ) {
+                    if dataStore
+                        .isLearningDay(
+                            for:
+                                member.id
+                        ) {
 
-                        Text("יום למידה")
-                            .font(.caption)
-                            .foregroundStyle(
-                                .secondary
-                            )
+                        Text(
+                            "יום למידה"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
 
-                    } else if let membership =
-                        dataStore
-                            .groupMemberships
-                            .first(
-                                where: {
-                                    $0.userID ==
-                                        member.id
-                                }
-                            ),
-                              let joinedAt =
-                        membership.joinedAt {
+                    } else if
+                        let membership =
+                            dataStore
+                                .groupMemberships
+                                .first(
+                                    where: {
+                                        $0.userID ==
+                                            member.id
+                                    }
+                                ),
+                        let joinedAt =
+                            membership
+                                .joinedAt {
 
                         Text(
                             "הצטרף \(joinedAt.formatted(date: .abbreviated, time: .omitted))"
@@ -922,13 +1246,16 @@ struct MemberTabView: View {
                 Spacer()
 
                 memberStatusIcon(
-                    userID: member.id
+                    userID:
+                        member.id
                 )
             }
 
             Divider()
 
-            HStack(spacing: 12) {
+            HStack(
+                spacing: 12
+            ) {
 
                 progressValue(
                     title: "שימוש",
@@ -936,10 +1263,12 @@ struct MemberTabView: View {
                         formattedMinutes(
                             dataStore
                                 .usageMinutes(
-                                    for: member.id
+                                    for:
+                                        member.id
                                 )
                         ),
-                    icon: "iphone"
+                    icon:
+                        "iphone"
                 )
 
                 progressValue(
@@ -948,10 +1277,12 @@ struct MemberTabView: View {
                         formattedMinutes(
                             dataStore
                                 .targetMinutes(
-                                    for: member.id
+                                    for:
+                                        member.id
                                 )
                         ),
-                    icon: "target"
+                    icon:
+                        "target"
                 )
             }
         }
@@ -973,7 +1304,9 @@ struct MemberTabView: View {
         icon: String
     ) -> some View {
 
-        HStack(spacing: 9) {
+        HStack(
+            spacing: 9
+        ) {
 
             Image(
                 systemName: icon
@@ -1037,14 +1370,14 @@ struct MemberTabView: View {
             Image(
                 systemName:
                     achieved
-                    ? "checkmark.circle.fill"
-                    : "xmark.circle.fill"
+                        ? "checkmark.circle.fill"
+                        : "xmark.circle.fill"
             )
             .font(.title2)
             .foregroundStyle(
                 achieved
-                ? Color.green
-                : Color.red
+                    ? Color.green
+                    : Color.red
             )
 
         } else {
@@ -1075,7 +1408,9 @@ struct MemberTabView: View {
                     "book.fill"
             )
             .font(.subheadline)
-            .fontWeight(.semibold)
+            .fontWeight(
+                .semibold
+            )
 
         } else if let achieved =
             dataStore.achieved(
@@ -1092,11 +1427,13 @@ struct MemberTabView: View {
                     : "xmark.circle.fill"
             )
             .font(.subheadline)
-            .fontWeight(.semibold)
+            .fontWeight(
+                .semibold
+            )
             .foregroundStyle(
                 achieved
-                ? Color.green
-                : Color.red
+                    ? Color.green
+                    : Color.red
             )
 
         } else {
@@ -1122,7 +1459,10 @@ struct MemberTabView: View {
         }
 
         let safeMinutes =
-            max(0, minutes)
+            max(
+                0,
+                minutes
+            )
 
         let hours =
             safeMinutes / 60
@@ -1131,11 +1471,15 @@ struct MemberTabView: View {
             safeMinutes % 60
 
         if hours == 0 {
-            return "\(remainingMinutes) דק׳"
+
+            return
+                "\(remainingMinutes) דק׳"
         }
 
         if remainingMinutes == 0 {
-            return "\(hours) שע׳"
+
+            return
+                "\(hours) שע׳"
         }
 
         return
@@ -1149,7 +1493,8 @@ struct MemberTabView: View {
         some ToolbarContent {
 
         ToolbarItem(
-            placement: .topBarTrailing
+            placement:
+                .topBarTrailing
         ) {
 
             Button {
@@ -1163,7 +1508,9 @@ struct MemberTabView: View {
                     Circle()
                         .fill(
                             Color.secondary
-                                .opacity(0.15)
+                                .opacity(
+                                    0.15
+                                )
                         )
                         .frame(
                             width: 36,
@@ -1175,7 +1522,9 @@ struct MemberTabView: View {
                             "person.crop.circle.fill"
                     )
                     .font(
-                        .system(size: 28)
+                        .system(
+                            size: 28
+                        )
                     )
                 }
             }
@@ -1190,7 +1539,9 @@ struct MemberTabView: View {
     private var loadingView:
         some View {
 
-        VStack(spacing: 16) {
+        VStack(
+            spacing: 16
+        ) {
 
             ProgressView()
 
@@ -1228,7 +1579,9 @@ struct MemberTabView: View {
         message: String
     ) -> some View {
 
-        VStack(spacing: 18) {
+        VStack(
+            spacing: 18
+        ) {
 
             Spacer()
 
@@ -1236,12 +1589,18 @@ struct MemberTabView: View {
                 systemName: icon
             )
             .font(
-                .system(size: 54)
+                .system(
+                    size: 54
+                )
             )
 
             Text(title)
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(
+                    .largeTitle
+                )
+                .fontWeight(
+                    .bold
+                )
 
             Text(message)
                 .foregroundStyle(
@@ -1261,7 +1620,9 @@ struct MemberTabView: View {
             maxWidth: .infinity,
             maxHeight: .infinity
         )
-        .navigationTitle(title)
+        .navigationTitle(
+            title
+        )
         .navigationBarTitleDisplayMode(
             .inline
         )
@@ -1275,7 +1636,8 @@ struct MemberTabView: View {
         let name =
             user.displayName?
                 .trimmingCharacters(
-                    in: .whitespacesAndNewlines
+                    in:
+                        .whitespacesAndNewlines
                 ) ?? ""
 
         return name.isEmpty
@@ -1307,14 +1669,18 @@ private struct SupabaseMemberProfileView:
 
             Section {
 
-                VStack(spacing: 14) {
+                VStack(
+                    spacing: 14
+                ) {
 
                     Image(
                         systemName:
                             "person.crop.circle.fill"
                     )
                     .font(
-                        .system(size: 82)
+                        .system(
+                            size: 82
+                        )
                     )
                     .foregroundStyle(
                         .secondary
@@ -1325,20 +1691,25 @@ private struct SupabaseMemberProfileView:
                         "TimeUp"
                     )
                     .font(.title2)
-                    .fontWeight(.bold)
+                    .fontWeight(
+                        .bold
+                    )
 
                     if let email =
                         user.email {
 
                         Text(email)
-                            .font(.footnote)
+                            .font(
+                                .footnote
+                            )
                             .foregroundStyle(
                                 .secondary
                             )
                     }
                 }
                 .frame(
-                    maxWidth: .infinity
+                    maxWidth:
+                        .infinity
                 )
                 .padding(
                     .vertical,
@@ -1365,7 +1736,8 @@ private struct SupabaseMemberProfileView:
             Section {
 
                 Button(
-                    role: .destructive
+                    role:
+                        .destructive
                 ) {
 
                     logout()
@@ -1388,20 +1760,27 @@ private struct SupabaseMemberProfileView:
                         }
                     }
                 }
-                .disabled(isLoggingOut)
+                .disabled(
+                    isLoggingOut
+                )
             }
         }
-        .navigationTitle("פרופיל")
+        .navigationTitle(
+            "פרופיל"
+        )
         .navigationBarTitleDisplayMode(
             .inline
         )
         .toolbar {
 
             ToolbarItem(
-                placement: .topBarLeading
+                placement:
+                    .topBarLeading
             ) {
 
-                Button("סגור") {
+                Button(
+                    "סגור"
+                ) {
 
                     dismiss()
                 }
@@ -1418,7 +1797,8 @@ private struct SupabaseMemberProfileView:
             do {
 
                 try await
-                    SupabaseManager.shared
+                    SupabaseManager
+                        .shared
                         .client
                         .auth
                         .signOut()
