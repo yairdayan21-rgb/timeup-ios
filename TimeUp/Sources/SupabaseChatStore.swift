@@ -7,6 +7,8 @@ final class SupabaseChatStore: ObservableObject {
     static let shared = SupabaseChatStore()
 
     @Published private(set) var messages: [ChatMessage] = []
+    @Published private(set) var unreadCounts: [UUID: Int] = [:]
+
     @Published private(set) var isLoading = false
     @Published private(set) var isSending = false
     @Published private(set) var lastError: String?
@@ -38,7 +40,24 @@ final class SupabaseChatStore: ObservableObject {
         }
     }
 
-    // MARK: - Insert Payload
+    // MARK: - Read State
+
+    struct ChatReadState: Codable, Equatable {
+
+        let groupID: UUID
+        let userID: UUID
+        let lastReadMessageID: UUID?
+        let lastReadAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case userID = "user_id"
+            case lastReadMessageID = "last_read_message_id"
+            case lastReadAt = "last_read_at"
+        }
+    }
+
+    // MARK: - Message Insert
 
     private struct MessageInsert: Encodable {
 
@@ -50,6 +69,23 @@ final class SupabaseChatStore: ObservableObject {
             case groupID = "group_id"
             case senderID = "sender_id"
             case text = "message_text"
+        }
+    }
+
+    // MARK: - Read State Upsert
+
+    private struct ReadStateUpsert: Encodable {
+
+        let groupID: UUID
+        let userID: UUID
+        let lastReadMessageID: UUID
+        let lastReadAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case userID = "user_id"
+            case lastReadMessageID = "last_read_message_id"
+            case lastReadAt = "last_read_at"
         }
     }
 
@@ -93,28 +129,209 @@ final class SupabaseChatStore: ObservableObject {
         }
     }
 
+    // MARK: - Load Unread Count
+
+    @MainActor
+    func loadUnreadCount(
+        groupID: UUID,
+        userID: UUID
+    ) async {
+
+        do {
+
+            let readStates: [ChatReadState] =
+                try await client
+                    .from("group_chat_read_state")
+                    .select(
+                        "group_id,user_id,last_read_message_id,last_read_at"
+                    )
+                    .eq(
+                        "group_id",
+                        value: groupID.uuidString
+                    )
+                    .eq(
+                        "user_id",
+                        value: userID.uuidString
+                    )
+                    .limit(1)
+                    .execute()
+                    .value
+
+            let groupMessages: [ChatMessage] =
+                try await client
+                    .from("group_messages")
+                    .select()
+                    .eq(
+                        "group_id",
+                        value: groupID.uuidString
+                    )
+                    .order(
+                        "created_at",
+                        ascending: true
+                    )
+                    .execute()
+                    .value
+
+            guard let readState =
+                    readStates.first else {
+
+                let unread =
+                    groupMessages.filter {
+                        $0.senderID != userID
+                    }.count
+
+                unreadCounts[groupID] =
+                    unread
+
+                return
+            }
+
+            guard let lastReadMessageID =
+                    readState.lastReadMessageID,
+                  let lastReadIndex =
+                    groupMessages.firstIndex(
+                        where: {
+                            $0.id ==
+                                lastReadMessageID
+                        }
+                    ) else {
+
+                let unread =
+                    groupMessages.filter {
+                        $0.senderID != userID
+                    }.count
+
+                unreadCounts[groupID] =
+                    unread
+
+                return
+            }
+
+            let nextIndex =
+                groupMessages.index(
+                    after: lastReadIndex
+                )
+
+            guard nextIndex <
+                    groupMessages.endIndex else {
+
+                unreadCounts[groupID] = 0
+                return
+            }
+
+            let unread =
+                groupMessages[
+                    nextIndex...
+                ]
+                .filter {
+                    $0.senderID != userID
+                }
+                .count
+
+            unreadCounts[groupID] =
+                unread
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Unread Count Helper
+
+    func unreadCount(
+        for groupID: UUID
+    ) -> Int {
+
+        unreadCounts[groupID] ?? 0
+    }
+
+    // MARK: - Mark Chat Read
+
+    @MainActor
+    func markChatAsRead(
+        groupID: UUID,
+        userID: UUID
+    ) async {
+
+        let groupMessages =
+            messages
+                .filter {
+                    $0.groupID ==
+                        groupID
+                }
+                .sorted {
+                    $0.createdAt <
+                        $1.createdAt
+                }
+
+        guard let lastMessage =
+                groupMessages.last else {
+
+            unreadCounts[groupID] = 0
+            return
+        }
+
+        let payload =
+            ReadStateUpsert(
+                groupID: groupID,
+                userID: userID,
+                lastReadMessageID:
+                    lastMessage.id,
+                lastReadAt: Date()
+            )
+
+        do {
+
+            try await client
+                .from(
+                    "group_chat_read_state"
+                )
+                .upsert(
+                    payload,
+                    onConflict:
+                        "group_id,user_id"
+                )
+                .execute()
+
+            unreadCounts[groupID] = 0
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+        }
+    }
+
     // MARK: - Realtime
 
     @MainActor
     func startRealtime(
-        groupID: UUID
+        groupID: UUID,
+        currentUserID: UUID? = nil,
+        markIncomingAsRead: Bool = false
     ) async {
 
-        if subscribedGroupID == groupID,
+        if subscribedGroupID ==
+            groupID,
            realtimeChannel != nil {
+
             return
         }
 
         await stopRealtime()
 
-        subscribedGroupID = groupID
+        subscribedGroupID =
+            groupID
 
         let channel =
             client.realtimeV2.channel(
                 "timeup-group-chat-\(groupID.uuidString)"
             )
 
-        realtimeChannel = channel
+        realtimeChannel =
+            channel
 
         let insertions =
             channel.postgresChange(
@@ -141,6 +358,28 @@ final class SupabaseChatStore: ObservableObject {
                     await self.loadMessages(
                         groupID: groupID
                     )
+
+                    guard let currentUserID
+                    else {
+                        continue
+                    }
+
+                    if markIncomingAsRead {
+
+                        await self.markChatAsRead(
+                            groupID: groupID,
+                            userID:
+                                currentUserID
+                        )
+
+                    } else {
+
+                        await self.loadUnreadCount(
+                            groupID: groupID,
+                            userID:
+                                currentUserID
+                        )
+                    }
                 }
             }
 
@@ -160,6 +399,8 @@ final class SupabaseChatStore: ObservableObject {
             subscribedGroupID = nil
         }
     }
+
+    // MARK: - Stop Realtime
 
     @MainActor
     func stopRealtime() async {
@@ -226,6 +467,11 @@ final class SupabaseChatStore: ObservableObject {
                 groupID: groupID
             )
 
+            await markChatAsRead(
+                groupID: groupID,
+                userID: senderID
+            )
+
         } catch {
 
             lastError =
@@ -246,12 +492,15 @@ final class SupabaseChatStore: ObservableObject {
         }
     }
 
+    // MARK: - Clear
+
     @MainActor
     func clear() async {
 
         await stopRealtime()
 
         messages = []
+        unreadCounts = [:]
         lastError = nil
     }
 }
@@ -268,10 +517,12 @@ enum ChatError: LocalizedError {
         switch self {
 
         case .emptyMessage:
-            return "לא ניתן לשלוח הודעה ריקה."
+            return
+                "לא ניתן לשלוח הודעה ריקה."
 
         case .messageTooLong:
-            return "הודעה יכולה להכיל עד 2,000 תווים."
+            return
+                "הודעה יכולה להכיל עד 2,000 תווים."
         }
     }
 }
