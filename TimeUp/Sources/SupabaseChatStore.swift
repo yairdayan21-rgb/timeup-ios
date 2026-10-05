@@ -13,6 +13,10 @@ final class SupabaseChatStore: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
+    private var realtimeChannel: RealtimeChannelV2?
+    private var realtimeTask: Task<Void, Never>?
+    private var subscribedGroupID: UUID?
+
     private init() {}
 
     // MARK: - Message Model
@@ -84,8 +88,95 @@ final class SupabaseChatStore: ObservableObject {
 
         } catch {
 
-            lastError = error.localizedDescription
+            lastError =
+                error.localizedDescription
         }
+    }
+
+    // MARK: - Realtime
+
+    @MainActor
+    func startRealtime(
+        groupID: UUID
+    ) async {
+
+        if subscribedGroupID == groupID,
+           realtimeChannel != nil {
+            return
+        }
+
+        await stopRealtime()
+
+        subscribedGroupID = groupID
+
+        let channel =
+            client.realtimeV2.channel(
+                "timeup-group-chat-\(groupID.uuidString)"
+            )
+
+        realtimeChannel = channel
+
+        let insertions =
+            channel.postgresChange(
+                InsertAction.self,
+                schema: "public",
+                table: "group_messages",
+                filter:
+                    "group_id=eq.\(groupID.uuidString)"
+            )
+
+        realtimeTask =
+            Task { [weak self] in
+
+                guard let self else {
+                    return
+                }
+
+                for await _ in insertions {
+
+                    guard !Task.isCancelled else {
+                        return
+                    }
+
+                    await self.loadMessages(
+                        groupID: groupID
+                    )
+                }
+            }
+
+        do {
+
+            try await channel.subscribe()
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+
+            realtimeTask?.cancel()
+            realtimeTask = nil
+
+            realtimeChannel = nil
+            subscribedGroupID = nil
+        }
+    }
+
+    @MainActor
+    func stopRealtime() async {
+
+        realtimeTask?.cancel()
+        realtimeTask = nil
+
+        if let realtimeChannel {
+
+            await client.realtimeV2
+                .removeChannel(
+                    realtimeChannel
+                )
+        }
+
+        realtimeChannel = nil
+        subscribedGroupID = nil
     }
 
     // MARK: - Send Message
@@ -137,7 +228,9 @@ final class SupabaseChatStore: ObservableObject {
 
         } catch {
 
-            lastError = error.localizedDescription
+            lastError =
+                error.localizedDescription
+
             throw error
         }
     }
@@ -153,7 +246,10 @@ final class SupabaseChatStore: ObservableObject {
         }
     }
 
-    func clear() {
+    @MainActor
+    func clear() async {
+
+        await stopRealtime()
 
         messages = []
         lastError = nil
