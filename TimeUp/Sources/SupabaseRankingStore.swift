@@ -8,16 +8,24 @@ final class SupabaseRankingStore: ObservableObject {
     static let shared = SupabaseRankingStore()
 
     @Published private(set) var groupRankings: [GroupRanking] = []
-    @Published private(set) var isLoading = false
-    @Published private(set) var lastError: String?
+    @Published private(set) var userRankings: [UserRanking] = []
 
-    private let client = SupabaseManager.shared.client
+    @Published private(set) var isLoading = false
+    @Published private(set) var isLoadingUsers = false
+
+    @Published private(set) var lastError: String?
+    @Published private(set) var userRankingError: String?
+
+    private let client =
+        SupabaseManager.shared.client
 
     private init() {}
 
-    // MARK: - Model
+    // MARK: - Group Ranking Model
 
-    struct GroupRanking: Identifiable, Decodable {
+    struct GroupRanking:
+        Identifiable,
+        Decodable {
 
         let groupID: UUID
         let groupName: String
@@ -29,12 +37,61 @@ final class SupabaseRankingStore: ObservableObject {
             groupID
         }
 
-        enum CodingKeys: String, CodingKey {
-            case groupID = "group_id"
-            case groupName = "group_name"
-            case currentStreak = "current_streak"
-            case averageUsageMinutes = "average_usage_minutes"
-            case rankingPosition = "ranking_position"
+        enum CodingKeys:
+            String,
+            CodingKey {
+
+            case groupID =
+                "group_id"
+
+            case groupName =
+                "group_name"
+
+            case currentStreak =
+                "current_streak"
+
+            case averageUsageMinutes =
+                "average_usage_minutes"
+
+            case rankingPosition =
+                "ranking_position"
+        }
+    }
+
+    // MARK: - User Ranking Model
+
+    struct UserRanking:
+        Identifiable,
+        Decodable {
+
+        let userID: UUID
+        let displayName: String?
+        let personalStreak: Int
+        let averageUsageMinutes: Double?
+        let rankingPosition: Int
+
+        var id: UUID {
+            userID
+        }
+
+        enum CodingKeys:
+            String,
+            CodingKey {
+
+            case userID =
+                "user_id"
+
+            case displayName =
+                "display_name"
+
+            case personalStreak =
+                "personal_streak"
+
+            case averageUsageMinutes =
+                "average_usage_minutes"
+
+            case rankingPosition =
+                "ranking_position"
         }
     }
 
@@ -53,7 +110,9 @@ final class SupabaseRankingStore: ObservableObject {
 
             let rankings: [GroupRanking] =
                 try await client
-                    .from("group_rankings")
+                    .from(
+                        "group_rankings"
+                    )
                     .select(
                         """
                         group_id,
@@ -70,23 +129,89 @@ final class SupabaseRankingStore: ObservableObject {
                     .execute()
                     .value
 
-            groupRankings = rankings
+            groupRankings =
+                rankings
 
         } catch {
 
             groupRankings = []
-            lastError = error.localizedDescription
+
+            lastError =
+                error.localizedDescription
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Load User Rankings
+
+    func loadUserRankings() async {
+
+        isLoadingUsers = true
+        userRankingError = nil
+
+        defer {
+            isLoadingUsers = false
+        }
+
+        do {
+
+            let rankings: [UserRanking] =
+                try await client
+                    .from(
+                        "user_rankings"
+                    )
+                    .select(
+                        """
+                        user_id,
+                        display_name,
+                        personal_streak,
+                        average_usage_minutes,
+                        ranking_position
+                        """
+                    )
+                    .order(
+                        "ranking_position",
+                        ascending: true
+                    )
+                    .execute()
+                    .value
+
+            userRankings =
+                rankings
+
+        } catch {
+
+            userRankings = []
+
+            userRankingError =
+                error.localizedDescription
+        }
+    }
+
+    // MARK: - Load All Rankings
+
+    func loadAllRankings() async {
+
+        async let groups: Void =
+            loadGroupRankings()
+
+        async let users: Void =
+            loadUserRankings()
+
+        _ = await (
+            groups,
+            users
+        )
+    }
+
+    // MARK: - Group Helpers
 
     func ranking(
         for groupID: UUID
     ) -> GroupRanking? {
 
         groupRankings.first {
-            $0.groupID == groupID
+            $0.groupID ==
+                groupID
         }
     }
 
@@ -94,14 +219,45 @@ final class SupabaseRankingStore: ObservableObject {
         for groupID: UUID
     ) -> Int? {
 
-        ranking(for: groupID)?
-            .rankingPosition
+        ranking(
+            for: groupID
+        )?
+        .rankingPosition
     }
+
+    // MARK: - User Helpers
+
+    func userRanking(
+        for userID: UUID
+    ) -> UserRanking? {
+
+        userRankings.first {
+            $0.userID ==
+                userID
+        }
+    }
+
+    func userPosition(
+        for userID: UUID
+    ) -> Int? {
+
+        userRanking(
+            for: userID
+        )?
+        .rankingPosition
+    }
+
+    // MARK: - Clear
 
     func clear() {
 
         groupRankings = []
+        userRankings = []
+
         lastError = nil
+        userRankingError = nil
+
         isLoading = false
+        isLoadingUsers = false
     }
 }
