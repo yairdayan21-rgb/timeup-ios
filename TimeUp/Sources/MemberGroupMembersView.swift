@@ -5,7 +5,11 @@ struct MemberGroupMembersView: View {
 
     let member: TimeUpMember
 
-    @ObservedObject private var store = TimeUpStore.shared
+    @ObservedObject private var store =
+        TimeUpStore.shared
+
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
 
     private var currentMember: TimeUpMember {
         store.member(id: member.id) ?? member
@@ -45,10 +49,10 @@ struct MemberGroupMembersView: View {
 
                 if groupMembers.isEmpty {
                     ContentUnavailableView(
-                        "אין חברים בקבוצה",
+                        noMembersText,
                         systemImage: "person.3",
                         description: Text(
-                            "כאשר חברים יצטרפו לקבוצה הם יופיעו כאן."
+                            noMembersDescription
                         )
                     )
                     .frame(
@@ -61,7 +65,7 @@ struct MemberGroupMembersView: View {
             }
             .padding(16)
         }
-        .navigationTitle("חברים")
+        .navigationTitle(membersNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -73,11 +77,11 @@ struct MemberGroupMembersView: View {
             spacing: 6
         ) {
 
-            Text("חברי הקבוצה")
+            Text(groupMembersTitle)
                 .font(.title2)
                 .fontWeight(.bold)
 
-            Text("\(groupMembers.count) חברים")
+            Text(memberCountText)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -150,7 +154,7 @@ struct MemberGroupMembersView: View {
                         .fontWeight(.semibold)
 
                     if groupMember.id == currentMember.id {
-                        Text("אתה")
+                        Text(youText)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -160,12 +164,14 @@ struct MemberGroupMembersView: View {
                     for: groupMember.id
                 ) {
                     Text(
-                        "היום: \(formattedMinutes(progress.usageMinutes))"
+                        todayUsageText(
+                            progress.usageMinutes
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 } else {
-                    Text("אין עדיין נתונים להיום")
+                    Text(noTodayDataText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -175,7 +181,7 @@ struct MemberGroupMembersView: View {
 
             todayStatus(for: groupMember)
 
-            Image(systemName: "chevron.left")
+            Image(systemName: chevronName)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -196,7 +202,7 @@ struct MemberGroupMembersView: View {
 
             if progress.isLearningDay {
 
-                Text("למידה")
+                Text(learningText)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
@@ -236,15 +242,153 @@ struct MemberGroupMembersView: View {
         let hours = safe / 60
         let remaining = safe % 60
 
-        if hours == 0 {
-            return "\(remaining) דק׳"
-        }
+        switch localization.language {
 
-        if remaining == 0 {
-            return "\(hours) שע׳"
-        }
+        case .hebrew:
+            if hours == 0 {
+                return "\(remaining) דק׳"
+            }
 
-        return "\(hours) שע׳ \(remaining) דק׳"
+            if remaining == 0 {
+                return "\(hours) שע׳"
+            }
+
+            return "\(hours) שע׳ \(remaining) דק׳"
+
+        case .english:
+            if hours == 0 {
+                return "\(remaining) min"
+            }
+
+            if remaining == 0 {
+                return "\(hours) hr"
+            }
+
+            return "\(hours) hr \(remaining) min"
+
+        case .arabic:
+            if hours == 0 {
+                return "\(remaining) د"
+            }
+
+            if remaining == 0 {
+                return "\(hours) س"
+            }
+
+            return "\(hours) س \(remaining) د"
+        }
+    }
+
+    // MARK: - Localization
+
+    private var membersNavigationTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "חברים"
+        case .english:
+            return "Members"
+        case .arabic:
+            return "الأعضاء"
+        }
+    }
+
+    private var groupMembersTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "חברי הקבוצה"
+        case .english:
+            return "Group members"
+        case .arabic:
+            return "أعضاء المجموعة"
+        }
+    }
+
+    private var memberCountText: String {
+        switch localization.language {
+        case .hebrew:
+            return "\(groupMembers.count) חברים"
+        case .english:
+            return "\(groupMembers.count) members"
+        case .arabic:
+            return "\(groupMembers.count) أعضاء"
+        }
+    }
+
+    private var noMembersText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין חברים בקבוצה"
+        case .english:
+            return "No group members"
+        case .arabic:
+            return "لا يوجد أعضاء في المجموعة"
+        }
+    }
+
+    private var noMembersDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "כאשר חברים יצטרפו לקבוצה הם יופיעו כאן."
+        case .english:
+            return "When members join the group, they will appear here."
+        case .arabic:
+            return "عندما ينضم أعضاء إلى المجموعة سيظهرون هنا."
+        }
+    }
+
+    private var youText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אתה"
+        case .english:
+            return "You"
+        case .arabic:
+            return "أنت"
+        }
+    }
+
+    private func todayUsageText(
+        _ minutes: Int
+    ) -> String {
+        switch localization.language {
+        case .hebrew:
+            return "היום: \(formattedMinutes(minutes))"
+        case .english:
+            return "Today: \(formattedMinutes(minutes))"
+        case .arabic:
+            return "اليوم: \(formattedMinutes(minutes))"
+        }
+    }
+
+    private var noTodayDataText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין עדיין נתונים להיום"
+        case .english:
+            return "No data for today yet"
+        case .arabic:
+            return "لا توجد بيانات لليوم بعد"
+        }
+    }
+
+    private var learningText: String {
+        switch localization.language {
+        case .hebrew:
+            return "למידה"
+        case .english:
+            return "Learning"
+        case .arabic:
+            return "تعلّم"
+        }
+    }
+
+    private var chevronName: String {
+        switch localization.language {
+        case .english:
+            return "chevron.right"
+        case .hebrew, .arabic:
+            return "chevron.left"
+        }
     }
 }
 
@@ -256,11 +400,16 @@ private struct MemberGroupMemberDetailView: View {
     let member: TimeUpMember
     let viewingMember: TimeUpMember
 
-    @ObservedObject private var store = TimeUpStore.shared
+    @ObservedObject private var store =
+        TimeUpStore.shared
+
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
 
     @State private var selectedDays = 14
 
-    private let calendar = Calendar.current
+    private let calendar =
+        Calendar.current
 
     private let rangeOptions = [
         7,
@@ -358,7 +507,7 @@ private struct MemberGroupMemberDetailView: View {
                         .fontWeight(.bold)
 
                     if storedMember.id == viewingMember.id {
-                        Text("אתה")
+                        Text(youText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -366,12 +515,14 @@ private struct MemberGroupMemberDetailView: View {
 
                 if let target = storedMember.dailyTargetMinutes {
                     Text(
-                        "יעד נוכחי: \(formattedMinutes(target))"
+                        currentTargetText(
+                            target
+                        )
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 } else {
-                    Text("אין יעד נוכחי")
+                    Text(noCurrentTargetText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -393,18 +544,18 @@ private struct MemberGroupMemberDetailView: View {
             spacing: 10
         ) {
 
-            Text("טווח")
+            Text(rangeText)
                 .font(.headline)
 
             Picker(
-                "טווח",
+                rangeText,
                 selection: $selectedDays
             ) {
                 ForEach(
                     rangeOptions,
                     id: \.self
                 ) { days in
-                    Text("\(days) ימים")
+                    Text(daysText(days))
                         .tag(days)
                 }
             }
@@ -422,20 +573,20 @@ private struct MemberGroupMemberDetailView: View {
         HStack(spacing: 0) {
 
             summaryItem(
-                title: "ממוצע",
+                title: averageText,
                 value: averageUsage.map {
                     formattedMinutes($0)
-                } ?? "אין נתונים"
+                } ?? noDataText
             )
 
             Divider()
                 .frame(height: 54)
 
             summaryItem(
-                title: "עמידה ביעד",
+                title: targetSuccessText,
                 value: successRate.map {
                     "\(Int($0.rounded()))%"
-                } ?? "אין נתונים"
+                } ?? noDataText
             )
         }
         .padding(18)
@@ -471,7 +622,7 @@ private struct MemberGroupMemberDetailView: View {
             spacing: 14
         ) {
 
-            Text("זמן מסך מול יעד")
+            Text(screenTimeVsTargetText)
                 .font(.headline)
 
             if progressInRange.isEmpty {
@@ -484,16 +635,16 @@ private struct MemberGroupMemberDetailView: View {
 
                     LineMark(
                         x: .value(
-                            "תאריך",
+                            dateText,
                             progress.date
                         ),
                         y: .value(
-                            "זמן מסך",
+                            screenTimeText,
                             progress.usageMinutes
                         ),
                         series: .value(
-                            "סדרה",
-                            "זמן מסך"
+                            seriesText,
+                            screenTimeText
                         )
                     )
                     .foregroundStyle(
@@ -505,11 +656,11 @@ private struct MemberGroupMemberDetailView: View {
 
                     PointMark(
                         x: .value(
-                            "תאריך",
+                            dateText,
                             progress.date
                         ),
                         y: .value(
-                            "זמן מסך",
+                            screenTimeText,
                             progress.usageMinutes
                         )
                     )
@@ -520,16 +671,16 @@ private struct MemberGroupMemberDetailView: View {
                     if let target = progress.targetMinutes {
                         LineMark(
                             x: .value(
-                                "תאריך",
+                                dateText,
                                 progress.date
                             ),
                             y: .value(
-                                "יעד",
+                                targetLabelText,
                                 target
                             ),
                             series: .value(
-                                "סדרה",
-                                "יעד"
+                                seriesText,
+                                targetLabelText
                             )
                         )
                         .foregroundStyle(.secondary)
@@ -582,7 +733,7 @@ private struct MemberGroupMemberDetailView: View {
                 HStack(spacing: 18) {
 
                     Label(
-                        "זמן מסך",
+                        screenTimeText,
                         systemImage: "circle.fill"
                     )
                     .font(.caption)
@@ -591,7 +742,7 @@ private struct MemberGroupMemberDetailView: View {
                     )
 
                     Label(
-                        "יעד",
+                        targetLabelText,
                         systemImage: "minus"
                     )
                     .font(.caption)
@@ -613,13 +764,13 @@ private struct MemberGroupMemberDetailView: View {
             spacing: 0
         ) {
 
-            Text("היסטוריה")
+            Text(historyText)
                 .font(.headline)
                 .padding(.bottom, 12)
 
             if progressNewestFirst.isEmpty {
 
-                Text("אין נתונים בטווח שנבחר.")
+                Text(noDataInRangeText)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(
@@ -665,30 +816,31 @@ private struct MemberGroupMemberDetailView: View {
             ) {
 
                 Text(
-                    progress.date.formatted(
-                        date: .abbreviated,
-                        time: .omitted
+                    formattedDate(
+                        progress.date
                     )
                 )
                 .fontWeight(.semibold)
 
                 if progress.isLearningDay {
 
-                    Text("יום למידה")
+                    Text(learningDayText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                 } else if let target = progress.targetMinutes {
 
                     Text(
-                        "יעד: \(formattedMinutes(target))"
+                        targetText(
+                            target
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 } else {
 
-                    Text("אין יעד")
+                    Text(noTargetText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -724,7 +876,7 @@ private struct MemberGroupMemberDetailView: View {
 
         if progress.isLearningDay {
 
-            Text("למידה")
+            Text(learningText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -733,7 +885,7 @@ private struct MemberGroupMemberDetailView: View {
             if progress.usageMinutes <= target {
 
                 Label(
-                    "בתוך היעד",
+                    withinTargetText,
                     systemImage: "checkmark.circle.fill"
                 )
                 .font(.caption)
@@ -742,7 +894,7 @@ private struct MemberGroupMemberDetailView: View {
             } else {
 
                 Label(
-                    "מעל היעד",
+                    aboveTargetText,
                     systemImage: "xmark.circle.fill"
                 )
                 .font(.caption)
@@ -751,7 +903,7 @@ private struct MemberGroupMemberDetailView: View {
 
         } else {
 
-            Text("אין יעד")
+            Text(noTargetText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -811,20 +963,37 @@ private struct MemberGroupMemberDetailView: View {
             .font(.system(size: 36))
             .foregroundStyle(.secondary)
 
-            Text("אין נתונים")
+            Text(noDataText)
                 .font(.headline)
 
-            Text(
-                "אין נתוני זמן מסך בטווח שנבחר."
-            )
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            Text(noScreenTimeInRangeText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: 190)
     }
 
     // MARK: - Formatting
+
+    private func formattedDate(
+        _ date: Date
+    ) -> String {
+
+        let formatter =
+            DateFormatter()
+
+        formatter.locale =
+            localization.language.locale
+
+        formatter.setLocalizedDateFormatFromTemplate(
+            "dMMMyyyy"
+        )
+
+        return formatter.string(
+            from: date
+        )
+    }
 
     private func formattedMinutes(
         _ minutes: Int
@@ -834,15 +1003,41 @@ private struct MemberGroupMemberDetailView: View {
         let hours = safe / 60
         let remaining = safe % 60
 
-        if hours == 0 {
-            return "\(remaining) דק׳"
-        }
+        switch localization.language {
 
-        if remaining == 0 {
-            return "\(hours) שע׳"
-        }
+        case .hebrew:
+            if hours == 0 {
+                return "\(remaining) דק׳"
+            }
 
-        return "\(hours) שע׳ \(remaining) דק׳"
+            if remaining == 0 {
+                return "\(hours) שע׳"
+            }
+
+            return "\(hours) שע׳ \(remaining) דק׳"
+
+        case .english:
+            if hours == 0 {
+                return "\(remaining) min"
+            }
+
+            if remaining == 0 {
+                return "\(hours) hr"
+            }
+
+            return "\(hours) hr \(remaining) min"
+
+        case .arabic:
+            if hours == 0 {
+                return "\(remaining) د"
+            }
+
+            if remaining == 0 {
+                return "\(hours) س"
+            }
+
+            return "\(hours) س \(remaining) د"
+        }
     }
 
     private func shortTime(
@@ -850,16 +1045,38 @@ private struct MemberGroupMemberDetailView: View {
     ) -> String {
 
         if minutes < 60 {
-            return "\(minutes)ד׳"
+            switch localization.language {
+            case .hebrew:
+                return "\(minutes)ד׳"
+            case .english:
+                return "\(minutes)m"
+            case .arabic:
+                return "\(minutes)د"
+            }
         }
 
         let hours =
             Double(minutes) / 60
 
-        return String(
-            format: "%.1fש׳",
-            hours
-        )
+        switch localization.language {
+        case .hebrew:
+            return String(
+                format: "%.1fש׳",
+                hours
+            )
+
+        case .english:
+            return String(
+                format: "%.1fh",
+                hours
+            )
+
+        case .arabic:
+            return String(
+                format: "%.1fس",
+                hours
+            )
+        }
     }
 
     // MARK: - Card
@@ -872,5 +1089,201 @@ private struct MemberGroupMemberDetailView: View {
         .fill(
             Color.secondary.opacity(0.10)
         )
+    }
+
+    // MARK: - Localization
+
+    private var youText: String {
+        switch localization.language {
+        case .hebrew: return "אתה"
+        case .english: return "You"
+        case .arabic: return "أنت"
+        }
+    }
+
+    private func currentTargetText(
+        _ minutes: Int
+    ) -> String {
+        switch localization.language {
+        case .hebrew:
+            return "יעד נוכחי: \(formattedMinutes(minutes))"
+        case .english:
+            return "Current target: \(formattedMinutes(minutes))"
+        case .arabic:
+            return "الهدف الحالي: \(formattedMinutes(minutes))"
+        }
+    }
+
+    private var noCurrentTargetText: String {
+        switch localization.language {
+        case .hebrew: return "אין יעד נוכחי"
+        case .english: return "No current target"
+        case .arabic: return "لا يوجد هدف حالي"
+        }
+    }
+
+    private var rangeText: String {
+        switch localization.language {
+        case .hebrew: return "טווח"
+        case .english: return "Range"
+        case .arabic: return "النطاق"
+        }
+    }
+
+    private func daysText(
+        _ days: Int
+    ) -> String {
+        switch localization.language {
+        case .hebrew: return "\(days) ימים"
+        case .english: return "\(days) days"
+        case .arabic: return "\(days) أيام"
+        }
+    }
+
+    private var averageText: String {
+        switch localization.language {
+        case .hebrew: return "ממוצע"
+        case .english: return "Average"
+        case .arabic: return "المتوسط"
+        }
+    }
+
+    private var targetSuccessText: String {
+        switch localization.language {
+        case .hebrew: return "עמידה ביעד"
+        case .english: return "Target success"
+        case .arabic: return "تحقيق الهدف"
+        }
+    }
+
+    private var noDataText: String {
+        switch localization.language {
+        case .hebrew: return "אין נתונים"
+        case .english: return "No data"
+        case .arabic: return "لا توجد بيانات"
+        }
+    }
+
+    private var screenTimeVsTargetText: String {
+        switch localization.language {
+        case .hebrew: return "זמן מסך מול יעד"
+        case .english: return "Screen time vs. target"
+        case .arabic: return "وقت الشاشة مقابل الهدف"
+        }
+    }
+
+    private var dateText: String {
+        switch localization.language {
+        case .hebrew: return "תאריך"
+        case .english: return "Date"
+        case .arabic: return "التاريخ"
+        }
+    }
+
+    private var screenTimeText: String {
+        switch localization.language {
+        case .hebrew: return "זמן מסך"
+        case .english: return "Screen time"
+        case .arabic: return "وقت الشاشة"
+        }
+    }
+
+    private var seriesText: String {
+        switch localization.language {
+        case .hebrew: return "סדרה"
+        case .english: return "Series"
+        case .arabic: return "السلسلة"
+        }
+    }
+
+    private var targetLabelText: String {
+        switch localization.language {
+        case .hebrew: return "יעד"
+        case .english: return "Target"
+        case .arabic: return "الهدف"
+        }
+    }
+
+    private var historyText: String {
+        switch localization.language {
+        case .hebrew: return "היסטוריה"
+        case .english: return "History"
+        case .arabic: return "السجل"
+        }
+    }
+
+    private var noDataInRangeText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין נתונים בטווח שנבחר."
+        case .english:
+            return "There is no data in the selected range."
+        case .arabic:
+            return "لا توجد بيانات ضمن النطاق المحدد."
+        }
+    }
+
+    private var learningDayText: String {
+        switch localization.language {
+        case .hebrew: return "יום למידה"
+        case .english: return "Learning day"
+        case .arabic: return "يوم تعلّم"
+        }
+    }
+
+    private func targetText(
+        _ minutes: Int
+    ) -> String {
+        switch localization.language {
+        case .hebrew:
+            return "יעד: \(formattedMinutes(minutes))"
+        case .english:
+            return "Target: \(formattedMinutes(minutes))"
+        case .arabic:
+            return "الهدف: \(formattedMinutes(minutes))"
+        }
+    }
+
+    private var noTargetText: String {
+        switch localization.language {
+        case .hebrew: return "אין יעד"
+        case .english: return "No target"
+        case .arabic: return "لا يوجد هدف"
+        }
+    }
+
+    private var learningText: String {
+        switch localization.language {
+        case .hebrew: return "למידה"
+        case .english: return "Learning"
+        case .arabic: return "تعلّم"
+        }
+    }
+
+    private var withinTargetText: String {
+        switch localization.language {
+        case .hebrew: return "בתוך היעד"
+        case .english: return "Within target"
+        case .arabic: return "ضمن الهدف"
+        }
+    }
+
+    private var aboveTargetText: String {
+        switch localization.language {
+        case .hebrew: return "מעל היעד"
+        case .english: return "Above target"
+        case .arabic: return "فوق الهدف"
+        }
+    }
+
+    private var noScreenTimeInRangeText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין נתוני זמן מסך בטווח שנבחר."
+        case .english:
+            return "There is no screen-time data in the selected range."
+        case .arabic:
+            return "لا توجد بيانات وقت شاشة ضمن النطاق المحدد."
+        }
     }
 }
