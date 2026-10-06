@@ -107,32 +107,29 @@ struct MemberTabView: View {
 
             NavigationStack {
 
-                if let group =
-                    dataStore.activeMemberGroup {
+    if dataStore.activeMemberGroup != nil {
 
-                    remoteGroupView(
-                        group: group
-                    )
-                    .toolbar {
-                        profileToolbar
-                    }
-
-                } else {
-
-                    ContentUnavailableView(
-                        noActiveGroupTitle,
-                        systemImage:
-                            "person.3.sequence.fill",
-                        description:
-                            Text(
-                                noActiveGroupDescription
-                            )
-                    )
-                    .toolbar {
-                        profileToolbar
-                    }
-                }
+        MemberGroupView()
+            .toolbar {
+                profileToolbar
             }
+
+    } else {
+
+        ContentUnavailableView(
+            noActiveGroupTitle,
+            systemImage:
+                "person.3.sequence.fill",
+            description:
+                Text(
+                    noActiveGroupDescription
+                )
+        )
+        .toolbar {
+            profileToolbar
+        }
+    }
+}
             .tabItem {
 
                 Label(
