@@ -8,6 +8,9 @@ struct AppLockView: View {
     @ObservedObject private var store =
         TimeUpStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var isUnlocked = false
 
     @State private var isAuthenticating = false
@@ -81,13 +84,11 @@ struct AppLockView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text(
-                "יש לאמת את הזהות כדי להיכנס"
-            )
-            .font(.headline)
-            .multilineTextAlignment(
-                .center
-            )
+            Text(authenticationRequiredText)
+                .font(.headline)
+                .multilineTextAlignment(
+                    .center
+                )
 
             if !authenticationMessage.isEmpty {
 
@@ -125,8 +126,8 @@ struct AppLockView: View {
 
                     Text(
                         isAuthenticating
-                            ? "מאמת..."
-                            : "פתיחה עם Face ID"
+                            ? authenticatingText
+                            : unlockWithFaceIDText
                     )
                 }
                 .frame(
@@ -171,7 +172,7 @@ struct AppLockView: View {
         let context = LAContext()
 
         context.localizedCancelTitle =
-            "ביטול"
+            cancelText
 
         var error: NSError?
 
@@ -185,13 +186,13 @@ struct AppLockView: View {
             isAuthenticating = false
 
             authenticationMessage =
-                "לא ניתן להשתמש באימות המכשיר כרגע."
+                deviceAuthenticationUnavailableText
 
             return
         }
 
         let reason =
-            "אימות זהות לצורך כניסה ל-TimeUp"
+            authenticationReasonText
 
         context.evaluatePolicy(
             .deviceOwnerAuthentication,
@@ -224,31 +225,183 @@ struct AppLockView: View {
                              .appCancel:
 
                             authenticationMessage =
-                                "האימות בוטל."
+                                authenticationCancelledText
 
                         case .authenticationFailed:
 
                             authenticationMessage =
-                                "האימות לא הצליח. נסה שוב."
+                                authenticationFailedText
 
                         case .biometryLockout:
 
                             authenticationMessage =
-                                "Face ID נעול זמנית. ניתן להשתמש בקוד המכשיר."
+                                biometryLockoutText
 
                         default:
 
                             authenticationMessage =
-                                "לא ניתן היה להשלים את האימות."
+                                authenticationCouldNotCompleteText
                         }
 
                     } else {
 
                         authenticationMessage =
-                            "לא ניתן היה להשלים את האימות."
+                            authenticationCouldNotCompleteText
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Localization
+
+    private var authenticationRequiredText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "יש לאמת את הזהות כדי להיכנס"
+
+        case .english:
+            return "Authentication is required to continue"
+
+        case .arabic:
+            return "يجب التحقق من هويتك للمتابعة"
+        }
+    }
+
+    private var authenticatingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "מאמת..."
+
+        case .english:
+            return "Authenticating..."
+
+        case .arabic:
+            return "جارٍ التحقق..."
+        }
+    }
+
+    private var unlockWithFaceIDText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "פתיחה עם Face ID"
+
+        case .english:
+            return "Unlock with Face ID"
+
+        case .arabic:
+            return "فتح باستخدام Face ID"
+        }
+    }
+
+    private var cancelText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "ביטול"
+
+        case .english:
+            return "Cancel"
+
+        case .arabic:
+            return "إلغاء"
+        }
+    }
+
+    private var authenticationReasonText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אימות זהות לצורך כניסה ל-TimeUp"
+
+        case .english:
+            return "Authenticate to access TimeUp"
+
+        case .arabic:
+            return "تحقق من هويتك للدخول إلى TimeUp"
+        }
+    }
+
+    private var deviceAuthenticationUnavailableText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן להשתמש באימות המכשיר כרגע."
+
+        case .english:
+            return "Device authentication is currently unavailable."
+
+        case .arabic:
+            return "التحقق من هوية الجهاز غير متاح حاليًا."
+        }
+    }
+
+    private var authenticationCancelledText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "האימות בוטל."
+
+        case .english:
+            return "Authentication was cancelled."
+
+        case .arabic:
+            return "تم إلغاء التحقق."
+        }
+    }
+
+    private var authenticationFailedText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "האימות לא הצליח. נסה שוב."
+
+        case .english:
+            return "Authentication failed. Please try again."
+
+        case .arabic:
+            return "فشل التحقق. حاول مرة أخرى."
+        }
+    }
+
+    private var biometryLockoutText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "Face ID נעול זמנית. ניתן להשתמש בקוד המכשיר."
+
+        case .english:
+            return "Face ID is temporarily locked. You can use your device passcode."
+
+        case .arabic:
+            return "تم قفل Face ID مؤقتًا. يمكنك استخدام رمز دخول الجهاز."
+        }
+    }
+
+    private var authenticationCouldNotCompleteText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן היה להשלים את האימות."
+
+        case .english:
+            return "Authentication could not be completed."
+
+        case .arabic:
+            return "تعذر إكمال التحقق."
         }
     }
 }
