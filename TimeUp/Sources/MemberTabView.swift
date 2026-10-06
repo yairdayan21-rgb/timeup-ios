@@ -548,6 +548,24 @@ struct MemberTabView: View {
                     groupID: group.id
                 )
         }
+        .onChange(
+            of: localization.language
+        ) { _, _ in
+
+            guard let group =
+                dataStore.activeMemberGroup
+            else {
+                return
+            }
+
+            Task {
+
+                await alternativesStore
+                    .refreshLanguage(
+                        groupID: group.id
+                    )
+            }
+        }
         .refreshable {
 
             guard let group =
@@ -563,6 +581,11 @@ struct MemberTabView: View {
 
             await dataStore
                 .syncReportedScreenTime()
+
+            await alternativesStore
+                .loadAlternatives(
+                    groupID: group.id
+                )
 
             await alternativesStore
                 .loadGroupFeed(
@@ -756,7 +779,7 @@ struct MemberTabView: View {
                 }
 
                 Text(
-                    alternative.textHE
+                    alternative.alternativeText
                 )
                 .font(.body)
                 .foregroundStyle(
