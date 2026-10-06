@@ -8,6 +8,9 @@ struct FaceIDSetupView: View {
     @ObservedObject private var store =
         TimeUpStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var isAuthenticating = false
     @State private var errorMessage = ""
     @State private var setupCompleted = false
@@ -43,18 +46,16 @@ struct FaceIDSetupView: View {
 
             VStack(spacing: 10) {
 
-                Text("להגן על TimeUp?")
+                Text(protectTimeUpText)
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
 
-                Text(
-                    "אפשר להשתמש ב-Face ID כדי להגן על הכניסה לחשבון שלך."
-                )
-                .font(.headline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                Text(faceIDDescriptionText)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
 
             if !errorMessage.isEmpty {
@@ -89,8 +90,8 @@ struct FaceIDSetupView: View {
 
                     Text(
                         isAuthenticating
-                            ? "מאמת..."
-                            : "הפעל Face ID"
+                            ? authenticatingText
+                            : enableFaceIDText
                     )
                     .fontWeight(.semibold)
                 }
@@ -106,7 +107,7 @@ struct FaceIDSetupView: View {
 
             } label: {
 
-                Text("לא עכשיו")
+                Text(notNowText)
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
@@ -150,7 +151,7 @@ struct FaceIDSetupView: View {
         let context = LAContext()
 
         context.localizedCancelTitle =
-            "ביטול"
+            cancelText
 
         var error: NSError?
 
@@ -162,13 +163,13 @@ struct FaceIDSetupView: View {
             isAuthenticating = false
 
             errorMessage =
-                "לא ניתן להשתמש באימות המכשיר כרגע."
+                deviceAuthenticationUnavailableText
 
             return
         }
 
         let reason =
-            "הפעלת הגנה על TimeUp"
+            enableProtectionReasonText
 
         context.evaluatePolicy(
             .deviceOwnerAuthentication,
@@ -207,38 +208,38 @@ struct FaceIDSetupView: View {
                              .appCancel:
 
                             errorMessage =
-                                "האימות בוטל. אפשר לנסות שוב או לבחור לא עכשיו."
+                                authenticationCancelledText
 
                         case .authenticationFailed:
 
                             errorMessage =
-                                "האימות לא הצליח. נסה שוב."
+                                authenticationFailedText
 
                         case .biometryNotAvailable:
 
                             errorMessage =
-                                "Face ID אינו זמין במכשיר הזה."
+                                faceIDUnavailableText
 
                         case .biometryNotEnrolled:
 
                             errorMessage =
-                                "לא הוגדר Face ID במכשיר."
+                                faceIDNotEnrolledText
 
                         case .biometryLockout:
 
                             errorMessage =
-                                "Face ID נעול זמנית."
+                                faceIDLockedText
 
                         default:
 
                             errorMessage =
-                                "לא ניתן היה להשלים את האימות."
+                                authenticationCouldNotCompleteText
                         }
 
                     } else {
 
                         errorMessage =
-                            "לא ניתן היה להשלים את האימות."
+                            authenticationCouldNotCompleteText
                     }
                 }
             }
@@ -254,5 +255,217 @@ struct FaceIDSetupView: View {
         )
 
         setupCompleted = true
+    }
+
+    // MARK: - Localization
+
+    private var protectTimeUpText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "להגן על TimeUp?"
+
+        case .english:
+            return "Protect TimeUp?"
+
+        case .arabic:
+            return "هل تريد حماية TimeUp؟"
+        }
+    }
+
+    private var faceIDDescriptionText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אפשר להשתמש ב-Face ID כדי להגן על הכניסה לחשבון שלך."
+
+        case .english:
+            return "You can use Face ID to protect access to your account."
+
+        case .arabic:
+            return "يمكنك استخدام Face ID لحماية الوصول إلى حسابك."
+        }
+    }
+
+    private var authenticatingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "מאמת..."
+
+        case .english:
+            return "Authenticating..."
+
+        case .arabic:
+            return "جارٍ التحقق..."
+        }
+    }
+
+    private var enableFaceIDText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הפעל Face ID"
+
+        case .english:
+            return "Enable Face ID"
+
+        case .arabic:
+            return "تفعيل Face ID"
+        }
+    }
+
+    private var notNowText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא עכשיו"
+
+        case .english:
+            return "Not now"
+
+        case .arabic:
+            return "ليس الآن"
+        }
+    }
+
+    private var cancelText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "ביטול"
+
+        case .english:
+            return "Cancel"
+
+        case .arabic:
+            return "إلغاء"
+        }
+    }
+
+    private var enableProtectionReasonText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הפעלת הגנה על TimeUp"
+
+        case .english:
+            return "Enable protection for TimeUp"
+
+        case .arabic:
+            return "تفعيل الحماية لـ TimeUp"
+        }
+    }
+
+    private var deviceAuthenticationUnavailableText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן להשתמש באימות המכשיר כרגע."
+
+        case .english:
+            return "Device authentication is currently unavailable."
+
+        case .arabic:
+            return "التحقق من هوية الجهاز غير متاح حاليًا."
+        }
+    }
+
+    private var authenticationCancelledText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "האימות בוטל. אפשר לנסות שוב או לבחור לא עכשיו."
+
+        case .english:
+            return "Authentication was cancelled. You can try again or choose Not now."
+
+        case .arabic:
+            return "تم إلغاء التحقق. يمكنك المحاولة مرة أخرى أو اختيار ليس الآن."
+        }
+    }
+
+    private var authenticationFailedText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "האימות לא הצליח. נסה שוב."
+
+        case .english:
+            return "Authentication failed. Please try again."
+
+        case .arabic:
+            return "فشل التحقق. حاول مرة أخرى."
+        }
+    }
+
+    private var faceIDUnavailableText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "Face ID אינו זמין במכשיר הזה."
+
+        case .english:
+            return "Face ID is not available on this device."
+
+        case .arabic:
+            return "Face ID غير متاح على هذا الجهاز."
+        }
+    }
+
+    private var faceIDNotEnrolledText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא הוגדר Face ID במכשיר."
+
+        case .english:
+            return "Face ID has not been set up on this device."
+
+        case .arabic:
+            return "لم يتم إعداد Face ID على هذا الجهاز."
+        }
+    }
+
+    private var faceIDLockedText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "Face ID נעול זמנית."
+
+        case .english:
+            return "Face ID is temporarily locked."
+
+        case .arabic:
+            return "تم قفل Face ID مؤقتًا."
+        }
+    }
+
+    private var authenticationCouldNotCompleteText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן היה להשלים את האימות."
+
+        case .english:
+            return "Authentication could not be completed."
+
+        case .arabic:
+            return "تعذر إكمال التحقق."
+        }
     }
 }
