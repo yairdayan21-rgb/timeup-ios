@@ -11,6 +11,9 @@ struct AdminHomeView: View {
     @StateObject private var rankingStore =
         SupabaseRankingStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     var body: some View {
 
         NavigationStack {
@@ -38,7 +41,7 @@ struct AdminHomeView: View {
                                 )
                             )
 
-                        Text("ניהול הקבוצות שלך")
+                        Text(adminSubtitle)
                             .foregroundStyle(
                                 .secondary
                             )
@@ -67,13 +70,13 @@ struct AdminHomeView: View {
                                 spacing: 3
                             ) {
 
-                                Text("דירוג")
+                                Text(rankingText)
                                     .fontWeight(
                                         .semibold
                                     )
 
                                 Text(
-                                    "קבוצות ומשתמשים"
+                                    groupsAndUsersText
                                 )
                                 .font(.caption)
                                 .foregroundStyle(
@@ -85,7 +88,7 @@ struct AdminHomeView: View {
 
                             Image(
                                 systemName:
-                                    "chevron.left"
+                                    chevronName
                             )
                             .foregroundStyle(
                                 .secondary
@@ -123,7 +126,7 @@ struct AdminHomeView: View {
                             .font(.title2)
 
                             Text(
-                                "יצירת קבוצה חדשה"
+                                createGroupText
                             )
                             .fontWeight(
                                 .semibold
@@ -133,7 +136,7 @@ struct AdminHomeView: View {
 
                             Image(
                                 systemName:
-                                    "chevron.left"
+                                    chevronName
                             )
                             .foregroundStyle(
                                 .secondary
@@ -161,7 +164,7 @@ struct AdminHomeView: View {
                         spacing: 12
                     ) {
 
-                        Text("הקבוצות שלי")
+                        Text(myGroupsText)
                             .font(
                                 .title3.bold()
                             )
@@ -174,7 +177,7 @@ struct AdminHomeView: View {
                                 Spacer()
 
                                 ProgressView(
-                                    "טוען קבוצות..."
+                                    loadingGroupsText
                                 )
 
                                 Spacer()
@@ -188,12 +191,12 @@ struct AdminHomeView: View {
                             dataStore.groups.isEmpty {
 
                             ContentUnavailableView(
-                                "עדיין אין קבוצות",
+                                noGroupsTitle,
                                 systemImage:
                                     "person.3",
                                 description:
                                     Text(
-                                        "צור את הקבוצה הראשונה שלך כדי להתחיל."
+                                        noGroupsDescription
                                     )
                             )
                             .frame(
@@ -228,7 +231,7 @@ struct AdminHomeView: View {
                         ) {
 
                             Label(
-                                "לא ניתן לטעון את הנתונים",
+                                unableToLoadDataText,
                                 systemImage:
                                     "exclamationmark.triangle"
                             )
@@ -243,7 +246,7 @@ struct AdminHomeView: View {
                                 )
 
                             Button(
-                                "נסה שוב"
+                                retryText
                             ) {
 
                                 Task {
@@ -303,6 +306,9 @@ struct AdminHomeView: View {
                                 "arrow.clockwise"
                         )
                     }
+                    .accessibilityLabel(
+                        refreshText
+                    )
                 }
             }
             .navigationDestination(
@@ -352,7 +358,7 @@ struct AdminHomeView: View {
                     Text(group.name)
                         .font(.headline)
 
-                    Text("קוד קבוצה")
+                    Text(groupCodeText)
                         .font(.caption)
                         .foregroundStyle(
                             .secondary
@@ -410,7 +416,9 @@ struct AdminHomeView: View {
                     "manual" {
 
                     Text(
-                        "\(group.successDays ?? 7) ימים"
+                        daysText(
+                            group.successDays ?? 7
+                        )
                     )
                     .foregroundStyle(
                         .secondary
@@ -441,21 +449,266 @@ struct AdminHomeView: View {
 
         case "personal_percentage":
 
-            return
-                "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
+            switch localization.language {
+
+            case .hebrew:
+                return "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
+
+            case .english:
+                return "\(group.reductionPercent ?? 0)% less than the previous day"
+
+            case .arabic:
+                return "أقل بنسبة \(group.reductionPercent ?? 0)% من اليوم السابق"
+            }
 
         case "group_average_percentage":
 
-            return
-                "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
+            switch localization.language {
+
+            case .hebrew:
+                return "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
+
+            case .english:
+                return "\(group.reductionPercent ?? 0)% less than the group average"
+
+            case .arabic:
+                return "أقل بنسبة \(group.reductionPercent ?? 0)% من متوسط المجموعة"
+            }
 
         case "manual":
 
-            return "יעד אישי"
+            switch localization.language {
+
+            case .hebrew:
+                return "יעד אישי"
+
+            case .english:
+                return "Personal target"
+
+            case .arabic:
+                return "هدف شخصي"
+            }
 
         default:
 
-            return "יעד קבוצה"
+            switch localization.language {
+
+            case .hebrew:
+                return "יעד קבוצה"
+
+            case .english:
+                return "Group target"
+
+            case .arabic:
+                return "هدف المجموعة"
+            }
+        }
+    }
+
+    // MARK: - Localization
+
+    private var chevronName: String {
+        localization.language == .english
+            ? "chevron.right"
+            : "chevron.left"
+    }
+
+    private var adminSubtitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "ניהול הקבוצות שלך"
+
+        case .english:
+            return "Manage your groups"
+
+        case .arabic:
+            return "إدارة مجموعاتك"
+        }
+    }
+
+    private var rankingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "דירוג"
+
+        case .english:
+            return "Ranking"
+
+        case .arabic:
+            return "الترتيب"
+        }
+    }
+
+    private var groupsAndUsersText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "קבוצות ומשתמשים"
+
+        case .english:
+            return "Groups and users"
+
+        case .arabic:
+            return "المجموعات والمستخدمون"
+        }
+    }
+
+    private var createGroupText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "יצירת קבוצה חדשה"
+
+        case .english:
+            return "Create a new group"
+
+        case .arabic:
+            return "إنشاء مجموعة جديدة"
+        }
+    }
+
+    private var myGroupsText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הקבוצות שלי"
+
+        case .english:
+            return "My groups"
+
+        case .arabic:
+            return "مجموعاتي"
+        }
+    }
+
+    private var loadingGroupsText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "טוען קבוצות..."
+
+        case .english:
+            return "Loading groups..."
+
+        case .arabic:
+            return "جارٍ تحميل المجموعات..."
+        }
+    }
+
+    private var noGroupsTitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "עדיין אין קבוצות"
+
+        case .english:
+            return "No groups yet"
+
+        case .arabic:
+            return "لا توجد مجموعات بعد"
+        }
+    }
+
+    private var noGroupsDescription: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "צור את הקבוצה הראשונה שלך כדי להתחיל."
+
+        case .english:
+            return "Create your first group to get started."
+
+        case .arabic:
+            return "أنشئ مجموعتك الأولى للبدء."
+        }
+    }
+
+    private var unableToLoadDataText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן לטעון את הנתונים"
+
+        case .english:
+            return "Unable to load data"
+
+        case .arabic:
+            return "تعذر تحميل البيانات"
+        }
+    }
+
+    private var retryText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "נסה שוב"
+
+        case .english:
+            return "Try again"
+
+        case .arabic:
+            return "حاول مرة أخرى"
+        }
+    }
+
+    private var refreshText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "רענון"
+
+        case .english:
+            return "Refresh"
+
+        case .arabic:
+            return "تحديث"
+        }
+    }
+
+    private var groupCodeText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "קוד קבוצה"
+
+        case .english:
+            return "Group code"
+
+        case .arabic:
+            return "رمز المجموعة"
+        }
+    }
+
+    private func daysText(
+        _ days: Int
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "\(days) ימים"
+
+        case .english:
+            return days == 1
+                ? "1 day"
+                : "\(days) days"
+
+        case .arabic:
+            return "\(days) يوم"
         }
     }
 }
@@ -465,15 +718,22 @@ struct AdminHomeView: View {
 private struct AdminRankingView: View {
 
     private enum RankingTab:
-        String,
         CaseIterable,
         Identifiable {
 
-        case groups = "קבוצות"
-        case users = "משתמשים"
+        case groups
+        case users
 
         var id: String {
-            rawValue
+
+            switch self {
+
+            case .groups:
+                return "groups"
+
+            case .users:
+                return "users"
+            }
         }
     }
 
@@ -486,6 +746,9 @@ private struct AdminRankingView: View {
     @StateObject private var dataStore =
         SupabaseDataStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     var body: some View {
 
         VStack(
@@ -493,7 +756,7 @@ private struct AdminRankingView: View {
         ) {
 
             Picker(
-                "סוג דירוג",
+                rankingTypeText,
                 selection:
                     $selectedTab
             ) {
@@ -502,8 +765,12 @@ private struct AdminRankingView: View {
                     RankingTab.allCases
                 ) { tab in
 
-                    Text(tab.rawValue)
-                        .tag(tab)
+                    Text(
+                        title(
+                            for: tab
+                        )
+                    )
+                    .tag(tab)
                 }
             }
             .pickerStyle(
@@ -530,7 +797,7 @@ private struct AdminRankingView: View {
             }
         }
         .navigationTitle(
-            "דירוג"
+            rankingText
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -553,20 +820,20 @@ private struct AdminRankingView: View {
 
             loadingView(
                 text:
-                    "טוען דירוג קבוצות..."
+                    loadingGroupRankingText
             )
 
         } else if
             rankingStore.groupRankings.isEmpty {
 
             ContentUnavailableView(
-                "אין עדיין דירוג קבוצות",
+                noGroupRankingTitle,
                 systemImage:
                     "trophy",
                 description:
                     Text(
                         rankingStore.lastError ??
-                        "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
+                        noGroupRankingDescription
                     )
             )
 
@@ -616,20 +883,20 @@ private struct AdminRankingView: View {
 
             loadingView(
                 text:
-                    "טוען דירוג משתמשים..."
+                    loadingUserRankingText
             )
 
         } else if
             rankingStore.userRankings.isEmpty {
 
             ContentUnavailableView(
-                "אין עדיין דירוג משתמשים",
+                noUserRankingTitle,
                 systemImage:
                     "person.2",
                 description:
                     Text(
                         rankingStore.userRankingError ??
-                        "הדירוג יופיע כאשר יהיו נתוני שימוש למשתמשים."
+                        noUserRankingDescription
                     )
             )
 
@@ -706,7 +973,7 @@ private struct AdminRankingView: View {
 
                     if isMyGroup {
 
-                        Text("שלי")
+                        Text(myGroupText)
                             .font(
                                 .caption2
                             )
@@ -734,7 +1001,9 @@ private struct AdminRankingView: View {
                 ) {
 
                     Label(
-                        "\(ranking.currentStreak) ימים",
+                        daysText(
+                            ranking.currentStreak
+                        ),
                         systemImage:
                             "flame.fill"
                     )
@@ -808,7 +1077,7 @@ private struct AdminRankingView: View {
 
                 Text(
                     ranking.displayName ??
-                    "משתמש"
+                    genericUserText
                 )
                 .font(.headline)
 
@@ -817,7 +1086,9 @@ private struct AdminRankingView: View {
                 ) {
 
                     Label(
-                        "\(ranking.personalStreak) ימים",
+                        daysText(
+                            ranking.personalStreak
+                        ),
                         systemImage:
                             "flame.fill"
                     )
@@ -947,19 +1218,250 @@ private struct AdminRankingView: View {
         let remainingMinutes =
             totalMinutes % 60
 
-        if hours == 0 {
+        switch localization.language {
 
-            return
-                "\(remainingMinutes) דק׳"
+        case .hebrew:
+
+            if hours == 0 {
+                return "\(remainingMinutes) דק׳"
+            }
+
+            if remainingMinutes == 0 {
+                return "\(hours) שע׳"
+            }
+
+            return "\(hours) שע׳ \(remainingMinutes) דק׳"
+
+        case .english:
+
+            if hours == 0 {
+                return "\(remainingMinutes) min"
+            }
+
+            if remainingMinutes == 0 {
+                return "\(hours) hr"
+            }
+
+            return "\(hours) hr \(remainingMinutes) min"
+
+        case .arabic:
+
+            if hours == 0 {
+                return "\(remainingMinutes) د"
+            }
+
+            if remainingMinutes == 0 {
+                return "\(hours) س"
+            }
+
+            return "\(hours) س \(remainingMinutes) د"
         }
+    }
 
-        if remainingMinutes == 0 {
+    // MARK: - Localization
 
-            return
-                "\(hours) שע׳"
+    private func title(
+        for tab: RankingTab
+    ) -> String {
+
+        switch tab {
+
+        case .groups:
+
+            switch localization.language {
+
+            case .hebrew:
+                return "קבוצות"
+
+            case .english:
+                return "Groups"
+
+            case .arabic:
+                return "المجموعات"
+            }
+
+        case .users:
+
+            switch localization.language {
+
+            case .hebrew:
+                return "משתמשים"
+
+            case .english:
+                return "Users"
+
+            case .arabic:
+                return "المستخدمون"
+            }
         }
+    }
 
-        return
-            "\(hours) שע׳ \(remainingMinutes) דק׳"
+    private var rankingTypeText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "סוג דירוג"
+
+        case .english:
+            return "Ranking type"
+
+        case .arabic:
+            return "نوع الترتيب"
+        }
+    }
+
+    private var rankingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "דירוג"
+
+        case .english:
+            return "Ranking"
+
+        case .arabic:
+            return "الترتيب"
+        }
+    }
+
+    private var loadingGroupRankingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "טוען דירוג קבוצות..."
+
+        case .english:
+            return "Loading group ranking..."
+
+        case .arabic:
+            return "جارٍ تحميل ترتيب المجموعات..."
+        }
+    }
+
+    private var noGroupRankingTitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אין עדיין דירוג קבוצות"
+
+        case .english:
+            return "No group ranking yet"
+
+        case .arabic:
+            return "لا يوجد ترتيب للمجموعات بعد"
+        }
+    }
+
+    private var noGroupRankingDescription: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
+
+        case .english:
+            return "The ranking will appear when group data is available."
+
+        case .arabic:
+            return "سيظهر الترتيب عند توفر بيانات للمجموعات."
+        }
+    }
+
+    private var loadingUserRankingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "טוען דירוג משתמשים..."
+
+        case .english:
+            return "Loading user ranking..."
+
+        case .arabic:
+            return "جارٍ تحميل ترتيب المستخدمين..."
+        }
+    }
+
+    private var noUserRankingTitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אין עדיין דירוג משתמשים"
+
+        case .english:
+            return "No user ranking yet"
+
+        case .arabic:
+            return "لا يوجد ترتيب للمستخدمين بعد"
+        }
+    }
+
+    private var noUserRankingDescription: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הדירוג יופיע כאשר יהיו נתוני שימוש למשתמשים."
+
+        case .english:
+            return "The ranking will appear when user activity data is available."
+
+        case .arabic:
+            return "سيظهر الترتيب عند توفر بيانات استخدام للمستخدمين."
+        }
+    }
+
+    private var myGroupText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "שלי"
+
+        case .english:
+            return "Mine"
+
+        case .arabic:
+            return "مجموعتي"
+        }
+    }
+
+    private var genericUserText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "משתמש"
+
+        case .english:
+            return "User"
+
+        case .arabic:
+            return "مستخدم"
+        }
+    }
+
+    private func daysText(
+        _ days: Int
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "\(days) ימים"
+
+        case .english:
+            return days == 1
+                ? "1 day"
+                : "\(days) days"
+
+        case .arabic:
+            return "\(days) يوم"
+        }
     }
 }
