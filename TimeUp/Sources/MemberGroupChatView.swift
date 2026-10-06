@@ -10,6 +10,9 @@ struct MemberGroupChatView: View {
     @StateObject private var chatStore =
         SupabaseChatStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var messageText = ""
     @State private var sendError: String?
 
@@ -39,8 +42,12 @@ struct MemberGroupChatView: View {
 
             composer
         }
-        .navigationTitle("צ׳אט קבוצתי")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(
+            groupChatTitle
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
 
         // MARK: - Load + Read State + Realtime
 
@@ -69,7 +76,7 @@ struct MemberGroupChatView: View {
         // MARK: - Send Error
 
         .alert(
-            "לא ניתן לשלוח הודעה",
+            sendErrorTitle,
             isPresented: Binding(
                 get: {
                     sendError != nil
@@ -83,7 +90,9 @@ struct MemberGroupChatView: View {
             )
         ) {
 
-            Button("אישור") {
+            Button(
+                okText
+            ) {
 
                 sendError = nil
             }
@@ -114,9 +123,12 @@ struct MemberGroupChatView: View {
                         messages.isEmpty {
 
                         ProgressView(
-                            "טוען הודעות..."
+                            loadingMessagesText
                         )
-                        .padding(.top, 40)
+                        .padding(
+                            .top,
+                            40
+                        )
 
                     } else if messages.isEmpty {
 
@@ -124,10 +136,16 @@ struct MemberGroupChatView: View {
 
                     } else {
 
-                        ForEach(messages) { message in
+                        ForEach(
+                            messages
+                        ) { message in
 
-                            messageRow(message)
-                                .id(message.id)
+                            messageRow(
+                                message
+                            )
+                            .id(
+                                message.id
+                            )
                         }
                     }
 
@@ -136,7 +154,9 @@ struct MemberGroupChatView: View {
 
                         Text(error)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(
+                                .red
+                            )
                             .padding()
                     }
                 }
@@ -149,7 +169,6 @@ struct MemberGroupChatView: View {
                     12
                 )
             }
-
             .onAppear {
 
                 scrollToBottom(
@@ -157,7 +176,6 @@ struct MemberGroupChatView: View {
                     animated: false
                 )
             }
-
             .onChange(
                 of: messages.count
             ) { _, _ in
@@ -174,24 +192,34 @@ struct MemberGroupChatView: View {
 
     private var chatHeader: some View {
 
-        VStack(spacing: 6) {
+        VStack(
+            spacing: 6
+        ) {
 
             Image(
                 systemName:
                     "person.3.fill"
             )
             .font(
-                .system(size: 34)
+                .system(
+                    size: 34
+                )
             )
             .foregroundStyle(
                 Color.accentColor
             )
 
-            Text(group.name)
-                .font(.headline)
+            Text(
+                group.name
+            )
+            .font(.headline)
 
             Text(
-                "\(dataStore.groupMembers.count) חברים בקבוצה"
+                groupMembersCountText(
+                    dataStore
+                        .groupMembers
+                        .count
+                )
             )
             .font(.caption)
             .foregroundStyle(
@@ -211,7 +239,9 @@ struct MemberGroupChatView: View {
 
     private var emptyChat: some View {
 
-        VStack(spacing: 10) {
+        VStack(
+            spacing: 10
+        ) {
 
             Spacer()
                 .frame(
@@ -223,17 +253,21 @@ struct MemberGroupChatView: View {
                     "bubble.left.and.bubble.right"
             )
             .font(
-                .system(size: 42)
+                .system(
+                    size: 42
+                )
             )
             .foregroundStyle(
                 .secondary
             )
 
-            Text("הצ׳אט עדיין ריק")
-                .font(.headline)
+            Text(
+                emptyChatTitle
+            )
+            .font(.headline)
 
             Text(
-                "שלחו את ההודעה הראשונה לקבוצה."
+                emptyChatDescription
             )
             .font(.subheadline)
             .foregroundStyle(
@@ -318,6 +352,9 @@ struct MemberGroupChatView: View {
                         ? Color.white
                         : Color.primary
                 )
+                .multilineTextAlignment(
+                    .leading
+                )
                 .padding(
                     .horizontal,
                     13
@@ -341,11 +378,9 @@ struct MemberGroupChatView: View {
                 }
 
                 Text(
-                    message.createdAt
-                        .formatted(
-                            date: .omitted,
-                            time: .shortened
-                        )
+                    formattedMessageTime(
+                        message.createdAt
+                    )
                 )
                 .font(.caption2)
                 .foregroundStyle(
@@ -381,7 +416,7 @@ struct MemberGroupChatView: View {
             return
                 currentUser?
                     .displayName ??
-                "אתה"
+                youText
         }
 
         if let member =
@@ -396,10 +431,10 @@ struct MemberGroupChatView: View {
 
             return
                 member.displayName ??
-                "חבר קבוצה"
+                groupMemberText
         }
 
-        return "חבר קבוצה"
+        return groupMemberText
     }
 
     // MARK: - Avatar
@@ -470,7 +505,7 @@ struct MemberGroupChatView: View {
         ) {
 
             TextField(
-                "הודעה לקבוצה...",
+                messagePlaceholder,
                 text: $messageText,
                 axis: .vertical
             )
@@ -525,7 +560,9 @@ struct MemberGroupChatView: View {
                             "arrow.up.circle.fill"
                     )
                     .font(
-                        .system(size: 34)
+                        .system(
+                            size: 34
+                        )
                     )
                     .foregroundStyle(
                         canSend
@@ -540,6 +577,9 @@ struct MemberGroupChatView: View {
             .disabled(
                 !canSend ||
                 chatStore.isSending
+            )
+            .accessibilityLabel(
+                sendText
             )
         }
         .padding(
@@ -583,7 +623,7 @@ struct MemberGroupChatView: View {
         else {
 
             sendError =
-                "המשתמש לא נטען."
+                userNotLoadedText
 
             return
         }
@@ -736,6 +776,217 @@ struct MemberGroupChatView: View {
                 lastMessage.id,
                 anchor: .bottom
             )
+        }
+    }
+
+    // MARK: - Formatting
+
+    private func formattedMessageTime(
+        _ date: Date
+    ) -> String {
+
+        let formatter =
+            DateFormatter()
+
+        formatter.locale =
+            localization
+                .language
+                .locale
+
+        formatter.timeStyle =
+            .short
+
+        formatter.dateStyle =
+            .none
+
+        return formatter.string(
+            from: date
+        )
+    }
+
+    private func groupMembersCountText(
+        _ count: Int
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "\(count) חברים בקבוצה"
+
+        case .english:
+            return count == 1
+                ? "1 member in the group"
+                : "\(count) members in the group"
+
+        case .arabic:
+            return "\(count) أعضاء في المجموعة"
+        }
+    }
+
+    // MARK: - Localization
+
+    private var groupChatTitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "צ׳אט קבוצתי"
+
+        case .english:
+            return "Group Chat"
+
+        case .arabic:
+            return "دردشة المجموعة"
+        }
+    }
+
+    private var sendErrorTitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן לשלוח הודעה"
+
+        case .english:
+            return "Unable to Send Message"
+
+        case .arabic:
+            return "تعذر إرسال الرسالة"
+        }
+    }
+
+    private var okText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אישור"
+
+        case .english:
+            return "OK"
+
+        case .arabic:
+            return "موافق"
+        }
+    }
+
+    private var loadingMessagesText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "טוען הודעות..."
+
+        case .english:
+            return "Loading messages..."
+
+        case .arabic:
+            return "جارٍ تحميل الرسائل..."
+        }
+    }
+
+    private var emptyChatTitle: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הצ׳אט עדיין ריק"
+
+        case .english:
+            return "The Chat Is Empty"
+
+        case .arabic:
+            return "الدردشة فارغة"
+        }
+    }
+
+    private var emptyChatDescription: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "שלחו את ההודעה הראשונה לקבוצה."
+
+        case .english:
+            return "Send the first message to the group."
+
+        case .arabic:
+            return "أرسل أول رسالة إلى المجموعة."
+        }
+    }
+
+    private var messagePlaceholder: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הודעה לקבוצה..."
+
+        case .english:
+            return "Message the group..."
+
+        case .arabic:
+            return "رسالة إلى المجموعة..."
+        }
+    }
+
+    private var sendText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "שלח הודעה"
+
+        case .english:
+            return "Send Message"
+
+        case .arabic:
+            return "إرسال الرسالة"
+        }
+    }
+
+    private var youText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אתה"
+
+        case .english:
+            return "You"
+
+        case .arabic:
+            return "أنت"
+        }
+    }
+
+    private var groupMemberText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "חבר קבוצה"
+
+        case .english:
+            return "Group Member"
+
+        case .arabic:
+            return "عضو في المجموعة"
+        }
+    }
+
+    private var userNotLoadedText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "המשתמש לא נטען."
+
+        case .english:
+            return "The user could not be loaded."
+
+        case .arabic:
+            return "تعذر تحميل المستخدم."
         }
     }
 }
