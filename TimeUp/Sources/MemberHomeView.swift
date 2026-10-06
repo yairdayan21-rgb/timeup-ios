@@ -9,8 +9,10 @@ struct MemberHomeView: View {
     @StateObject private var store =
         TimeUpStore.shared
 
-    @State private var statusText =
-        "זמן המסך עדיין לא מחובר"
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
+    @State private var statusText = ""
 
     @State private var isRequestingAuthorization =
         false
@@ -40,7 +42,7 @@ struct MemberHomeView: View {
                 ) {
 
                     Text(
-                        "שלום, \(currentMember.displayName)"
+                        greetingText
                     )
                     .font(
                         .system(
@@ -50,12 +52,10 @@ struct MemberHomeView: View {
                         )
                     )
 
-                    Text(
-                        "זה היום שלך ב-TimeUp"
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    Text(todaySubtitleText)
+                        .foregroundStyle(
+                            .secondary
+                        )
                 }
 
                 // MARK: - Daily Status
@@ -66,7 +66,7 @@ struct MemberHomeView: View {
                         value:
                             "\(currentStreak)",
                         title:
-                            "רצף",
+                            streakText,
                         icon:
                             "flame.fill"
                     )
@@ -75,7 +75,7 @@ struct MemberHomeView: View {
                         value:
                             yesterdayStatusText,
                         title:
-                            "אתמול",
+                            yesterdayText,
                         icon:
                             yesterdayStatusIcon
                     )
@@ -84,7 +84,7 @@ struct MemberHomeView: View {
                         value:
                             "\(completedDaysCount)",
                         title:
-                            "ימים",
+                            daysText,
                         icon:
                             "calendar"
                     )
@@ -100,21 +100,21 @@ struct MemberHomeView: View {
                     ) {
 
                         Label(
-                            "יום למידה",
+                            learningDayText,
                             systemImage:
                                 "brain.head.profile"
                         )
                         .font(.headline)
 
                         Text(
-                            "TimeUp אוסף נתוני שימוש כדי לבנות את היעד הראשון שלך."
+                            learningDayDescriptionText
                         )
                         .foregroundStyle(
                             .secondary
                         )
 
                         Text(
-                            "היום הזה לא נחשב הצלחה או כישלון ולא מאפס את הרצף."
+                            learningDayStreakDescriptionText
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -144,7 +144,7 @@ struct MemberHomeView: View {
                 ) {
 
                     Label(
-                        "זמן מסך היום",
+                        screenTimeTodayText,
                         systemImage:
                             "hourglass"
                     )
@@ -162,7 +162,7 @@ struct MemberHomeView: View {
                     )
 
                     Text(
-                        "זמן המסך מתעדכן אוטומטית במהלך היום."
+                        screenTimeUpdatesAutomaticallyText
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -198,7 +198,7 @@ struct MemberHomeView: View {
                 ) {
 
                     Label(
-                        "היעד שלך",
+                        yourTargetText,
                         systemImage:
                             "target"
                     )
@@ -225,7 +225,9 @@ struct MemberHomeView: View {
                             target {
 
                             Text(
-                                "נשארו \(formattedRemaining(target)) עד ליעד"
+                                remainingUntilTargetText(
+                                    target
+                                )
                             )
                             .foregroundStyle(
                                 .secondary
@@ -234,7 +236,7 @@ struct MemberHomeView: View {
                         } else {
 
                             Text(
-                                "היעד היומי עבר"
+                                dailyTargetExceededText
                             )
                             .foregroundStyle(
                                 .red
@@ -265,14 +267,14 @@ struct MemberHomeView: View {
                         isCurrentLearningPhase {
 
                         Text(
-                            "היעד הראשון ייקבע לאחר יום הלמידה."
+                            firstTargetAfterLearningDayText
                         )
                         .fontWeight(
                             .semibold
                         )
 
                         Text(
-                            "בינתיים TimeUp מודד את זמן המסך שלך כרגיל."
+                            measuringNormallyText
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -282,14 +284,14 @@ struct MemberHomeView: View {
                     } else {
 
                         Text(
-                            "עדיין לא נקבע יעד יומי."
+                            noDailyTargetText
                         )
                         .foregroundStyle(
                             .secondary
                         )
 
                         Text(
-                            "TimeUp יתחיל למדוד את היעד ברגע שיוגדר."
+                            targetMeasurementStartText
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -317,7 +319,7 @@ struct MemberHomeView: View {
                     ) {
 
                         Label(
-                            "סיכום היום האחרון",
+                            lastDaySummaryText,
                             systemImage:
                                 "clock.arrow.circlepath"
                         )
@@ -326,7 +328,7 @@ struct MemberHomeView: View {
                         HStack {
 
                             Text(
-                                "זמן מסך"
+                                screenTimeText
                             )
 
                             Spacer()
@@ -349,7 +351,7 @@ struct MemberHomeView: View {
                             HStack {
 
                                 Text(
-                                    "יעד"
+                                    targetText
                                 )
 
                                 Spacer()
@@ -371,7 +373,7 @@ struct MemberHomeView: View {
                             .isLearningDay {
 
                             Label(
-                                "יום למידה הושלם",
+                                learningDayCompletedText,
                                 systemImage:
                                     "brain.head.profile"
                             )
@@ -384,7 +386,7 @@ struct MemberHomeView: View {
                                 .achieved {
 
                             Label(
-                                "עמדת ביעד",
+                                targetAchievedText,
                                 systemImage:
                                     "checkmark.circle.fill"
                             )
@@ -398,7 +400,7 @@ struct MemberHomeView: View {
                         } else {
 
                             Label(
-                                "היעד לא הושג",
+                                targetNotAchievedText,
                                 systemImage:
                                     "xmark.circle.fill"
                             )
@@ -438,10 +440,10 @@ struct MemberHomeView: View {
 
                         Text(
                             isRequestingAuthorization
-                            ? "מתחבר..."
-                            : hasScreenTimeAuthorization
-                                ? "זמן המסך מחובר"
-                                : "חבר את זמן המסך"
+                                ? connectingText
+                                : hasScreenTimeAuthorization
+                                    ? screenTimeConnectedText
+                                    : connectScreenTimeText
                         )
                         .fontWeight(
                             .semibold
@@ -478,12 +480,12 @@ struct MemberHomeView: View {
                 ) {
 
                     Text(
-                        "הקבוצה שלך"
+                        yourGroupText
                     )
                     .font(.headline)
 
                     Text(
-                        "קוד קבוצה: \(groupCode)"
+                        groupCodeText
                     )
                     .font(
                         .system(
@@ -535,6 +537,13 @@ struct MemberHomeView: View {
 
                 startScreenTimeMonitoring()
             }
+        }
+
+        .onChange(
+            of: localization.language
+        ) { _, _ in
+
+            refreshAuthorizationStatus()
         }
 
         // MARK: - Live Usage Refresh
@@ -624,12 +633,12 @@ struct MemberHomeView: View {
         }
 
         if progress.isLearningDay {
-            return "למידה"
+            return learningText
         }
 
         return progress.achieved
-            ? "הצלחה"
-            : "לא הושג"
+            ? successText
+            : notAchievedText
     }
 
     private var yesterdayStatusIcon:
@@ -704,27 +713,71 @@ struct MemberHomeView: View {
         _ minutes: Int
     ) -> String {
 
+        let safeMinutes =
+            max(minutes, 0)
+
         let hours =
-            minutes / 60
+            safeMinutes / 60
 
         let remainingMinutes =
-            minutes % 60
+            safeMinutes % 60
 
-        if hours > 0 &&
-            remainingMinutes > 0 {
+        switch localization.language {
+
+        case .hebrew:
+
+            if hours > 0 &&
+                remainingMinutes > 0 {
+
+                return
+                    "\(hours) ש׳ \(remainingMinutes) דק׳"
+            }
+
+            if hours > 0 {
+
+                return
+                    "\(hours) ש׳"
+            }
 
             return
-                "\(hours) ש׳ \(remainingMinutes) דק׳"
-        }
+                "\(remainingMinutes) דק׳"
 
-        if hours > 0 {
+        case .english:
+
+            if hours > 0 &&
+                remainingMinutes > 0 {
+
+                return
+                    "\(hours) hr \(remainingMinutes) min"
+            }
+
+            if hours > 0 {
+
+                return
+                    "\(hours) hr"
+            }
 
             return
-                "\(hours) ש׳"
-        }
+                "\(remainingMinutes) min"
 
-        return
-            "\(remainingMinutes) דק׳"
+        case .arabic:
+
+            if hours > 0 &&
+                remainingMinutes > 0 {
+
+                return
+                    "\(hours) س \(remainingMinutes) د"
+            }
+
+            if hours > 0 {
+
+                return
+                    "\(hours) س"
+            }
+
+            return
+                "\(remainingMinutes) د"
+        }
     }
 
     // MARK: - Status Card
@@ -843,7 +896,7 @@ struct MemberHomeView: View {
         if hasScreenTimeAuthorization {
 
             statusText =
-                "זמן המסך מחובר ✓"
+                screenTimeConnectedCheckText
 
         } else if
             AuthorizationCenter.shared
@@ -851,7 +904,7 @@ struct MemberHomeView: View {
             .denied {
 
             statusText =
-                "הגישה לזמן המסך נדחתה"
+                screenTimeAccessDeniedText
 
         } else if
             AuthorizationCenter.shared
@@ -859,12 +912,12 @@ struct MemberHomeView: View {
             .notDetermined {
 
             statusText =
-                "נדרש אישור לזמן מסך"
+                screenTimePermissionRequiredText
 
         } else {
 
             statusText =
-                "סטטוס זמן מסך לא ידוע"
+                unknownScreenTimeStatusText
         }
     }
 
@@ -911,7 +964,7 @@ struct MemberHomeView: View {
         } catch {
 
             statusText =
-                "לא ניתן להתחיל את מדידת זמן המסך"
+                screenTimeMonitoringFailedText
         }
     }
 
@@ -978,6 +1031,442 @@ struct MemberHomeView: View {
                         false
                 }
             }
+        }
+    }
+
+    // MARK: - Localization
+
+    private var greetingText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "שלום, \(currentMember.displayName)"
+        case .english:
+            return "Hello, \(currentMember.displayName)"
+        case .arabic:
+            return "مرحبًا، \(currentMember.displayName)"
+        }
+    }
+
+    private var todaySubtitleText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "זה היום שלך ב-TimeUp"
+        case .english:
+            return "This is your day in TimeUp"
+        case .arabic:
+            return "هذا يومك في TimeUp"
+        }
+    }
+
+    private var streakText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "רצף"
+        case .english:
+            return "Streak"
+        case .arabic:
+            return "السلسلة"
+        }
+    }
+
+    private var yesterdayText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "אתמול"
+        case .english:
+            return "Yesterday"
+        case .arabic:
+            return "أمس"
+        }
+    }
+
+    private var daysText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "ימים"
+        case .english:
+            return "Days"
+        case .arabic:
+            return "أيام"
+        }
+    }
+
+    private var learningDayText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "יום למידה"
+        case .english:
+            return "Learning day"
+        case .arabic:
+            return "يوم تعلّم"
+        }
+    }
+
+    private var learningDayDescriptionText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "TimeUp אוסף נתוני שימוש כדי לבנות את היעד הראשון שלך."
+        case .english:
+            return "TimeUp collects usage data to create your first target."
+        case .arabic:
+            return "يجمع TimeUp بيانات الاستخدام لإنشاء هدفك الأول."
+        }
+    }
+
+    private var learningDayStreakDescriptionText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "היום הזה לא נחשב הצלחה או כישלון ולא מאפס את הרצף."
+        case .english:
+            return "This day does not count as a success or failure and does not reset the streak."
+        case .arabic:
+            return "لا يُحتسب هذا اليوم كنجاح أو فشل ولا يعيد ضبط السلسلة."
+        }
+    }
+
+    private var screenTimeTodayText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "זמן מסך היום"
+        case .english:
+            return "Screen time today"
+        case .arabic:
+            return "وقت الشاشة اليوم"
+        }
+    }
+
+    private var screenTimeUpdatesAutomaticallyText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "זמן המסך מתעדכן אוטומטית במהלך היום."
+        case .english:
+            return "Screen time updates automatically throughout the day."
+        case .arabic:
+            return "يتم تحديث وقت الشاشة تلقائيًا خلال اليوم."
+        }
+    }
+
+    private var yourTargetText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "היעד שלך"
+        case .english:
+            return "Your target"
+        case .arabic:
+            return "هدفك"
+        }
+    }
+
+    private func remainingUntilTargetText(
+        _ target: Int
+    ) -> String {
+
+        switch localization.language {
+        case .hebrew:
+            return "נשארו \(formattedRemaining(target)) עד ליעד"
+        case .english:
+            return "\(formattedRemaining(target)) remaining until your target"
+        case .arabic:
+            return "متبقي \(formattedRemaining(target)) حتى الهدف"
+        }
+    }
+
+    private var dailyTargetExceededText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "היעד היומי עבר"
+        case .english:
+            return "Daily target exceeded"
+        case .arabic:
+            return "تم تجاوز الهدف اليومي"
+        }
+    }
+
+    private var firstTargetAfterLearningDayText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "היעד הראשון ייקבע לאחר יום הלמידה."
+        case .english:
+            return "Your first target will be set after the learning day."
+        case .arabic:
+            return "سيتم تحديد هدفك الأول بعد يوم التعلّم."
+        }
+    }
+
+    private var measuringNormallyText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "בינתיים TimeUp מודד את זמן המסך שלך כרגיל."
+        case .english:
+            return "In the meantime, TimeUp measures your screen time as usual."
+        case .arabic:
+            return "في هذه الأثناء، يقيس TimeUp وقت الشاشة كالمعتاد."
+        }
+    }
+
+    private var noDailyTargetText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "עדיין לא נקבע יעד יומי."
+        case .english:
+            return "A daily target has not been set yet."
+        case .arabic:
+            return "لم يتم تحديد هدف يومي بعد."
+        }
+    }
+
+    private var targetMeasurementStartText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "TimeUp יתחיל למדוד את היעד ברגע שיוגדר."
+        case .english:
+            return "TimeUp will start tracking the target as soon as it is set."
+        case .arabic:
+            return "سيبدأ TimeUp بتتبع الهدف بمجرد تحديده."
+        }
+    }
+
+    private var lastDaySummaryText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "סיכום היום האחרון"
+        case .english:
+            return "Last day summary"
+        case .arabic:
+            return "ملخص اليوم الأخير"
+        }
+    }
+
+    private var screenTimeText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "זמן מסך"
+        case .english:
+            return "Screen time"
+        case .arabic:
+            return "وقت الشاشة"
+        }
+    }
+
+    private var targetText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "יעד"
+        case .english:
+            return "Target"
+        case .arabic:
+            return "الهدف"
+        }
+    }
+
+    private var learningDayCompletedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "יום למידה הושלם"
+        case .english:
+            return "Learning day completed"
+        case .arabic:
+            return "اكتمل يوم التعلّم"
+        }
+    }
+
+    private var targetAchievedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "עמדת ביעד"
+        case .english:
+            return "You met your target"
+        case .arabic:
+            return "حققت هدفك"
+        }
+    }
+
+    private var targetNotAchievedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "היעד לא הושג"
+        case .english:
+            return "Target not achieved"
+        case .arabic:
+            return "لم يتم تحقيق الهدف"
+        }
+    }
+
+    private var connectingText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "מתחבר..."
+        case .english:
+            return "Connecting..."
+        case .arabic:
+            return "جارٍ الاتصال..."
+        }
+    }
+
+    private var screenTimeConnectedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "זמן המסך מחובר"
+        case .english:
+            return "Screen Time connected"
+        case .arabic:
+            return "تم ربط وقت الشاشة"
+        }
+    }
+
+    private var connectScreenTimeText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "חבר את זמן המסך"
+        case .english:
+            return "Connect Screen Time"
+        case .arabic:
+            return "ربط وقت الشاشة"
+        }
+    }
+
+    private var yourGroupText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "הקבוצה שלך"
+        case .english:
+            return "Your group"
+        case .arabic:
+            return "مجموعتك"
+        }
+    }
+
+    private var groupCodeText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "קוד קבוצה: \(groupCode)"
+        case .english:
+            return "Group code: \(groupCode)"
+        case .arabic:
+            return "رمز المجموعة: \(groupCode)"
+        }
+    }
+
+    private var learningText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "למידה"
+        case .english:
+            return "Learning"
+        case .arabic:
+            return "تعلّم"
+        }
+    }
+
+    private var successText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "הצלחה"
+        case .english:
+            return "Success"
+        case .arabic:
+            return "نجاح"
+        }
+    }
+
+    private var notAchievedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "לא הושג"
+        case .english:
+            return "Not met"
+        case .arabic:
+            return "لم يتحقق"
+        }
+    }
+
+    private var screenTimeConnectedCheckText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "זמן המסך מחובר ✓"
+        case .english:
+            return "Screen Time connected ✓"
+        case .arabic:
+            return "تم ربط وقت الشاشة ✓"
+        }
+    }
+
+    private var screenTimeAccessDeniedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "הגישה לזמן המסך נדחתה"
+        case .english:
+            return "Screen Time access denied"
+        case .arabic:
+            return "تم رفض الوصول إلى وقت الشاشة"
+        }
+    }
+
+    private var screenTimePermissionRequiredText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "נדרש אישור לזמן מסך"
+        case .english:
+            return "Screen Time permission is required"
+        case .arabic:
+            return "مطلوب إذن للوصول إلى وقت الشاشة"
+        }
+    }
+
+    private var unknownScreenTimeStatusText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "סטטוס זמן מסך לא ידוע"
+        case .english:
+            return "Unknown Screen Time status"
+        case .arabic:
+            return "حالة وقت الشاشة غير معروفة"
+        }
+    }
+
+    private var screenTimeMonitoringFailedText: String {
+
+        switch localization.language {
+        case .hebrew:
+            return "לא ניתן להתחיל את מדידת זמן המסך"
+        case .english:
+            return "Unable to start Screen Time monitoring"
+        case .arabic:
+            return "تعذر بدء مراقبة وقت الشاشة"
         }
     }
 }
