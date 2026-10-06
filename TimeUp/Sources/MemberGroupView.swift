@@ -8,18 +8,20 @@ struct MemberGroupView: View {
     @StateObject private var chatStore =
         SupabaseChatStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var selectedSection:
         GroupSection = .overview
 
     private enum GroupSection:
-        String,
         CaseIterable {
 
-        case overview = "סקירה"
-        case detail = "פירוט"
-        case dashboard = "Dashboard"
-        case members = "חברים"
-        case chat = "צ׳אט"
+        case overview
+        case detail
+        case dashboard
+        case members
+        case chat
     }
 
     private var group:
@@ -119,11 +121,12 @@ struct MemberGroupView: View {
             } else {
 
                 ContentUnavailableView(
-                    "לא נמצאה קבוצה",
+                    noGroupTitle,
                     systemImage: "person.3",
-                    description: Text(
-                        "לא נמצאה חברות פעילה בקבוצה."
-                    )
+                    description:
+                        Text(
+                            noGroupDescription
+                        )
                 )
             }
         }
@@ -162,7 +165,9 @@ struct MemberGroupView: View {
                         HStack(spacing: 6) {
 
                             Text(
-                                section.rawValue
+                                sectionTitle(
+                                    section
+                                )
                             )
 
                             if section == .chat &&
@@ -317,7 +322,9 @@ struct MemberGroupView: View {
                 )
 
                 Text(
-                    "\(memberCount) חברים"
+                    membersCountText(
+                        memberCount
+                    )
                 )
             }
             .font(.subheadline)
@@ -348,11 +355,15 @@ struct MemberGroupView: View {
                     spacing: 4
                 ) {
 
-                    Text("רצף קבוצתי")
-                        .font(.headline)
+                    Text(
+                        groupStreakTitle
+                    )
+                    .font(.headline)
 
                     Text(
-                        "\(group.currentStreak) ימים"
+                        daysText(
+                            group.currentStreak
+                        )
                     )
                     .font(
                         .system(
@@ -376,8 +387,8 @@ struct MemberGroupView: View {
 
             Text(
                 group.currentStreak == 0
-                    ? "הרצף מתחיל כאשר כל חברי הקבוצה עומדים ביעד."
-                    : "כל חברי הקבוצה צריכים לעמוד ביעד כדי להמשיך את הרצף."
+                    ? streakStartDescription
+                    : streakContinueDescription
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -424,8 +435,10 @@ struct MemberGroupView: View {
                     spacing: 4
                 ) {
 
-                    Text("המסע הקבוצתי")
-                        .font(.headline)
+                    Text(
+                        groupJourneyTitle
+                    )
+                    .font(.headline)
 
                     Text(
                         journeySubtitle(
@@ -542,8 +555,17 @@ struct MemberGroupView: View {
 
         if streak >= successDays {
 
-            return
-                "הקבוצה השלימה את היעד"
+            switch localization.language {
+
+            case .hebrew:
+                return "הקבוצה השלימה את היעד"
+
+            case .english:
+                return "The group completed the goal"
+
+            case .arabic:
+                return "أكملت المجموعة الهدف"
+            }
 
         } else {
 
@@ -553,8 +575,19 @@ struct MemberGroupView: View {
                     0
                 )
 
-            return
-                "עוד \(remaining) ימים להשלמת היעד"
+            switch localization.language {
+
+            case .hebrew:
+                return "עוד \(remaining) ימים להשלמת היעד"
+
+            case .english:
+                return remaining == 1
+                    ? "1 more day to complete the goal"
+                    : "\(remaining) more days to complete the goal"
+
+            case .arabic:
+                return "متبقي \(remaining) أيام لإكمال الهدف"
+            }
         }
     }
 
@@ -572,17 +605,24 @@ struct MemberGroupView: View {
 
             HStack {
 
-                Text("היום בקבוצה")
-                    .font(.headline)
+                Text(
+                    todayInGroupTitle
+                )
+                .font(.headline)
 
                 Spacer()
 
                 Text(
-                    Date.now,
-                    format:
+                    Date.now.formatted(
                         .dateTime
-                        .day()
-                        .month()
+                            .day()
+                            .month()
+                            .locale(
+                                localization
+                                    .language
+                                    .locale
+                            )
+                    )
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -597,11 +637,13 @@ struct MemberGroupView: View {
                     spacing: 4
                 ) {
 
-                    Text("חברי קבוצה")
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+                    Text(
+                        groupMembersTitle
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
 
                     Text(
                         "\(memberCount)"
@@ -617,11 +659,13 @@ struct MemberGroupView: View {
                     spacing: 4
                 ) {
 
-                    Text("רצף נוכחי")
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+                    Text(
+                        currentStreakTitle
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
 
                     Text(
                         "\(group.currentStreak)"
@@ -651,8 +695,8 @@ struct MemberGroupView: View {
 
                     Text(
                         result.succeeded
-                            ? "כל חברי הקבוצה עמדו ביעד."
-                            : "הקבוצה לא עמדה היום ביעד."
+                            ? groupSucceededTodayText
+                            : groupFailedTodayText
                     )
                     .font(.footnote)
                 }
@@ -660,7 +704,7 @@ struct MemberGroupView: View {
             } else {
 
                 Text(
-                    "תוצאת היום תיסגר אוטומטית לאחר שכל נתוני השימוש יתקבלו."
+                    pendingResultText
                 )
                 .font(.footnote)
                 .foregroundStyle(
@@ -696,12 +740,16 @@ struct MemberGroupView: View {
 
             HStack {
 
-                Text("חברי הקבוצה")
-                    .font(.headline)
+                Text(
+                    groupMembersTitle
+                )
+                .font(.headline)
 
                 Spacer()
 
-                Button("הצג הכל") {
+                Button(
+                    showAllText
+                ) {
 
                     selectedSection =
                         .members
@@ -726,7 +774,7 @@ struct MemberGroupView: View {
                 } else {
 
                     ContentUnavailableView(
-                        "אין חברים בקבוצה",
+                        noMembersTitle,
                         systemImage:
                             "person.3"
                     )
@@ -765,7 +813,7 @@ struct MemberGroupView: View {
                             Text(
                                 member
                                     .displayName ??
-                                "משתמש"
+                                genericUserText
                             )
                             .fontWeight(
                                 .semibold
@@ -774,13 +822,15 @@ struct MemberGroupView: View {
                             if member.id ==
                                 currentUser?.id {
 
-                                Text("אתה")
-                                    .font(
-                                        .caption
-                                    )
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
+                                Text(
+                                    youText
+                                )
+                                .font(
+                                    .caption
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
                             }
                         }
 
@@ -827,20 +877,23 @@ struct MemberGroupView: View {
                 spacing: 16
             ) {
 
-                Text("פירוט קבוצתי")
-                    .font(.title2.bold())
+                Text(
+                    groupDetailTitle
+                )
+                .font(.title2.bold())
 
                 if dataStore
                     .dailyResults
                     .isEmpty {
 
                     ContentUnavailableView(
-                        "אין עדיין נתונים",
+                        noDataTitle,
                         systemImage:
                             "chart.bar.doc.horizontal",
-                        description: Text(
-                            "נתוני השימוש של חברי הקבוצה יופיעו כאן."
-                        )
+                        description:
+                            Text(
+                                noDataDescription
+                            )
                     )
 
                 } else {
@@ -875,30 +928,36 @@ struct MemberGroupView: View {
                 spacing: 18
             ) {
 
-                Text("Dashboard")
-                    .font(.title2.bold())
+                Text(
+                    dashboardTitle
+                )
+                .font(.title2.bold())
 
                 dashboardCard(
-                    title: "רצף קבוצתי",
+                    title:
+                        groupStreakTitle,
                     value:
                         "\(group.currentStreak)",
-                    subtitle: "ימים"
+                    subtitle:
+                        daysLabel
                 )
 
                 dashboardCard(
-                    title: "חברי הקבוצה",
+                    title:
+                        groupMembersTitle,
                     value:
                         "\(memberCount)",
                     subtitle:
-                        "משתמשים"
+                        usersLabel
                 )
 
                 dashboardCard(
-                    title: "ימי הצלחה",
+                    title:
+                        successDaysTitle,
                     value:
                         "\(group.successDays ?? 7)",
                     subtitle:
-                        "יעד המסע"
+                        journeyGoalSubtitle
                 )
 
                 if let latest =
@@ -908,7 +967,7 @@ struct MemberGroupView: View {
 
                     dashboardCard(
                         title:
-                            "ממוצע שימוש",
+                            averageUsageTitle,
                         value:
                             formatMinutes(
                                 latest
@@ -916,7 +975,7 @@ struct MemberGroupView: View {
                                 0
                             ),
                         subtitle:
-                            "ביום האחרון שנסגר"
+                            lastClosedDaySubtitle
                     )
                 }
             }
@@ -983,8 +1042,10 @@ struct MemberGroupView: View {
                 spacing: 12
             ) {
 
-                Text("חברים")
-                    .font(.title2.bold())
+                Text(
+                    membersSectionTitle
+                )
+                .font(.title2.bold())
 
                 ForEach(
                     dataStore.groupMembers
@@ -1039,18 +1100,20 @@ struct MemberGroupView: View {
 
                     Text(
                         member.displayName ??
-                        "משתמש"
+                        genericUserText
                     )
                     .fontWeight(.semibold)
 
                     if member.id ==
                         currentUser?.id {
 
-                        Text("• אתה")
-                            .font(.caption)
-                            .foregroundStyle(
-                                .secondary
-                            )
+                        Text(
+                            "• \(youText)"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
                     }
                 }
 
@@ -1059,7 +1122,7 @@ struct MemberGroupView: View {
                     if result.isLearningDay {
 
                         Text(
-                            "\(formatMinutes(result.usageMinutes)) • יום למידה"
+                            "\(formatMinutes(result.usageMinutes)) • \(learningDayText)"
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -1085,7 +1148,7 @@ struct MemberGroupView: View {
                 } else {
 
                     Text(
-                        "ממתין לנתוני היום"
+                        waitingForTodayDataText
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -1262,20 +1325,47 @@ struct MemberGroupView: View {
         let remaining =
             minutes % 60
 
-        if hours == 0 {
+        switch localization.language {
+
+        case .hebrew:
+
+            if hours == 0 {
+                return "\(remaining) דק׳"
+            }
+
+            if remaining == 0 {
+                return "\(hours) שע׳"
+            }
 
             return
-                "\(remaining) דק׳"
-        }
+                "\(hours) שע׳ \(remaining) דק׳"
 
-        if remaining == 0 {
+        case .english:
+
+            if hours == 0 {
+                return "\(remaining) min"
+            }
+
+            if remaining == 0 {
+                return "\(hours) hr"
+            }
 
             return
-                "\(hours) שע׳"
-        }
+                "\(hours) hr \(remaining) min"
 
-        return
-            "\(hours) שע׳ \(remaining) דק׳"
+        case .arabic:
+
+            if hours == 0 {
+                return "\(remaining) د"
+            }
+
+            if remaining == 0 {
+                return "\(hours) س"
+            }
+
+            return
+                "\(hours) س \(remaining) د"
+        }
     }
 
     // MARK: - Error
@@ -1304,6 +1394,418 @@ struct MemberGroupView: View {
             .fill(
                 Color.red.opacity(0.08)
             )
+        }
+    }
+
+    // MARK: - Localization
+
+    private func sectionTitle(
+        _ section: GroupSection
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+
+            switch section {
+            case .overview:
+                return "סקירה"
+            case .detail:
+                return "פירוט"
+            case .dashboard:
+                return "לוח בקרה"
+            case .members:
+                return "חברים"
+            case .chat:
+                return "צ׳אט"
+            }
+
+        case .english:
+
+            switch section {
+            case .overview:
+                return "Overview"
+            case .detail:
+                return "Details"
+            case .dashboard:
+                return "Dashboard"
+            case .members:
+                return "Members"
+            case .chat:
+                return "Chat"
+            }
+
+        case .arabic:
+
+            switch section {
+            case .overview:
+                return "نظرة عامة"
+            case .detail:
+                return "التفاصيل"
+            case .dashboard:
+                return "لوحة التحكم"
+            case .members:
+                return "الأعضاء"
+            case .chat:
+                return "الدردشة"
+            }
+        }
+    }
+
+    private func membersCountText(
+        _ count: Int
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "\(count) חברים"
+
+        case .english:
+            return count == 1
+                ? "1 member"
+                : "\(count) members"
+
+        case .arabic:
+            return "\(count) أعضاء"
+        }
+    }
+
+    private func daysText(
+        _ count: Int
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "\(count) ימים"
+
+        case .english:
+            return count == 1
+                ? "1 day"
+                : "\(count) days"
+
+        case .arabic:
+            return "\(count) أيام"
+        }
+    }
+
+    private var noGroupTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "לא נמצאה קבוצה"
+        case .english:
+            return "Group Not Found"
+        case .arabic:
+            return "لم يتم العثور على مجموعة"
+        }
+    }
+
+    private var noGroupDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "לא נמצאה חברות פעילה בקבוצה."
+        case .english:
+            return "No active group membership was found."
+        case .arabic:
+            return "لم يتم العثور على عضوية نشطة في المجموعة."
+        }
+    }
+
+    private var groupStreakTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "רצף קבוצתי"
+        case .english:
+            return "Group Streak"
+        case .arabic:
+            return "سلسلة المجموعة"
+        }
+    }
+
+    private var streakStartDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "הרצף מתחיל כאשר כל חברי הקבוצה עומדים ביעד."
+        case .english:
+            return "The streak starts when every group member reaches their goal."
+        case .arabic:
+            return "تبدأ السلسلة عندما يحقق جميع أعضاء المجموعة هدفهم."
+        }
+    }
+
+    private var streakContinueDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "כל חברי הקבוצה צריכים לעמוד ביעד כדי להמשיך את הרצף."
+        case .english:
+            return "Every group member must reach their goal to keep the streak going."
+        case .arabic:
+            return "يجب على جميع أعضاء المجموعة تحقيق هدفهم لمواصلة السلسلة."
+        }
+    }
+
+    private var groupJourneyTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "המסע הקבוצתי"
+        case .english:
+            return "Group Journey"
+        case .arabic:
+            return "رحلة المجموعة"
+        }
+    }
+
+    private var todayInGroupTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "היום בקבוצה"
+        case .english:
+            return "Today in the Group"
+        case .arabic:
+            return "اليوم في المجموعة"
+        }
+    }
+
+    private var groupMembersTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "חברי הקבוצה"
+        case .english:
+            return "Group Members"
+        case .arabic:
+            return "أعضاء المجموعة"
+        }
+    }
+
+    private var currentStreakTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "רצף נוכחי"
+        case .english:
+            return "Current Streak"
+        case .arabic:
+            return "السلسلة الحالية"
+        }
+    }
+
+    private var groupSucceededTodayText: String {
+        switch localization.language {
+        case .hebrew:
+            return "כל חברי הקבוצה עמדו ביעד."
+        case .english:
+            return "Every group member reached their goal."
+        case .arabic:
+            return "حقق جميع أعضاء المجموعة هدفهم."
+        }
+    }
+
+    private var groupFailedTodayText: String {
+        switch localization.language {
+        case .hebrew:
+            return "הקבוצה לא עמדה היום ביעד."
+        case .english:
+            return "The group did not reach today's goal."
+        case .arabic:
+            return "لم تحقق المجموعة هدف اليوم."
+        }
+    }
+
+    private var pendingResultText: String {
+        switch localization.language {
+        case .hebrew:
+            return "תוצאת היום תיסגר אוטומטית לאחר שכל נתוני השימוש יתקבלו."
+        case .english:
+            return "Today's result will close automatically after all usage data is received."
+        case .arabic:
+            return "سيتم إغلاق نتيجة اليوم تلقائيًا بعد استلام جميع بيانات الاستخدام."
+        }
+    }
+
+    private var showAllText: String {
+        switch localization.language {
+        case .hebrew:
+            return "הצג הכל"
+        case .english:
+            return "Show All"
+        case .arabic:
+            return "عرض الكل"
+        }
+    }
+
+    private var noMembersTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין חברים בקבוצה"
+        case .english:
+            return "No Group Members"
+        case .arabic:
+            return "لا يوجد أعضاء في المجموعة"
+        }
+    }
+
+    private var genericUserText: String {
+        switch localization.language {
+        case .hebrew:
+            return "משתמש"
+        case .english:
+            return "User"
+        case .arabic:
+            return "مستخدم"
+        }
+    }
+
+    private var youText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אתה"
+        case .english:
+            return "You"
+        case .arabic:
+            return "أنت"
+        }
+    }
+
+    private var groupDetailTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "פירוט קבוצתי"
+        case .english:
+            return "Group Details"
+        case .arabic:
+            return "تفاصيل المجموعة"
+        }
+    }
+
+    private var noDataTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין עדיין נתונים"
+        case .english:
+            return "No Data Yet"
+        case .arabic:
+            return "لا توجد بيانات بعد"
+        }
+    }
+
+    private var noDataDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "נתוני השימוש של חברי הקבוצה יופיעו כאן."
+        case .english:
+            return "Group members' usage data will appear here."
+        case .arabic:
+            return "ستظهر بيانات استخدام أعضاء المجموعة هنا."
+        }
+    }
+
+    private var dashboardTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "לוח בקרה"
+        case .english:
+            return "Dashboard"
+        case .arabic:
+            return "لوحة التحكم"
+        }
+    }
+
+    private var daysLabel: String {
+        switch localization.language {
+        case .hebrew:
+            return "ימים"
+        case .english:
+            return "days"
+        case .arabic:
+            return "أيام"
+        }
+    }
+
+    private var usersLabel: String {
+        switch localization.language {
+        case .hebrew:
+            return "משתמשים"
+        case .english:
+            return "users"
+        case .arabic:
+            return "مستخدمون"
+        }
+    }
+
+    private var successDaysTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "ימי הצלחה"
+        case .english:
+            return "Success Days"
+        case .arabic:
+            return "أيام النجاح"
+        }
+    }
+
+    private var journeyGoalSubtitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "יעד המסע"
+        case .english:
+            return "journey goal"
+        case .arabic:
+            return "هدف الرحلة"
+        }
+    }
+
+    private var averageUsageTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "ממוצע שימוש"
+        case .english:
+            return "Average Usage"
+        case .arabic:
+            return "متوسط الاستخدام"
+        }
+    }
+
+    private var lastClosedDaySubtitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "ביום האחרון שנסגר"
+        case .english:
+            return "on the last completed day"
+        case .arabic:
+            return "في آخر يوم مكتمل"
+        }
+    }
+
+    private var membersSectionTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "חברים"
+        case .english:
+            return "Members"
+        case .arabic:
+            return "الأعضاء"
+        }
+    }
+
+    private var learningDayText: String {
+        switch localization.language {
+        case .hebrew:
+            return "יום למידה"
+        case .english:
+            return "Learning Day"
+        case .arabic:
+            return "يوم التعلّم"
+        }
+    }
+
+    private var waitingForTodayDataText: String {
+        switch localization.language {
+        case .hebrew:
+            return "ממתין לנתוני היום"
+        case .english:
+            return "Waiting for today's data"
+        case .arabic:
+            return "بانتظار بيانات اليوم"
         }
     }
 }
