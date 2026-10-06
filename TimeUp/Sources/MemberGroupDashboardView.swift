@@ -8,6 +8,9 @@ struct MemberGroupDashboardView: View {
     @ObservedObject private var store =
         TimeUpStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var selectedDays = 14
 
     private let calendar =
@@ -35,7 +38,7 @@ struct MemberGroupDashboardView: View {
             }
             .padding(16)
         }
-        .navigationTitle("Dashboard")
+        .navigationTitle(dashboardTitle)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -143,11 +146,11 @@ struct MemberGroupDashboardView: View {
             spacing: 10
         ) {
 
-            Text("טווח נתונים")
+            Text(dataRangeText)
                 .font(.headline)
 
             Picker(
-                "טווח נתונים",
+                dataRangeText,
                 selection:
                     $selectedDays
             ) {
@@ -158,7 +161,7 @@ struct MemberGroupDashboardView: View {
                 ) { days in
 
                     Text(
-                        "\(days) ימים"
+                        daysText(days)
                     )
                     .tag(days)
                 }
@@ -194,12 +197,12 @@ struct MemberGroupDashboardView: View {
             ) {
 
                 Text(
-                    "מגמת זמן מסך ממוצע קבוצתי"
+                    averageTrendTitle
                 )
                 .font(.headline)
 
                 Text(
-                    "ממוצע זמן המסך של חברי הקבוצה בכל יום"
+                    averageTrendDescription
                 )
                 .font(.footnote)
                 .foregroundStyle(
@@ -213,7 +216,7 @@ struct MemberGroupDashboardView: View {
 
                 noDataView(
                     text:
-                        "אין עדיין מספיק נתוני זמן מסך להצגת המגמה."
+                        averageTrendEmptyText
                 )
 
             } else {
@@ -224,11 +227,11 @@ struct MemberGroupDashboardView: View {
 
                     LineMark(
                         x: .value(
-                            "תאריך",
+                            chartDateText,
                             point.date
                         ),
                         y: .value(
-                            "דקות",
+                            chartMinutesText,
                             point.minutes
                         )
                     )
@@ -238,11 +241,11 @@ struct MemberGroupDashboardView: View {
 
                     PointMark(
                         x: .value(
-                            "תאריך",
+                            chartDateText,
                             point.date
                         ),
                         y: .value(
-                            "דקות",
+                            chartMinutesText,
                             point.minutes
                         )
                     )
@@ -326,12 +329,12 @@ struct MemberGroupDashboardView: View {
             ) {
 
                 Text(
-                    "השוואת זמן מסך בין חברי הקבוצה"
+                    memberComparisonTitle
                 )
                 .font(.headline)
 
                 Text(
-                    "ממוצע זמן המסך לכל חבר בטווח שנבחר"
+                    memberComparisonDescription
                 )
                 .font(.footnote)
                 .foregroundStyle(
@@ -345,7 +348,7 @@ struct MemberGroupDashboardView: View {
 
                 noDataView(
                     text:
-                        "אין עדיין מספיק נתונים להשוואה בין חברי הקבוצה."
+                        memberComparisonEmptyText
                 )
 
             } else {
@@ -356,11 +359,11 @@ struct MemberGroupDashboardView: View {
 
                     BarMark(
                         x: .value(
-                            "זמן מסך",
+                            screenTimeText,
                             item.minutes
                         ),
                         y: .value(
-                            "חבר",
+                            memberText,
                             item.name
                         )
                     )
@@ -441,12 +444,12 @@ struct MemberGroupDashboardView: View {
             ) {
 
                 Text(
-                    "אחוז עמידה בממוצע הקבוצתי"
+                    successRateTitle
                 )
                 .font(.headline)
 
                 Text(
-                    "אחוז הרשומות שבהן חברי הקבוצה עמדו ביעד"
+                    successRateDescription
                 )
                 .font(.footnote)
                 .foregroundStyle(
@@ -514,7 +517,7 @@ struct MemberGroupDashboardView: View {
                     ) {
 
                         Text(
-                            "\(successfulEntries) מתוך \(eligibleEntries)"
+                            successEntriesText
                         )
                         .font(.title3)
                         .fontWeight(
@@ -522,7 +525,7 @@ struct MemberGroupDashboardView: View {
                         )
 
                         Text(
-                            "עמידות ביעד בטווח שנבחר"
+                            successEntriesDescription
                         )
                         .font(.subheadline)
                         .foregroundStyle(
@@ -530,7 +533,7 @@ struct MemberGroupDashboardView: View {
                         )
 
                         Text(
-                            "ימי למידה ורשומות ללא יעד אינם נכללים בחישוב."
+                            successCalculationNote
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -547,7 +550,7 @@ struct MemberGroupDashboardView: View {
 
                 noDataView(
                     text:
-                        "אין עדיין מספיק נתונים עם יעד לחישוב אחוז העמידה."
+                        successRateEmptyText
                 )
             }
         }
@@ -798,22 +801,28 @@ struct MemberGroupDashboardView: View {
         String
     {
 
-        let start =
-            startDate.formatted(
-                .dateTime
-                    .day()
-                    .month()
-            )
+        let startFormatter =
+            DateFormatter()
 
-        let end =
-            endDate.formatted(
-                .dateTime
-                    .day()
-                    .month()
-                    .year()
-            )
+        startFormatter.locale =
+            localization.language.locale
 
-        return "\(start) – \(end)"
+        startFormatter.setLocalizedDateFormatFromTemplate(
+            "dMMM"
+        )
+
+        let endFormatter =
+            DateFormatter()
+
+        endFormatter.locale =
+            localization.language.locale
+
+        endFormatter.setLocalizedDateFormatFromTemplate(
+            "dMMMyyyy"
+        )
+
+        return
+            "\(startFormatter.string(from: startDate)) – \(endFormatter.string(from: endDate))"
     }
 
     private func formattedMinutes(
@@ -829,16 +838,47 @@ struct MemberGroupDashboardView: View {
         let remaining =
             safe % 60
 
-        if hours == 0 {
-            return "\(remaining) דק׳"
-        }
+        switch localization.language {
 
-        if remaining == 0 {
-            return "\(hours) שע׳"
-        }
+        case .hebrew:
 
-        return
-            "\(hours) שע׳ \(remaining) דק׳"
+            if hours == 0 {
+                return "\(remaining) דק׳"
+            }
+
+            if remaining == 0 {
+                return "\(hours) שע׳"
+            }
+
+            return
+                "\(hours) שע׳ \(remaining) דק׳"
+
+        case .english:
+
+            if hours == 0 {
+                return "\(remaining) min"
+            }
+
+            if remaining == 0 {
+                return "\(hours) hr"
+            }
+
+            return
+                "\(hours) hr \(remaining) min"
+
+        case .arabic:
+
+            if hours == 0 {
+                return "\(remaining) د"
+            }
+
+            if remaining == 0 {
+                return "\(hours) س"
+            }
+
+            return
+                "\(hours) س \(remaining) د"
+        }
     }
 
     private func shortTime(
@@ -846,16 +886,40 @@ struct MemberGroupDashboardView: View {
     ) -> String {
 
         if minutes < 60 {
-            return "\(minutes)ד׳"
+
+            switch localization.language {
+            case .hebrew:
+                return "\(minutes)ד׳"
+            case .english:
+                return "\(minutes)m"
+            case .arabic:
+                return "\(minutes)د"
+            }
         }
 
         let value =
             Double(minutes) / 60
 
-        return String(
-            format: "%.1fש׳",
-            value
-        )
+        switch localization.language {
+
+        case .hebrew:
+            return String(
+                format: "%.1fש׳",
+                value
+            )
+
+        case .english:
+            return String(
+                format: "%.1fh",
+                value
+            )
+
+        case .arabic:
+            return String(
+                format: "%.1fس",
+                value
+            )
+        }
     }
 
     // MARK: - Empty State
@@ -877,7 +941,7 @@ struct MemberGroupDashboardView: View {
                 .secondary
             )
 
-            Text("אין נתונים")
+            Text(noDataText)
                 .font(.headline)
 
             Text(text)
@@ -911,6 +975,209 @@ struct MemberGroupDashboardView: View {
             Color.secondary
                 .opacity(0.10)
         )
+    }
+
+    // MARK: - Localization
+
+    private var dashboardTitle: String {
+        switch localization.language {
+        case .hebrew: return "דשבורד"
+        case .english: return "Dashboard"
+        case .arabic: return "لوحة البيانات"
+        }
+    }
+
+    private var dataRangeText: String {
+        switch localization.language {
+        case .hebrew: return "טווח נתונים"
+        case .english: return "Data range"
+        case .arabic: return "نطاق البيانات"
+        }
+    }
+
+    private func daysText(
+        _ days: Int
+    ) -> String {
+        switch localization.language {
+        case .hebrew:
+            return "\(days) ימים"
+        case .english:
+            return "\(days) days"
+        case .arabic:
+            return "\(days) أيام"
+        }
+    }
+
+    private var averageTrendTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "מגמת זמן מסך ממוצע קבוצתי"
+        case .english:
+            return "Group average screen-time trend"
+        case .arabic:
+            return "اتجاه متوسط وقت الشاشة للمجموعة"
+        }
+    }
+
+    private var averageTrendDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "ממוצע זמן המסך של חברי הקבוצה בכל יום"
+        case .english:
+            return "Average screen time of group members each day"
+        case .arabic:
+            return "متوسط وقت الشاشة لأعضاء المجموعة كل يوم"
+        }
+    }
+
+    private var averageTrendEmptyText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין עדיין מספיק נתוני זמן מסך להצגת המגמה."
+        case .english:
+            return "There is not enough screen-time data to show the trend yet."
+        case .arabic:
+            return "لا توجد بيانات كافية عن وقت الشاشة لعرض الاتجاه بعد."
+        }
+    }
+
+    private var memberComparisonTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "השוואת זמן מסך בין חברי הקבוצה"
+        case .english:
+            return "Screen-time comparison between group members"
+        case .arabic:
+            return "مقارنة وقت الشاشة بين أعضاء المجموعة"
+        }
+    }
+
+    private var memberComparisonDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "ממוצע זמן המסך לכל חבר בטווח שנבחר"
+        case .english:
+            return "Average screen time for each member in the selected range"
+        case .arabic:
+            return "متوسط وقت الشاشة لكل عضو خلال النطاق المحدد"
+        }
+    }
+
+    private var memberComparisonEmptyText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין עדיין מספיק נתונים להשוואה בין חברי הקבוצה."
+        case .english:
+            return "There is not enough data to compare group members yet."
+        case .arabic:
+            return "لا توجد بيانات كافية لمقارنة أعضاء المجموعة بعد."
+        }
+    }
+
+    private var successRateTitle: String {
+        switch localization.language {
+        case .hebrew:
+            return "אחוז עמידה בממוצע הקבוצתי"
+        case .english:
+            return "Group target success rate"
+        case .arabic:
+            return "نسبة تحقيق أهداف المجموعة"
+        }
+    }
+
+    private var successRateDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "אחוז הרשומות שבהן חברי הקבוצה עמדו ביעד"
+        case .english:
+            return "Percentage of entries where group members met their target"
+        case .arabic:
+            return "نسبة السجلات التي حقق فيها أعضاء المجموعة أهدافهم"
+        }
+    }
+
+    private var successEntriesText: String {
+        switch localization.language {
+        case .hebrew:
+            return "\(successfulEntries) מתוך \(eligibleEntries)"
+        case .english:
+            return "\(successfulEntries) of \(eligibleEntries)"
+        case .arabic:
+            return "\(successfulEntries) من \(eligibleEntries)"
+        }
+    }
+
+    private var successEntriesDescription: String {
+        switch localization.language {
+        case .hebrew:
+            return "עמידות ביעד בטווח שנבחר"
+        case .english:
+            return "Targets achieved in the selected range"
+        case .arabic:
+            return "الأهداف المحققة ضمن النطاق المحدد"
+        }
+    }
+
+    private var successCalculationNote: String {
+        switch localization.language {
+        case .hebrew:
+            return "ימי למידה ורשומות ללא יעד אינם נכללים בחישוב."
+        case .english:
+            return "Learning days and entries without a target are excluded from the calculation."
+        case .arabic:
+            return "لا يتم احتساب أيام التعلّم والسجلات التي لا تحتوي على هدف."
+        }
+    }
+
+    private var successRateEmptyText: String {
+        switch localization.language {
+        case .hebrew:
+            return "אין עדיין מספיק נתונים עם יעד לחישוב אחוז העמידה."
+        case .english:
+            return "There is not enough target data to calculate the success rate yet."
+        case .arabic:
+            return "لا توجد بيانات أهداف كافية لحساب نسبة النجاح بعد."
+        }
+    }
+
+    private var chartDateText: String {
+        switch localization.language {
+        case .hebrew: return "תאריך"
+        case .english: return "Date"
+        case .arabic: return "التاريخ"
+        }
+    }
+
+    private var chartMinutesText: String {
+        switch localization.language {
+        case .hebrew: return "דקות"
+        case .english: return "Minutes"
+        case .arabic: return "دقائق"
+        }
+    }
+
+    private var screenTimeText: String {
+        switch localization.language {
+        case .hebrew: return "זמן מסך"
+        case .english: return "Screen time"
+        case .arabic: return "وقت الشاشة"
+        }
+    }
+
+    private var memberText: String {
+        switch localization.language {
+        case .hebrew: return "חבר"
+        case .english: return "Member"
+        case .arabic: return "عضو"
+        }
+    }
+
+    private var noDataText: String {
+        switch localization.language {
+        case .hebrew: return "אין נתונים"
+        case .english: return "No data"
+        case .arabic: return "لا توجد بيانات"
+        }
     }
 }
 
