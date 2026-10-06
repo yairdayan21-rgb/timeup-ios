@@ -24,6 +24,7 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var isSyncingScreenTime = false
     @Published private(set) var isCreatingGroup = false
     @Published private(set) var isSavingManualTarget = false
+    @Published private(set) var isCompletingOnboarding = false
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
@@ -48,6 +49,8 @@ final class SupabaseDataStore: ObservableObject {
         public let email: String?
         public let displayName: String?
         public let role: String
+        public let onboardingCompleted: Bool
+        public let onboardingCompletedAt: Date?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -55,6 +58,8 @@ final class SupabaseDataStore: ObservableObject {
             case email
             case displayName = "display_name"
             case role
+            case onboardingCompleted = "onboarding_completed"
+            case onboardingCompletedAt = "onboarding_completed_at"
         }
     }
 
@@ -253,6 +258,17 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    private struct OnboardingCompletionUpdate: Encodable {
+
+        let onboardingCompleted: Bool
+        let onboardingCompletedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case onboardingCompleted = "onboarding_completed"
+            case onboardingCompletedAt = "onboarding_completed_at"
+        }
+    }
+
     // MARK: - Load Current Account
 
     func loadCurrentAccount() async {
@@ -281,7 +297,9 @@ final class SupabaseDataStore: ObservableObject {
                         auth_user_id,
                         email,
                         display_name,
-                        role
+                        role,
+                        onboarding_completed,
+                        onboarding_completed_at
                         """
                     )
                     .eq(
@@ -596,7 +614,9 @@ final class SupabaseDataStore: ObservableObject {
                             auth_user_id,
                             email,
                             display_name,
-                            role
+                            role,
+                            onboarding_completed,
+                            onboarding_completed_at
                             """
                         )
                         .eq(
@@ -1297,6 +1317,54 @@ final class SupabaseDataStore: ObservableObject {
         await loadCurrentAccount()
     }
 
+    // MARK: - Onboarding
+
+    func completeOnboarding() async throws {
+
+        guard let user = currentUser else {
+            throw SupabaseDataStoreError.userNotLoaded
+        }
+
+        guard user.role == "member" else {
+            return
+        }
+
+        isCompletingOnboarding = true
+        lastError = nil
+
+        defer {
+            isCompletingOnboarding = false
+        }
+
+        let completedAt = Date()
+
+        do {
+
+            try await client
+                .from("users")
+                .update(
+                    OnboardingCompletionUpdate(
+                        onboardingCompleted: true,
+                        onboardingCompletedAt: completedAt
+                    )
+                )
+                .eq(
+                    "id",
+                    value: user.id.uuidString
+                )
+                .execute()
+
+            await loadCurrentAccount()
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+
+            throw error
+        }
+    }
+
     // MARK: - Helpers
 
     var activeMemberGroup:
@@ -1340,6 +1408,16 @@ final class SupabaseDataStore: ObservableObject {
         activeMemberGroup != nil
     }
 
+    var shouldShowOnboarding: Bool {
+
+        guard let currentUser else {
+            return false
+        }
+
+        return currentUser.role == "member" &&
+            !currentUser.onboardingCompleted
+    }
+
     // MARK: - Clear Data
 
     private func clearLoadedData() {
@@ -1370,6 +1448,7 @@ final class SupabaseDataStore: ObservableObject {
         isSyncingScreenTime = false
         isCreatingGroup = false
         isSavingManualTarget = false
+        isCompletingOnboarding = false
     }
 }
 
