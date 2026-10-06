@@ -7,7 +7,7 @@ final class SupabaseChatStore: ObservableObject {
     static let shared = SupabaseChatStore()
 
     @Published private(set) var messages: [ChatMessage] = []
-    @Published private(set) var unreadCounts: [UUID: Int] = []
+    @Published private(set) var unreadCounts: [UUID: Int] = [:]
 
     @Published private(set) var isLoading = false
     @Published private(set) var isSending = false
