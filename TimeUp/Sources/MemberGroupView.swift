@@ -1267,9 +1267,9 @@ struct MemberGroupView: View {
             return
         }
 
-        await chatStore.loadUnreadCount(
+        await chatStore.startUnreadRealtime(
             groupID: group.id,
-            userID: currentUser.id
+            currentUserID: currentUser.id
         )
     }
 
