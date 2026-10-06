@@ -12,6 +12,9 @@ struct MemberTabView: View {
     @StateObject private var alternativesStore =
         SupabaseAlternativesStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var selectedTab:
         MemberTab = .dashboard
 
@@ -76,7 +79,7 @@ struct MemberTabView: View {
             .tabItem {
 
                 Label(
-                    "דירוג",
+                    t(.ranking),
                     systemImage: "trophy"
                 )
             }
@@ -85,10 +88,9 @@ struct MemberTabView: View {
             NavigationStack {
 
                 placeholderView(
-                    title: "AI",
+                    title: t(.ai),
                     icon: "sparkles",
-                    message:
-                        "כאן יהיה הצ׳אט האישי שלך עם TimeUp AI."
+                    message: t(.aiComingSoon)
                 )
                 .toolbar {
                     profileToolbar
@@ -97,7 +99,7 @@ struct MemberTabView: View {
             .tabItem {
 
                 Label(
-                    "AI",
+                    t(.ai),
                     systemImage: "sparkles"
                 )
             }
@@ -118,12 +120,12 @@ struct MemberTabView: View {
                 } else {
 
                     ContentUnavailableView(
-                        "אין קבוצה פעילה",
+                        noActiveGroupTitle,
                         systemImage:
                             "person.3.sequence.fill",
                         description:
                             Text(
-                                "החשבון אינו משויך כרגע לקבוצה פעילה."
+                                noActiveGroupDescription
                             )
                     )
                     .toolbar {
@@ -134,7 +136,7 @@ struct MemberTabView: View {
             .tabItem {
 
                 Label(
-                    "הקבוצה",
+                    t(.group),
                     systemImage: "person.3"
                 )
             }
@@ -152,7 +154,7 @@ struct MemberTabView: View {
             .tabItem {
 
                 Label(
-                    "דשבורד",
+                    t(.dashboard),
                     systemImage:
                         "square.grid.2x2.fill"
                 )
@@ -186,7 +188,7 @@ struct MemberTabView: View {
                     ProgressView()
 
                     Text(
-                        "טוען דירוג קבוצות..."
+                        t(.loadingRanking)
                     )
                     .foregroundStyle(
                         .secondary
@@ -201,12 +203,12 @@ struct MemberTabView: View {
                 rankingStore.groupRankings.isEmpty {
 
                 ContentUnavailableView(
-                    "אין עדיין דירוג",
+                    t(.noRanking),
                     systemImage: "trophy",
                     description:
                         Text(
                             rankingStore.lastError ??
-                            "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
+                            t(.rankingWillAppear)
                         )
                 )
 
@@ -233,7 +235,7 @@ struct MemberTabView: View {
             }
         }
         .navigationTitle(
-            "דירוג קבוצות"
+            t(.groupRanking)
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -312,7 +314,7 @@ struct MemberTabView: View {
                     if isMyGroup {
 
                         Text(
-                            "הקבוצה שלי"
+                            t(.myGroupBadge)
                         )
                         .font(.caption2)
                         .fontWeight(
@@ -338,7 +340,9 @@ struct MemberTabView: View {
                 ) {
 
                     Label(
-                        "\(ranking.currentStreak) ימים",
+                        streakText(
+                            ranking.currentStreak
+                        ),
                         systemImage:
                             "flame.fill"
                     )
@@ -393,30 +397,12 @@ struct MemberTabView: View {
         _ minutes: Double
     ) -> String {
 
-        let roundedMinutes =
+        formattedDuration(
             max(
                 0,
-                Int(
-                    minutes.rounded()
-                )
+                Int(minutes.rounded())
             )
-
-        let hours =
-            roundedMinutes / 60
-
-        let remainingMinutes =
-            roundedMinutes % 60
-
-        if hours == 0 {
-            return "\(remainingMinutes) דק׳"
-        }
-
-        if remainingMinutes == 0 {
-            return "\(hours) שע׳"
-        }
-
-        return
-            "\(hours) שע׳ \(remainingMinutes) דק׳"
+        )
     }
 
     // MARK: - Dashboard
@@ -439,14 +425,14 @@ struct MemberTabView: View {
                 ) {
 
                     Text(
-                        "שלום \(displayName(for: user))"
+                        "\(t(.hello)) \(displayName(for: user))"
                     )
                     .font(
                         .largeTitle.bold()
                     )
 
                     Text(
-                        "הנתונים שלך מחוברים ל-TimeUp"
+                        t(.connectedToTimeUp)
                     )
                     .foregroundStyle(
                         .secondary
@@ -464,7 +450,7 @@ struct MemberTabView: View {
                         HStack {
 
                             Label(
-                                "הקבוצה שלי",
+                                t(.myGroup),
                                 systemImage:
                                     "person.3.fill"
                             )
@@ -487,7 +473,7 @@ struct MemberTabView: View {
                             )
 
                         Text(
-                            "קוד קבוצה: \(group.code)"
+                            "\(t(.groupCode)): \(group.code)"
                         )
                         .font(.footnote)
                         .foregroundStyle(
@@ -522,7 +508,7 @@ struct MemberTabView: View {
                 } else {
 
                     ContentUnavailableView(
-                        "אין קבוצה פעילה",
+                        noActiveGroupTitle,
                         systemImage:
                             "person.3.sequence.fill"
                     )
@@ -531,7 +517,7 @@ struct MemberTabView: View {
             .padding(20)
         }
         .navigationTitle(
-            "דשבורד"
+            t(.dashboard)
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -603,7 +589,7 @@ struct MemberTabView: View {
             ) {
 
                 Label(
-                    "אלטרנטיבות לשימושכם",
+                    t(.alternativesTitle),
                     systemImage: "figure.walk"
                 )
                 .font(
@@ -611,7 +597,7 @@ struct MemberTabView: View {
                 )
 
                 Text(
-                    "עשיתם? סימנתם ✓"
+                    t(.alternativesSubtitle)
                 )
                 .font(.subheadline)
                 .foregroundStyle(
@@ -629,7 +615,7 @@ struct MemberTabView: View {
                     ProgressView()
 
                     Text(
-                        "מגריל לכם רעיונות להיום..."
+                        t(.loadingAlternatives)
                     )
                     .foregroundStyle(
                         .secondary
@@ -649,7 +635,7 @@ struct MemberTabView: View {
                 ) {
 
                     Label(
-                        "סיימתם את ההצעות להיום",
+                        t(.alternativesFinished),
                         systemImage:
                             "checkmark.circle.fill"
                     )
@@ -657,7 +643,7 @@ struct MemberTabView: View {
 
                     Text(
                         alternativesStore.alternativesError ??
-                        "מחר יחכו לכם רעיונות חדשים."
+                        t(.alternativesTomorrow)
                     )
                     .font(.subheadline)
                     .foregroundStyle(
@@ -786,7 +772,9 @@ struct MemberTabView: View {
 
                 Image(
                     systemName:
-                        "chevron.left"
+                        localization.language == .english
+                        ? "chevron.right"
+                        : "chevron.left"
                 )
                 .font(.caption)
                 .foregroundStyle(
@@ -822,7 +810,7 @@ struct MemberTabView: View {
             HStack {
 
                 Label(
-                    "מה הקבוצה עשתה היום",
+                    t(.groupActivityToday),
                     systemImage:
                         "person.3.fill"
                 )
@@ -856,7 +844,7 @@ struct MemberTabView: View {
                     ProgressView()
 
                     Text(
-                        "טוען פעילות קבוצתית..."
+                        t(.loadingGroupActivity)
                     )
                     .foregroundStyle(
                         .secondary
@@ -876,7 +864,7 @@ struct MemberTabView: View {
                 ) {
 
                     Text(
-                        "עוד לא סומנה אלטרנטיבה היום."
+                        t(.noAlternativeCompleted)
                     )
                     .font(.subheadline)
                     .fontWeight(
@@ -884,7 +872,7 @@ struct MemberTabView: View {
                     )
 
                     Text(
-                        "תהיו הראשונים בקבוצה שעושים משהו במקום להיות בטלפון."
+                        t(.beFirstInGroup)
                     )
                     .font(.footnote)
                     .foregroundStyle(
@@ -1015,7 +1003,7 @@ struct MemberTabView: View {
             HStack {
 
                 Label(
-                    "היום שלי",
+                    t(.myToday),
                     systemImage:
                         "chart.bar.fill"
                 )
@@ -1028,7 +1016,7 @@ struct MemberTabView: View {
                 ) {
 
                     Text(
-                        "יום למידה"
+                        t(.learningDay)
                     )
                     .font(.caption)
                     .fontWeight(
@@ -1054,7 +1042,7 @@ struct MemberTabView: View {
             ) {
 
                 progressValue(
-                    title: "שימוש",
+                    title: t(.usage),
                     value:
                         formattedMinutes(
                             dataStore
@@ -1067,7 +1055,7 @@ struct MemberTabView: View {
                 )
 
                 progressValue(
-                    title: "יעד",
+                    title: t(.target),
                     value:
                         formattedMinutes(
                             dataStore
@@ -1140,7 +1128,7 @@ struct MemberTabView: View {
                         )
 
                         Text(
-                            "קוד קבוצה: \(group.code)"
+                            "\(t(.groupCode)): \(group.code)"
                         )
                         .font(.footnote)
                         .foregroundStyle(
@@ -1166,7 +1154,7 @@ struct MemberTabView: View {
             .padding(20)
         }
         .navigationTitle(
-            "הקבוצה"
+            t(.group)
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -1243,7 +1231,7 @@ struct MemberTabView: View {
             ) {
 
                 Text(
-                    "רצף קבוצתי"
+                    t(.groupStreak)
                 )
                 .font(.subheadline)
                 .foregroundStyle(
@@ -1251,7 +1239,9 @@ struct MemberTabView: View {
                 )
 
                 Text(
-                    "\(dataStore.currentGroupStreak) ימים"
+                    streakText(
+                        dataStore.currentGroupStreak
+                    )
                 )
                 .font(
                     .title2.bold()
@@ -1291,7 +1281,7 @@ struct MemberTabView: View {
                 HStack {
 
                     Label(
-                        "מצב הקבוצה היום",
+                        t(.groupStatusToday),
                         systemImage:
                             "chart.bar.fill"
                     )
@@ -1318,7 +1308,7 @@ struct MemberTabView: View {
                 ) {
 
                     groupMetric(
-                        title: "השלימו",
+                        title: t(.completed),
                         value:
                             "\(result.completedMemberCount)/\(result.memberCount)",
                         icon:
@@ -1326,7 +1316,7 @@ struct MemberTabView: View {
                     )
 
                     groupMetric(
-                        title: "ממוצע",
+                        title: t(.average),
                         value:
                             formattedMinutes(
                                 result
@@ -1339,8 +1329,8 @@ struct MemberTabView: View {
 
                 Label(
                     result.succeeded
-                        ? "הקבוצה עמדה ביעד"
-                        : "הקבוצה עדיין לא השלימה את היעד",
+                        ? t(.groupAchievedTarget)
+                        : t(.groupStillInProgress),
                     systemImage:
                         result.succeeded
                         ? "checkmark.circle.fill"
@@ -1377,14 +1367,14 @@ struct MemberTabView: View {
             ) {
 
                 Label(
-                    "מצב הקבוצה היום",
+                    t(.groupStatusToday),
                     systemImage:
                         "clock.fill"
                 )
                 .font(.headline)
 
                 Text(
-                    "התוצאה הקבוצתית של היום עדיין לא נקבעה."
+                    t(.groupResultPending)
                 )
                 .font(.subheadline)
                 .foregroundStyle(
@@ -1468,7 +1458,7 @@ struct MemberTabView: View {
             HStack {
 
                 Label(
-                    "חברים",
+                    t(.members),
                     systemImage:
                         "person.2.fill"
                 )
@@ -1504,7 +1494,7 @@ struct MemberTabView: View {
                     ProgressView()
 
                     Text(
-                        "טוען נתוני קבוצה..."
+                        t(.loadingGroup)
                     )
                     .foregroundStyle(
                         .secondary
@@ -1521,12 +1511,12 @@ struct MemberTabView: View {
                     .isEmpty {
 
                 ContentUnavailableView(
-                    "אין חברים להצגה",
+                    t(.noMembers),
                     systemImage:
                         "person.2.slash",
                     description:
                         Text(
-                            "לא נמצאו חברים פעילים בקבוצה."
+                            noActiveMembersDescription
                         )
                 )
 
@@ -1615,7 +1605,7 @@ struct MemberTabView: View {
                                 .id {
 
                             Text(
-                                "אתה"
+                                t(.you)
                             )
                             .font(.caption)
                             .fontWeight(
@@ -1644,7 +1634,7 @@ struct MemberTabView: View {
                         ) {
 
                         Text(
-                            "יום למידה"
+                            t(.learningDay)
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -1666,7 +1656,9 @@ struct MemberTabView: View {
                                 .joinedAt {
 
                         Text(
-                            "הצטרף \(joinedAt.formatted(date: .abbreviated, time: .omitted))"
+                            joinedText(
+                                joinedAt
+                            )
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -1690,7 +1682,7 @@ struct MemberTabView: View {
             ) {
 
                 progressValue(
-                    title: "שימוש",
+                    title: t(.usage),
                     value:
                         formattedMinutes(
                             dataStore
@@ -1704,7 +1696,7 @@ struct MemberTabView: View {
                 )
 
                 progressValue(
-                    title: "יעד",
+                    title: t(.target),
                     value:
                         formattedMinutes(
                             dataStore
@@ -1835,7 +1827,7 @@ struct MemberTabView: View {
         ) {
 
             Label(
-                "יום למידה",
+                t(.learningDay),
                 systemImage:
                     "book.fill"
             )
@@ -1851,8 +1843,8 @@ struct MemberTabView: View {
 
             Label(
                 achieved
-                    ? "עמדת ביעד"
-                    : "היעד לא הושג",
+                    ? t(.achievedTarget)
+                    : t(.targetNotAchieved),
                 systemImage:
                     achieved
                     ? "checkmark.circle.fill"
@@ -1871,7 +1863,7 @@ struct MemberTabView: View {
         } else {
 
             Label(
-                "היום עדיין בתהליך",
+                t(.dayInProgress),
                 systemImage:
                     "clock.fill"
             )
@@ -1890,32 +1882,65 @@ struct MemberTabView: View {
             return "—"
         }
 
-        let safeMinutes =
+        return formattedDuration(
             max(
                 0,
                 minutes
             )
+        )
+    }
+
+    private func formattedDuration(
+        _ minutes: Int
+    ) -> String {
 
         let hours =
-            safeMinutes / 60
+            minutes / 60
 
         let remainingMinutes =
-            safeMinutes % 60
+            minutes % 60
 
-        if hours == 0 {
+        switch localization.language {
+
+        case .hebrew:
+
+            if hours == 0 {
+                return "\(remainingMinutes) דק׳"
+            }
+
+            if remainingMinutes == 0 {
+                return "\(hours) שע׳"
+            }
 
             return
-                "\(remainingMinutes) דק׳"
-        }
+                "\(hours) שע׳ \(remainingMinutes) דק׳"
 
-        if remainingMinutes == 0 {
+        case .english:
+
+            if hours == 0 {
+                return "\(remainingMinutes) min"
+            }
+
+            if remainingMinutes == 0 {
+                return "\(hours) hr"
+            }
 
             return
-                "\(hours) שע׳"
-        }
+                "\(hours) hr \(remainingMinutes) min"
 
-        return
-            "\(hours) שע׳ \(remainingMinutes) דק׳"
+        case .arabic:
+
+            if hours == 0 {
+                return "\(remainingMinutes) د"
+            }
+
+            if remainingMinutes == 0 {
+                return "\(hours) س"
+            }
+
+            return
+                "\(hours) س \(remainingMinutes) د"
+        }
     }
 
     // MARK: - Profile
@@ -1961,7 +1986,7 @@ struct MemberTabView: View {
                 }
             }
             .accessibilityLabel(
-                "פרופיל"
+                t(.profile)
             )
         }
     }
@@ -1978,7 +2003,7 @@ struct MemberTabView: View {
             ProgressView()
 
             Text(
-                "טוען את החשבון..."
+                t(.accountLoading)
             )
             .foregroundStyle(
                 .secondary
@@ -1994,13 +2019,13 @@ struct MemberTabView: View {
         some View {
 
         ContentUnavailableView(
-            "לא ניתן לטעון את החשבון",
+            t(.accountUnavailable),
             systemImage:
                 "person.crop.circle.badge.exclamationmark",
             description:
                 Text(
                     dataStore.lastError ??
-                    "נסה להתחבר מחדש."
+                    t(.tryLoginAgain)
                 )
         )
     }
@@ -2076,6 +2101,105 @@ struct MemberTabView: View {
             ? "TimeUp"
             : name
     }
+
+    // MARK: - Localization Helpers
+
+    private func t(
+        _ key: TimeUpText
+    ) -> String {
+
+        localization.text(key)
+    }
+
+    private func streakText(
+        _ streak: Int
+    ) -> String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "\(streak) ימים"
+
+        case .english:
+            return streak == 1
+                ? "1 day"
+                : "\(streak) days"
+
+        case .arabic:
+            return "\(streak) أيام"
+        }
+    }
+
+    private func joinedText(
+        _ date: Date
+    ) -> String {
+
+        let formattedDate =
+            date.formatted(
+                date: .abbreviated,
+                time: .omitted
+            )
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הצטרף \(formattedDate)"
+
+        case .english:
+            return "Joined \(formattedDate)"
+
+        case .arabic:
+            return "انضم \(formattedDate)"
+        }
+    }
+
+    private var noActiveGroupTitle:
+        String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אין קבוצה פעילה"
+
+        case .english:
+            return "No Active Group"
+
+        case .arabic:
+            return "لا توجد مجموعة نشطة"
+        }
+    }
+
+    private var noActiveGroupDescription:
+        String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "החשבון אינו משויך כרגע לקבוצה פעילה."
+
+        case .english:
+            return "Your account is not currently assigned to an active group."
+
+        case .arabic:
+            return "حسابك غير مرتبط حاليًا بمجموعة نشطة."
+        }
+    }
+
+    private var noActiveMembersDescription:
+        String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא נמצאו חברים פעילים בקבוצה."
+
+        case .english:
+            return "No active members were found in the group."
+
+        case .arabic:
+            return "لم يتم العثور على أعضاء نشطين في المجموعة."
+        }
+    }
 }
 
 // MARK: - Supabase Member Profile
@@ -2091,6 +2215,9 @@ private struct SupabaseMemberProfileView:
 
     @StateObject private var dataStore =
         SupabaseDataStore.shared
+
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
 
     @State private var isLoggingOut =
         false
@@ -2158,7 +2285,9 @@ private struct SupabaseMemberProfileView:
                 } label: {
 
                     Label(
-                        "הגדרות",
+                        localization.text(
+                            .settings
+                        ),
                         systemImage:
                             "gearshape"
                     )
@@ -2179,7 +2308,9 @@ private struct SupabaseMemberProfileView:
                     HStack {
 
                         Label(
-                            "יציאה מהחשבון",
+                            localization.text(
+                                .logout
+                            ),
                             systemImage:
                                 "rectangle.portrait.and.arrow.right"
                         )
@@ -2198,7 +2329,9 @@ private struct SupabaseMemberProfileView:
             }
         }
         .navigationTitle(
-            "פרופיל"
+            localization.text(
+                .profile
+            )
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -2211,7 +2344,9 @@ private struct SupabaseMemberProfileView:
             ) {
 
                 Button(
-                    "סגור"
+                    localization.text(
+                        .close
+                    )
                 ) {
 
                     dismiss()
