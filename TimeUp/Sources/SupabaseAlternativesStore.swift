@@ -35,7 +35,7 @@ final class SupabaseAlternativesStore: ObservableObject {
     struct Alternative: Identifiable, Decodable, Equatable {
 
         let alternativeID: Int64
-        let textHE: String
+        let alternativeText: String
 
         var id: Int64 {
             alternativeID
@@ -43,7 +43,7 @@ final class SupabaseAlternativesStore: ObservableObject {
 
         enum CodingKeys: String, CodingKey {
             case alternativeID = "alternative_id"
-            case textHE = "text_he"
+            case alternativeText = "alternative_text"
         }
     }
 
@@ -91,10 +91,12 @@ final class SupabaseAlternativesStore: ObservableObject {
 
         let groupID: UUID
         let limit: Int
+        let language: String
 
         enum CodingKeys: String, CodingKey {
             case groupID = "p_group_id"
             case limit = "p_limit"
+            case language = "p_language"
         }
     }
 
@@ -116,6 +118,13 @@ final class SupabaseAlternativesStore: ObservableObject {
         enum CodingKeys: String, CodingKey {
             case groupID = "p_group_id"
         }
+    }
+
+    // MARK: - Language
+
+    private var currentLanguageCode: String {
+
+        TimeUpLocalization.shared.language.rawValue
     }
 
     // MARK: - Initial Load
@@ -166,7 +175,9 @@ final class SupabaseAlternativesStore: ObservableObject {
                         params:
                             GetAlternativesParameters(
                                 groupID: groupID,
-                                limit: 5
+                                limit: 5,
+                                language:
+                                    currentLanguageCode
                             )
                     )
                     .execute()
@@ -226,21 +237,18 @@ final class SupabaseAlternativesStore: ObservableObject {
                     .execute()
                     .value
 
-            // Remove the completed item immediately
-            // so the UI responds without waiting.
+            // Remove completed item immediately.
 
             alternatives.removeAll {
                 $0.alternativeID ==
                     alternative.alternativeID
             }
 
-            // Ask Supabase for the full current list.
+            // Fetch the same current daily list,
+            // filling only the missing slot.
             //
-            // The server now preserves today's active
-            // suggestions and fills only the missing slot.
-            //
-            // Result:
-            // 4 existing suggestions + 1 new suggestion.
+            // The selected language affects only the text.
+            // It does not change today's selected IDs.
 
             let currentAlternatives: [Alternative] =
                 try await client
@@ -249,7 +257,9 @@ final class SupabaseAlternativesStore: ObservableObject {
                         params:
                             GetAlternativesParameters(
                                 groupID: groupID,
-                                limit: 5
+                                limit: 5,
+                                language:
+                                    currentLanguageCode
                             )
                     )
                     .execute()
@@ -258,11 +268,8 @@ final class SupabaseAlternativesStore: ObservableObject {
             alternatives =
                 currentAlternatives
 
-            // Refresh immediately for the member who
-            // completed the alternative.
-            //
-            // Other group members receive the update
-            // through Realtime.
+            // Refresh immediately for this member.
+            // Other members receive feed changes via Realtime.
 
             await loadGroupFeed(
                 groupID: groupID
@@ -273,6 +280,22 @@ final class SupabaseAlternativesStore: ObservableObject {
             alternativesError =
                 error.localizedDescription
         }
+    }
+
+    // MARK: - Language Refresh
+
+    func refreshLanguage(
+        groupID: UUID
+    ) async {
+
+        // This asks Supabase for the same current
+        // alternative IDs using the newly selected language.
+        //
+        // The RPC preserves today's stable suggestions.
+
+        await loadAlternatives(
+            groupID: groupID
+        )
     }
 
     // MARK: - Group Feed
