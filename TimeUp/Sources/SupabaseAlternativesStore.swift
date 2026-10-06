@@ -226,48 +226,43 @@ final class SupabaseAlternativesStore: ObservableObject {
                     .execute()
                     .value
 
-            // Remove completed alternative immediately.
+            // Remove the completed item immediately
+            // so the UI responds without waiting.
 
             alternatives.removeAll {
                 $0.alternativeID ==
                     alternative.alternativeID
             }
 
-            // Get one fresh random replacement.
+            // Ask Supabase for the full current list.
+            //
+            // The server now preserves today's active
+            // suggestions and fills only the missing slot.
+            //
+            // Result:
+            // 4 existing suggestions + 1 new suggestion.
 
-            let replacements: [Alternative] =
+            let currentAlternatives: [Alternative] =
                 try await client
                     .rpc(
                         "get_timeup_alternatives",
                         params:
                             GetAlternativesParameters(
                                 groupID: groupID,
-                                limit: 1
+                                limit: 5
                             )
                     )
                     .execute()
                     .value
 
-            if let replacement =
-                replacements.first {
+            alternatives =
+                currentAlternatives
 
-                let alreadyExists =
-                    alternatives.contains {
-                        $0.alternativeID ==
-                            replacement.alternativeID
-                    }
-
-                if !alreadyExists {
-
-                    alternatives.append(
-                        replacement
-                    )
-                }
-            }
-
-            // Immediate refresh for the member
-            // who completed the alternative.
-            // Realtime updates the other members.
+            // Refresh immediately for the member who
+            // completed the alternative.
+            //
+            // Other group members receive the update
+            // through Realtime.
 
             await loadGroupFeed(
                 groupID: groupID
