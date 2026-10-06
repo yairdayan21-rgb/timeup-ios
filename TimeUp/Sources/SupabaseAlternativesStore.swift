@@ -114,9 +114,11 @@ final class SupabaseAlternativesStore: ObservableObject {
     private struct GroupFeedParameters: Encodable {
 
         let groupID: UUID
+        let language: String
 
         enum CodingKeys: String, CodingKey {
             case groupID = "p_group_id"
+            case language = "p_language"
         }
     }
 
@@ -288,13 +290,25 @@ final class SupabaseAlternativesStore: ObservableObject {
         groupID: UUID
     ) async {
 
-        // This asks Supabase for the same current
-        // alternative IDs using the newly selected language.
+        // Refresh both the current alternatives
+        // and the group feed in the selected language.
         //
-        // The RPC preserves today's stable suggestions.
+        // The alternatives RPC preserves today's
+        // stable suggestion IDs.
 
-        await loadAlternatives(
-            groupID: groupID
+        async let alternativesTask: Void =
+            loadAlternatives(
+                groupID: groupID
+            )
+
+        async let feedTask: Void =
+            loadGroupFeed(
+                groupID: groupID
+            )
+
+        _ = await (
+            alternativesTask,
+            feedTask
         )
     }
 
@@ -319,7 +333,9 @@ final class SupabaseAlternativesStore: ObservableObject {
                         "get_timeup_group_alternatives_feed",
                         params:
                             GroupFeedParameters(
-                                groupID: groupID
+                                groupID: groupID,
+                                language:
+                                    currentLanguageCode
                             )
                     )
                     .execute()
