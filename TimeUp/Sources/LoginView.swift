@@ -9,6 +9,9 @@ struct LoginView: View {
     @StateObject private var dataStore =
         SupabaseDataStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var showJoinScreen = false
     @State private var showMemberApp = false
     @State private var showAdminApp = false
@@ -71,8 +74,12 @@ struct LoginView: View {
                             weight: .light
                         )
                     )
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.primary)
+                    .symbolRenderingMode(
+                        .hierarchical
+                    )
+                    .foregroundStyle(
+                        .primary
+                    )
 
                 Text("TimeUp")
                     .font(
@@ -82,19 +89,34 @@ struct LoginView: View {
                             design: .rounded
                         )
                     )
-                    .padding(.top, 20)
+                    .padding(
+                        .top,
+                        20
+                    )
 
-                Text("להקטין זמן מסך. לגדול ביחד.")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 8)
+                Text(
+                    taglineText
+                )
+                .font(.headline)
+                .foregroundStyle(
+                    .secondary
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+                .padding(
+                    .top,
+                    8
+                )
 
                 Spacer()
 
-                VStack(spacing: 12) {
+                VStack(
+                    spacing: 12
+                ) {
 
                     SignInWithAppleButton(
-                        .continue,
+                        appleButtonLabel,
                         onRequest:
                             configureAppleRequest,
                         onCompletion:
@@ -103,7 +125,9 @@ struct LoginView: View {
                     .signInWithAppleButtonStyle(
                         .black
                     )
-                    .frame(height: 54)
+                    .frame(
+                        height: 54
+                    )
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 12
@@ -111,7 +135,9 @@ struct LoginView: View {
                     )
 
                     Button {
+
                         startGoogleSignIn()
+
                     } label: {
 
                         HStack {
@@ -122,44 +148,69 @@ struct LoginView: View {
                             )
 
                             Text(
-                                "Continue with Google"
+                                googleButtonText
                             )
-                            .fontWeight(.semibold)
+                            .fontWeight(
+                                .semibold
+                            )
                         }
                         .frame(
                             maxWidth: .infinity
                         )
-                        .frame(height: 54)
+                        .frame(
+                            height: 54
+                        )
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(
+                        .bordered
+                    )
                 }
 
                 if !appleSignInError.isEmpty {
 
-                    Text(appleSignInError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(
-                            .center
-                        )
-                        .padding(.top, 12)
+                    Text(
+                        appleSignInError
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .red
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .padding(
+                        .top,
+                        12
+                    )
                 }
 
                 Text(
-                    "By continuing, you agree to TimeUp's Terms & Privacy Policy."
+                    termsText
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 20)
+                .foregroundStyle(
+                    .secondary
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+                .padding(
+                    .top,
+                    20
+                )
 
                 Spacer()
-                    .frame(height: 32)
+                    .frame(
+                        height: 32
+                    )
             }
-            .padding(.horizontal, 24)
-
+            .padding(
+                .horizontal,
+                24
+            )
             .navigationDestination(
-                isPresented: $showJoinScreen
+                isPresented:
+                    $showJoinScreen
             ) {
 
                 JoinGroupView(
@@ -172,9 +223,9 @@ struct LoginView: View {
                     true
                 )
             }
-
             .navigationDestination(
-                isPresented: $showMemberApp
+                isPresented:
+                    $showMemberApp
             ) {
 
                 MemberTabView()
@@ -182,9 +233,9 @@ struct LoginView: View {
                         true
                     )
             }
-
             .navigationDestination(
-                isPresented: $showAdminApp
+                isPresented:
+                    $showAdminApp
             ) {
 
                 AdminHomeView()
@@ -202,16 +253,21 @@ struct LoginView: View {
             ASAuthorizationAppleIDRequest
     ) {
 
-        let nonce = randomNonceString()
+        let nonce =
+            randomNonceString()
 
-        currentNonce = nonce
+        currentNonce =
+            nonce
 
         request.requestedScopes = [
             .fullName,
             .email
         ]
 
-        request.nonce = sha256(nonce)
+        request.nonce =
+            sha256(
+                nonce
+            )
     }
 
     private func handleAppleResult(
@@ -223,43 +279,50 @@ struct LoginView: View {
 
         switch result {
 
-        case .success(let authorization):
+        case .success(
+            let authorization
+        ):
 
             guard
                 let credential =
-                    authorization.credential
+                    authorization
+                        .credential
                         as?
                         ASAuthorizationAppleIDCredential
             else {
 
                 appleSignInError =
-                    "לא ניתן היה לקרוא את פרטי ההתחברות."
+                    unableToReadLoginText
 
                 return
             }
 
             guard
-                let nonce = currentNonce
+                let nonce =
+                    currentNonce
             else {
 
                 appleSignInError =
-                    "לא ניתן היה לאמת את ההתחברות עם Apple."
+                    unableToVerifyAppleText
 
                 return
             }
 
             guard
                 let identityToken =
-                    credential.identityToken,
+                    credential
+                        .identityToken,
                 let idToken =
                     String(
-                        data: identityToken,
-                        encoding: .utf8
+                        data:
+                            identityToken,
+                        encoding:
+                            .utf8
                     )
             else {
 
                 appleSignInError =
-                    "לא התקבל Apple ID Token."
+                    missingAppleTokenText
 
                 return
             }
@@ -267,10 +330,12 @@ struct LoginView: View {
             let appleUserID =
                 credential.user
 
-            guard !appleUserID.isEmpty else {
+            guard
+                !appleUserID.isEmpty
+            else {
 
                 appleSignInError =
-                    "לא התקבל מזהה משתמש מ-Apple."
+                    missingAppleUserIDText
 
                 return
             }
@@ -283,29 +348,37 @@ struct LoginView: View {
 
                     let session =
                         try await
-                            SupabaseManager.shared
+                            SupabaseManager
+                                .shared
                                 .client
                                 .auth
                                 .signInWithIdToken(
                                     credentials:
                                         OpenIDConnectCredentials(
-                                            provider: .apple,
-                                            idToken: idToken,
-                                            nonce: nonce
+                                            provider:
+                                                .apple,
+                                            idToken:
+                                                idToken,
+                                            nonce:
+                                                nonce
                                         )
                                 )
 
                     let displayName =
                         appleDisplayName(
-                            from: credential
+                            from:
+                                credential
                         )
 
                     try await
                         ensureSupabaseUserExists(
                             authUserID:
-                                session.user.id,
+                                session
+                                    .user
+                                    .id,
                             email:
-                                credential.email,
+                                credential
+                                    .email,
                             displayName:
                                 displayName
                         )
@@ -315,7 +388,8 @@ struct LoginView: View {
 
                     await MainActor.run {
 
-                        currentNonce = nil
+                        currentNonce =
+                            nil
 
                         authenticatedProvider =
                             .apple
@@ -330,26 +404,35 @@ struct LoginView: View {
 
                     await MainActor.run {
 
-                        currentNonce = nil
+                        currentNonce =
+                            nil
 
                         appleSignInError =
-                            "ההתחברות ל-TimeUp לא הושלמה."
+                            timeUpLoginIncompleteText
                     }
                 }
             }
 
-        case .failure(let error):
+        case .failure(
+            let error
+        ):
 
-            currentNonce = nil
-            authenticatedProvider = nil
-            authenticatedUserID = nil
+            currentNonce =
+                nil
+
+            authenticatedProvider =
+                nil
+
+            authenticatedUserID =
+                nil
 
             if
                 let authorizationError =
                     error as?
                     ASAuthorizationError,
-                authorizationError.code
-                    == .canceled
+                authorizationError
+                    .code ==
+                    .canceled
             {
 
                 appleSignInError = ""
@@ -357,7 +440,7 @@ struct LoginView: View {
             } else {
 
                 appleSignInError =
-                    "ההתחברות עם Apple לא הושלמה."
+                    appleLoginIncompleteText
             }
         }
     }
@@ -373,13 +456,16 @@ struct LoginView: View {
         let existingUsers:
             [SupabaseTimeUpUser] =
             try await
-                SupabaseManager.shared.client
+                SupabaseManager
+                    .shared
+                    .client
                     .from("users")
                     .select()
                     .eq(
                         "auth_user_id",
                         value:
-                            authUserID.uuidString
+                            authUserID
+                                .uuidString
                     )
                     .limit(1)
                     .execute()
@@ -402,35 +488,46 @@ struct LoginView: View {
             )
 
         try await
-            SupabaseManager.shared.client
+            SupabaseManager
+                .shared
+                .client
                 .from("users")
-                .insert(newUser)
+                .insert(
+                    newUser
+                )
                 .execute()
     }
 
     private func routeAuthenticatedUser() {
 
-        guard dataStore.currentUser != nil else {
+        guard
+            dataStore.currentUser != nil
+        else {
 
             appleSignInError =
-                "לא ניתן היה לטעון את חשבון TimeUp."
+                unableToLoadAccountText
 
             return
         }
 
         if dataStore.isAdmin {
 
-            showAdminApp = true
+            showAdminApp =
+                true
+
             return
         }
 
         if dataStore.hasActiveGroup {
 
-            showMemberApp = true
+            showMemberApp =
+                true
+
             return
         }
 
-        showJoinScreen = true
+        showJoinScreen =
+            true
     }
 
     private func appleDisplayName(
@@ -449,16 +546,20 @@ struct LoginView: View {
             PersonNameComponentsFormatter()
 
         let name =
-            formatter.string(
-                from: fullName
-            )
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+            formatter
+                .string(
+                    from:
+                        fullName
+                )
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
 
-        return name.isEmpty
-            ? nil
-            : name
+        return
+            name.isEmpty
+                ? nil
+                : name
     }
 
     // MARK: - Nonce
@@ -467,7 +568,9 @@ struct LoginView: View {
         length: Int = 32
     ) -> String {
 
-        precondition(length > 0)
+        precondition(
+            length > 0
+        )
 
         let charset:
             [Character] =
@@ -476,11 +579,13 @@ struct LoginView: View {
             )
 
         var result = ""
-        var remainingLength = length
+        var remainingLength =
+            length
 
         while remainingLength > 0 {
 
-            var random: UInt8 = 0
+            var random:
+                UInt8 = 0
 
             let errorCode =
                 SecRandomCopyBytes(
@@ -489,18 +594,22 @@ struct LoginView: View {
                     &random
                 )
 
-            if errorCode != errSecSuccess {
+            if errorCode !=
+                errSecSuccess {
 
                 fatalError(
                     "Unable to generate nonce."
                 )
             }
 
-            if random < charset.count {
+            if random <
+                charset.count {
 
                 result.append(
                     charset[
-                        Int(random)
+                        Int(
+                            random
+                        )
                     ]
                 )
 
@@ -516,16 +625,20 @@ struct LoginView: View {
     ) -> String {
 
         let inputData =
-            Data(input.utf8)
+            Data(
+                input.utf8
+            )
 
         let hashed =
             SHA256.hash(
-                data: inputData
+                data:
+                    inputData
             )
 
         return hashed.map {
             String(
-                format: "%02x",
+                format:
+                    "%02x",
                 $0
             )
         }
@@ -536,10 +649,195 @@ struct LoginView: View {
 
     private func startGoogleSignIn() {
 
-        authenticatedProvider = nil
-        authenticatedUserID = nil
+        authenticatedProvider =
+            nil
+
+        authenticatedUserID =
+            nil
 
         appleSignInError =
-            "Google Sign-In עדיין לא מחובר."
+            googleNotConnectedText
+    }
+
+    // MARK: - Apple Button
+
+    private var appleButtonLabel:
+        SignInWithAppleButton.Label {
+
+        switch localization.language {
+
+        case .hebrew,
+             .english,
+             .arabic:
+
+            return .continue
+        }
+    }
+
+    // MARK: - Localization
+
+    private var taglineText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "להקטין זמן מסך. לגדול ביחד."
+
+        case .english:
+            return "Less screen time. Grow together."
+
+        case .arabic:
+            return "وقت شاشة أقل. ننمو معًا."
+        }
+    }
+
+    private var googleButtonText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "המשך עם Google"
+
+        case .english:
+            return "Continue with Google"
+
+        case .arabic:
+            return "المتابعة باستخدام Google"
+        }
+    }
+
+    private var termsText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "בהמשך, אתה מסכים לתנאי השימוש ולמדיניות הפרטיות של TimeUp."
+
+        case .english:
+            return "By continuing, you agree to TimeUp's Terms & Privacy Policy."
+
+        case .arabic:
+            return "بالمتابعة، أنت توافق على شروط الاستخدام وسياسة الخصوصية الخاصة بـ TimeUp."
+        }
+    }
+
+    private var unableToReadLoginText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן היה לקרוא את פרטי ההתחברות."
+
+        case .english:
+            return "Unable to read the sign-in details."
+
+        case .arabic:
+            return "تعذر قراءة تفاصيل تسجيل الدخول."
+        }
+    }
+
+    private var unableToVerifyAppleText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן היה לאמת את ההתחברות עם Apple."
+
+        case .english:
+            return "Unable to verify the Apple sign-in."
+
+        case .arabic:
+            return "تعذر التحقق من تسجيل الدخول باستخدام Apple."
+        }
+    }
+
+    private var missingAppleTokenText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא התקבל Apple ID Token."
+
+        case .english:
+            return "Apple ID Token was not received."
+
+        case .arabic:
+            return "لم يتم استلام Apple ID Token."
+        }
+    }
+
+    private var missingAppleUserIDText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא התקבל מזהה משתמש מ-Apple."
+
+        case .english:
+            return "Apple user ID was not received."
+
+        case .arabic:
+            return "لم يتم استلام معرّف المستخدم من Apple."
+        }
+    }
+
+    private var timeUpLoginIncompleteText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "ההתחברות ל-TimeUp לא הושלמה."
+
+        case .english:
+            return "Sign-in to TimeUp could not be completed."
+
+        case .arabic:
+            return "تعذر إكمال تسجيل الدخول إلى TimeUp."
+        }
+    }
+
+    private var appleLoginIncompleteText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "ההתחברות עם Apple לא הושלמה."
+
+        case .english:
+            return "Sign-in with Apple could not be completed."
+
+        case .arabic:
+            return "تعذر إكمال تسجيل الدخول باستخدام Apple."
+        }
+    }
+
+    private var unableToLoadAccountText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "לא ניתן היה לטעון את חשבון TimeUp."
+
+        case .english:
+            return "Unable to load your TimeUp account."
+
+        case .arabic:
+            return "تعذر تحميل حساب TimeUp الخاص بك."
+        }
+    }
+
+    private var googleNotConnectedText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "התחברות עם Google עדיין לא מחוברת."
+
+        case .english:
+            return "Google Sign-In is not connected yet."
+
+        case .arabic:
+            return "تسجيل الدخول باستخدام Google غير متصل بعد."
+        }
     }
 }
