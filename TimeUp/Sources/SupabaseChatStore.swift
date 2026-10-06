@@ -7,7 +7,7 @@ final class SupabaseChatStore: ObservableObject {
     static let shared = SupabaseChatStore()
 
     @Published private(set) var messages: [ChatMessage] = []
-    @Published private(set) var unreadCounts: [UUID: Int] = [:]
+    @Published private(set) var unreadCounts: [UUID: Int] = []
 
     @Published private(set) var isLoading = false
     @Published private(set) var isSending = false
@@ -15,9 +15,16 @@ final class SupabaseChatStore: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
+    // Foreground chat realtime
     private var realtimeChannel: RealtimeChannelV2?
     private var realtimeTask: Task<Void, Never>?
     private var subscribedGroupID: UUID?
+
+    // Independent unread realtime
+    private var unreadRealtimeChannel: RealtimeChannelV2?
+    private var unreadRealtimeTask: Task<Void, Never>?
+    private var unreadSubscribedGroupID: UUID?
+    private var unreadSubscribedUserID: UUID?
 
     private init() {}
 
@@ -304,7 +311,7 @@ final class SupabaseChatStore: ObservableObject {
         }
     }
 
-    // MARK: - Realtime
+    // MARK: - Foreground Chat Realtime
 
     @MainActor
     func startRealtime(
@@ -312,13 +319,6 @@ final class SupabaseChatStore: ObservableObject {
         currentUserID: UUID? = nil,
         markIncomingAsRead: Bool = false
     ) async {
-
-        if subscribedGroupID ==
-            groupID,
-           realtimeChannel != nil {
-
-            return
-        }
 
         await stopRealtime()
 
@@ -400,7 +400,7 @@ final class SupabaseChatStore: ObservableObject {
         }
     }
 
-    // MARK: - Stop Realtime
+    // MARK: - Stop Foreground Chat Realtime
 
     @MainActor
     func stopRealtime() async {
@@ -418,6 +418,115 @@ final class SupabaseChatStore: ObservableObject {
 
         realtimeChannel = nil
         subscribedGroupID = nil
+    }
+
+    // MARK: - Independent Unread Realtime
+
+    @MainActor
+    func startUnreadRealtime(
+        groupID: UUID,
+        currentUserID: UUID
+    ) async {
+
+        if unreadSubscribedGroupID == groupID,
+           unreadSubscribedUserID == currentUserID,
+           unreadRealtimeChannel != nil {
+
+            await loadUnreadCount(
+                groupID: groupID,
+                userID: currentUserID
+            )
+
+            return
+        }
+
+        await stopUnreadRealtime()
+
+        unreadSubscribedGroupID =
+            groupID
+
+        unreadSubscribedUserID =
+            currentUserID
+
+        await loadUnreadCount(
+            groupID: groupID,
+            userID: currentUserID
+        )
+
+        let channel =
+            client.realtimeV2.channel(
+                "timeup-group-unread-\(groupID.uuidString)-\(currentUserID.uuidString)"
+            )
+
+        unreadRealtimeChannel =
+            channel
+
+        let insertions =
+            channel.postgresChange(
+                InsertAction.self,
+                schema: "public",
+                table: "group_messages",
+                filter:
+                    "group_id=eq.\(groupID.uuidString)"
+            )
+
+        unreadRealtimeTask =
+            Task { [weak self] in
+
+                guard let self else {
+                    return
+                }
+
+                for await _ in insertions {
+
+                    guard !Task.isCancelled else {
+                        return
+                    }
+
+                    await self.loadUnreadCount(
+                        groupID: groupID,
+                        userID: currentUserID
+                    )
+                }
+            }
+
+        do {
+
+            try await channel.subscribe()
+
+        } catch {
+
+            lastError =
+                error.localizedDescription
+
+            unreadRealtimeTask?.cancel()
+            unreadRealtimeTask = nil
+
+            unreadRealtimeChannel = nil
+            unreadSubscribedGroupID = nil
+            unreadSubscribedUserID = nil
+        }
+    }
+
+    // MARK: - Stop Independent Unread Realtime
+
+    @MainActor
+    func stopUnreadRealtime() async {
+
+        unreadRealtimeTask?.cancel()
+        unreadRealtimeTask = nil
+
+        if let unreadRealtimeChannel {
+
+            await client.realtimeV2
+                .removeChannel(
+                    unreadRealtimeChannel
+                )
+        }
+
+        unreadRealtimeChannel = nil
+        unreadSubscribedGroupID = nil
+        unreadSubscribedUserID = nil
     }
 
     // MARK: - Send Message
@@ -498,6 +607,7 @@ final class SupabaseChatStore: ObservableObject {
     func clear() async {
 
         await stopRealtime()
+        await stopUnreadRealtime()
 
         messages = []
         unreadCounts = [:]
