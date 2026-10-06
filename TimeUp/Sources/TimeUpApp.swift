@@ -7,6 +7,9 @@ struct TimeUpApp: App {
     @StateObject private var store =
         TimeUpStore.shared
 
+    @StateObject private var localization =
+        TimeUpLocalization.shared
+
     private let screenTimeSyncTaskIdentifier =
         "com.timeup.app.screen-time-sync"
 
@@ -22,7 +25,20 @@ struct TimeUpApp: App {
             RootView()
                 .environmentObject(store)
 
+                // MARK: - Global Localization
+
+                .environment(
+                    \.locale,
+                    localization.language.locale
+                )
+
+                .environment(
+                    \.layoutDirection,
+                    localization.language.layoutDirection
+                )
+
                 .onAppear {
+
                     scheduleBackgroundScreenTimeSync()
 
                     Task {
@@ -177,6 +193,9 @@ private struct RootView: View {
     @StateObject private var dataStore =
         SupabaseDataStore.shared
 
+    @ObservedObject private var localization =
+        TimeUpLocalization.shared
+
     @State private var didLoadAccount = false
 
 
@@ -189,7 +208,7 @@ private struct RootView: View {
                 if !didLoadAccount {
 
                     ProgressView(
-                        "טוען את TimeUp..."
+                        loadingText
                     )
 
                 } else if
@@ -223,6 +242,24 @@ private struct RootView: View {
             await dataStore.loadCurrentAccount()
 
             didLoadAccount = true
+        }
+    }
+
+
+    // MARK: - Localized Root Text
+
+    private var loadingText: String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "טוען את TimeUp..."
+
+        case .english:
+            return "Loading TimeUp..."
+
+        case .arabic:
+            return "جارٍ تحميل TimeUp..."
         }
     }
 }
