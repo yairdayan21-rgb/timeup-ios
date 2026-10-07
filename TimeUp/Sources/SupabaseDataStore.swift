@@ -29,8 +29,7 @@ final class SupabaseDataStore: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
-    private let appGroupID =
-        "group.com.timeup.shared"
+    private let appGroupID = "group.com.timeup.shared"
 
     private let reportedUsageMinutesKey =
         "reportedUsageMinutes"
@@ -282,11 +281,8 @@ final class SupabaseDataStore: ObservableObject {
 
         do {
 
-            let session =
-                try await client.auth.session
-
-            let authUserID =
-                session.user.id
+            let session = try await client.auth.session
+            let authUserID = session.user.id
 
             let users: [TimeUpRemoteUser] =
                 try await client
@@ -319,9 +315,7 @@ final class SupabaseDataStore: ObservableObject {
 
             currentUser = user
 
-            try await loadMemberships(
-                for: user.id
-            )
+            try await loadMemberships(for: user.id)
 
         } catch {
 
@@ -336,8 +330,7 @@ final class SupabaseDataStore: ObservableObject {
         for userID: UUID
     ) async throws {
 
-        let loadedMemberships:
-            [TimeUpRemoteMembership] =
+        let loadedMemberships: [TimeUpRemoteMembership] =
             try await client
                 .from("group_memberships")
                 .select(
@@ -358,17 +351,53 @@ final class SupabaseDataStore: ObservableObject {
 
         memberships = loadedMemberships
 
-        let groupIDs =
-            loadedMemberships.map {
+        if currentUser?.role == "admin" {
+
+            try await loadAdminGroups(for: userID)
+
+        } else {
+
+            let groupIDs = loadedMemberships.map {
                 $0.groupID
             }
 
-        try await loadGroups(
-            ids: groupIDs
-        )
+            try await loadGroups(ids: groupIDs)
+        }
     }
 
-    // MARK: - Groups
+    // MARK: - Admin Groups
+
+    private func loadAdminGroups(
+        for adminUserID: UUID
+    ) async throws {
+
+        let loadedGroups: [TimeUpRemoteGroup] =
+            try await client
+                .from("groups")
+                .select(
+                    """
+                    id,
+                    name,
+                    join_code,
+                    goal_method,
+                    reduction_percent,
+                    journey_days,
+                    current_streak,
+                    timezone,
+                    created_at
+                    """
+                )
+                .eq(
+                    "created_by",
+                    value: adminUserID.uuidString
+                )
+                .execute()
+                .value
+
+        groups = loadedGroups
+    }
+
+    // MARK: - Member Groups
 
     private func loadGroups(
         ids: [UUID]
@@ -379,13 +408,11 @@ final class SupabaseDataStore: ObservableObject {
             return
         }
 
-        var loadedGroups:
-            [TimeUpRemoteGroup] = []
+        var loadedGroups: [TimeUpRemoteGroup] = []
 
         for groupID in ids {
 
-            let result:
-                [TimeUpRemoteGroup] =
+            let result: [TimeUpRemoteGroup] =
                 try await client
                     .from("groups")
                     .select(
@@ -436,10 +463,9 @@ final class SupabaseDataStore: ObservableObject {
             throw SupabaseDataStoreError.adminRequired
         }
 
-        let cleanName =
-            name.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        let cleanName = name.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
 
         guard !cleanName.isEmpty else {
             throw SupabaseDataStoreError.invalidGroupName
@@ -456,32 +482,27 @@ final class SupabaseDataStore: ObservableObject {
 
         for _ in 0..<20 {
 
-            let code =
-                String(
-                    format: "%04d",
-                    Int.random(in: 1...9999)
-                )
+            let code = String(
+                format: "%04d",
+                Int.random(in: 1...9999)
+            )
 
-            let payload =
-                GroupInsert(
-                    name: cleanName,
-                    joinCode: code,
-                    createdBy: user.id,
-                    goalMethod: goalMethod,
-                    reductionPercent:
-                        goalMethod == "manual"
-                            ? nil
-                            : reductionPercent,
-                    journeyDays:
-                        successDays ?? 7,
-                    currentStreak: 0,
-                    timezone: timezone
-                )
+            let payload = GroupInsert(
+                name: cleanName,
+                joinCode: code,
+                createdBy: user.id,
+                goalMethod: goalMethod,
+                reductionPercent: goalMethod == "manual"
+                    ? nil
+                    : reductionPercent,
+                journeyDays: successDays ?? 7,
+                currentStreak: 0,
+                timezone: timezone
+            )
 
             do {
 
-                let createdGroups:
-                    [TimeUpRemoteGroup] =
+                let createdGroups: [TimeUpRemoteGroup] =
                     try await client
                         .from("groups")
                         .insert(payload)
@@ -501,21 +522,17 @@ final class SupabaseDataStore: ObservableObject {
                         .execute()
                         .value
 
-                guard
-                    let createdGroup =
-                        createdGroups.first
-                else {
+                guard let createdGroup = createdGroups.first else {
                     throw SupabaseDataStoreError.groupCreationFailed
                 }
 
                 do {
 
-                    let membership =
-                        MembershipInsert(
-                            groupID: createdGroup.id,
-                            userID: user.id,
-                            membershipRole: "admin"
-                        )
+                    let membership = MembershipInsert(
+                        groupID: createdGroup.id,
+                        userID: user.id,
+                        membershipRole: "admin"
+                    )
 
                     try await client
                         .from("group_memberships")
@@ -547,11 +564,10 @@ final class SupabaseDataStore: ObservableObject {
         }
 
         let finalError =
-            lastCreationError ??
-            SupabaseDataStoreError.groupCreationFailed
+            lastCreationError
+            ?? SupabaseDataStoreError.groupCreationFailed
 
-        lastError =
-            finalError.localizedDescription
+        lastError = finalError.localizedDescription
 
         throw finalError
     }
@@ -571,8 +587,7 @@ final class SupabaseDataStore: ObservableObject {
 
         do {
 
-            let loadedMemberships:
-                [TimeUpRemoteMembership] =
+            let loadedMemberships: [TimeUpRemoteMembership] =
                 try await client
                     .from("group_memberships")
                     .select(
@@ -591,21 +606,18 @@ final class SupabaseDataStore: ObservableObject {
                     .execute()
                     .value
 
-            groupMemberships =
-                loadedMemberships
+            groupMemberships = loadedMemberships
 
             guard !loadedMemberships.isEmpty else {
                 groupMembers = []
                 return
             }
 
-            var loadedUsers:
-                [TimeUpRemoteUser] = []
+            var loadedUsers: [TimeUpRemoteUser] = []
 
             for membership in loadedMemberships {
 
-                let users:
-                    [TimeUpRemoteUser] =
+                let users: [TimeUpRemoteUser] =
                     try await client
                         .from("users")
                         .select(
@@ -621,8 +633,7 @@ final class SupabaseDataStore: ObservableObject {
                         )
                         .eq(
                             "id",
-                            value:
-                                membership.userID.uuidString
+                            value: membership.userID.uuidString
                         )
                         .limit(1)
                         .execute()
@@ -633,27 +644,22 @@ final class SupabaseDataStore: ObservableObject {
                 }
             }
 
-            groupMembers =
-                loadedUsers.sorted {
+            groupMembers = loadedUsers.sorted {
 
-                    let firstName =
-                        $0.displayName ?? ""
+                let firstName = $0.displayName ?? ""
+                let secondName = $1.displayName ?? ""
 
-                    let secondName =
-                        $1.displayName ?? ""
-
-                    return firstName.localizedCompare(
-                        secondName
-                    ) == .orderedAscending
-                }
+                return firstName.localizedCompare(
+                    secondName
+                ) == .orderedAscending
+            }
 
         } catch {
 
             groupMemberships = []
             groupMembers = []
 
-            lastError =
-                error.localizedDescription
+            lastError = error.localizedDescription
         }
     }
 
@@ -672,8 +678,7 @@ final class SupabaseDataStore: ObservableObject {
 
         do {
 
-            async let targetsRequest:
-                [TimeUpRemoteDailyTarget] =
+            async let targetsRequest: [TimeUpRemoteDailyTarget] =
                 client
                     .from("daily_targets")
                     .select(
@@ -694,8 +699,7 @@ final class SupabaseDataStore: ObservableObject {
                     .execute()
                     .value
 
-            async let resultsRequest:
-                [TimeUpRemoteDailyResult] =
+            async let resultsRequest: [TimeUpRemoteDailyResult] =
                 client
                     .from("daily_results")
                     .select(
@@ -720,8 +724,7 @@ final class SupabaseDataStore: ObservableObject {
                     .execute()
                     .value
 
-            async let groupResultsRequest:
-                [TimeUpRemoteGroupDailyResult] =
+            async let groupResultsRequest: [TimeUpRemoteGroupDailyResult] =
                 client
                     .from("group_daily_results")
                     .select(
@@ -763,8 +766,7 @@ final class SupabaseDataStore: ObservableObject {
             dailyResults = []
             groupDailyResults = []
 
-            lastError =
-                error.localizedDescription
+            lastError = error.localizedDescription
         }
     }
 
@@ -799,20 +801,18 @@ final class SupabaseDataStore: ObservableObject {
             isSavingManualTarget = false
         }
 
-        let targetDate =
-            databaseDateString(
-                from: Date(),
-                group: group
-            )
+        let targetDate = databaseDateString(
+            from: Date(),
+            group: group
+        )
 
-        let payload =
-            DailyTargetUpsert(
-                groupID: group.id,
-                userID: userID,
-                targetDate: targetDate,
-                targetMinutes: targetMinutes,
-                goalMethod: "manual"
-            )
+        let payload = DailyTargetUpsert(
+            groupID: group.id,
+            userID: userID,
+            targetDate: targetDate,
+            targetMinutes: targetMinutes,
+            goalMethod: "manual"
+        )
 
         do {
 
@@ -820,20 +820,15 @@ final class SupabaseDataStore: ObservableObject {
                 .from("daily_targets")
                 .upsert(
                     payload,
-                    onConflict:
-                        "group_id,user_id,target_date"
+                    onConflict: "group_id,user_id,target_date"
                 )
                 .execute()
 
-            await loadDailyProgress(
-                groupID: group.id
-            )
+            await loadDailyProgress(groupID: group.id)
 
         } catch {
 
-            lastError =
-                error.localizedDescription
-
+            lastError = error.localizedDescription
             throw error
         }
     }
@@ -853,46 +848,36 @@ final class SupabaseDataStore: ObservableObject {
             return
         }
 
-        guard
-            let defaults = UserDefaults(
-                suiteName: appGroupID
-            )
-        else {
+        guard let defaults = UserDefaults(
+            suiteName: appGroupID
+        ) else {
             return
         }
 
-        guard
-            defaults.object(
+        guard defaults.object(
+            forKey: reportedUsageMinutesKey
+        ) != nil else {
+            return
+        }
+
+        let usageMinutes = max(
+            0,
+            defaults.integer(
                 forKey: reportedUsageMinutesKey
-            ) != nil
-        else {
+            )
+        )
+
+        guard let reportedAt = defaults.object(
+            forKey: reportedUsageUpdatedAtKey
+        ) as? Date else {
             return
         }
 
-        let usageMinutes =
-            max(
-                0,
-                defaults.integer(
-                    forKey: reportedUsageMinutesKey
-                )
-            )
-
-        guard
-            let reportedAt =
-                defaults.object(
-                    forKey: reportedUsageUpdatedAtKey
-                ) as? Date
-        else {
-            return
-        }
-
-        guard
-            isSameGroupLocalDay(
-                reportedAt,
-                Date(),
-                group: group
-            )
-        else {
+        guard isSameGroupLocalDay(
+            reportedAt,
+            Date(),
+            group: group
+        ) else {
             return
         }
 
@@ -903,33 +888,30 @@ final class SupabaseDataStore: ObservableObject {
             isSyncingScreenTime = false
         }
 
-        let today =
-            databaseDateString(
-                from: Date(),
-                group: group
-            )
+        let today = databaseDateString(
+            from: Date(),
+            group: group
+        )
 
-        let target =
-            dailyTargets.first {
-                $0.groupID == group.id &&
-                $0.userID == user.id &&
-                $0.targetDate == today
-            }
+        let target = dailyTargets.first {
+            $0.groupID == group.id
+                && $0.userID == user.id
+                && $0.targetDate == today
+        }
 
-        let existingResult =
-            dailyResults.first {
-                $0.groupID == group.id &&
-                $0.userID == user.id &&
-                $0.resultDate == today
-            }
+        let existingResult = dailyResults.first {
+            $0.groupID == group.id
+                && $0.userID == user.id
+                && $0.resultDate == today
+        }
 
         let targetMinutes =
-            target?.targetMinutes ??
-            existingResult?.targetMinutes
+            target?.targetMinutes
+            ?? existingResult?.targetMinutes
 
         let isLearningDay =
-            existingResult?.isLearningDay ??
-            (targetMinutes == nil)
+            existingResult?.isLearningDay
+            ?? (targetMinutes == nil)
 
         let achieved: Bool?
 
@@ -939,26 +921,24 @@ final class SupabaseDataStore: ObservableObject {
 
         } else if let targetMinutes {
 
-            achieved =
-                usageMinutes <= targetMinutes
+            achieved = usageMinutes <= targetMinutes
 
         } else {
 
             achieved = nil
         }
 
-        let payload =
-            DailyResultUpsert(
-                groupID: group.id,
-                userID: user.id,
-                resultDate: today,
-                usageMinutes: usageMinutes,
-                targetMinutes: targetMinutes,
-                achieved: achieved,
-                isLearningDay: isLearningDay,
-                source: "screen_time",
-                updatedAt: Date()
-            )
+        let payload = DailyResultUpsert(
+            groupID: group.id,
+            userID: user.id,
+            resultDate: today,
+            usageMinutes: usageMinutes,
+            targetMinutes: targetMinutes,
+            achieved: achieved,
+            isLearningDay: isLearningDay,
+            source: "screen_time",
+            updatedAt: Date()
+        )
 
         do {
 
@@ -966,19 +946,15 @@ final class SupabaseDataStore: ObservableObject {
                 .from("daily_results")
                 .upsert(
                     payload,
-                    onConflict:
-                        "group_id,user_id,result_date"
+                    onConflict: "group_id,user_id,result_date"
                 )
                 .execute()
 
-            await loadDailyProgress(
-                groupID: group.id
-            )
+            await loadDailyProgress(groupID: group.id)
 
         } catch {
 
-            lastError =
-                error.localizedDescription
+            lastError = error.localizedDescription
         }
     }
 
@@ -993,15 +969,14 @@ final class SupabaseDataStore: ObservableObject {
             return nil
         }
 
-        let dateKey =
-            databaseDateString(
-                from: date,
-                group: group
-            )
+        let dateKey = databaseDateString(
+            from: date,
+            group: group
+        )
 
         return dailyTargets.first {
-            $0.userID == userID &&
-            $0.targetDate == dateKey
+            $0.userID == userID
+                && $0.targetDate == dateKey
         }
     }
 
@@ -1014,15 +989,14 @@ final class SupabaseDataStore: ObservableObject {
             return nil
         }
 
-        let dateKey =
-            databaseDateString(
-                from: date,
-                group: group
-            )
+        let dateKey = databaseDateString(
+            from: date,
+            group: group
+        )
 
         return dailyResults.first {
-            $0.userID == userID &&
-            $0.resultDate == dateKey
+            $0.userID == userID
+                && $0.resultDate == dateKey
         }
     }
 
@@ -1034,23 +1008,20 @@ final class SupabaseDataStore: ObservableObject {
             return nil
         }
 
-        let dateKey =
-            databaseDateString(
-                from: date,
-                group: group
-            )
+        let dateKey = databaseDateString(
+            from: date,
+            group: group
+        )
 
         return groupDailyResults.first {
             $0.resultDate == dateKey
         }
     }
 
-    func latestGroupResult()
-        -> TimeUpRemoteGroupDailyResult? {
+    func latestGroupResult() -> TimeUpRemoteGroupDailyResult? {
 
         groupDailyResults.max {
-            $0.resultDate <
-            $1.resultDate
+            $0.resultDate < $1.resultDate
         }
     }
 
@@ -1060,8 +1031,7 @@ final class SupabaseDataStore: ObservableObject {
             return group.currentStreak
         }
 
-        return latestGroupResult()?
-            .streakAfterDay ?? 0
+        return latestGroupResult()?.streakAfterDay ?? 0
     }
 
     func targetMinutes(
@@ -1069,13 +1039,11 @@ final class SupabaseDataStore: ObservableObject {
         on date: Date = Date()
     ) -> Int? {
 
-        if let result =
-            result(
-                for: userID,
-                on: date
-            ),
-           let targetMinutes =
-            result.targetMinutes {
+        if let result = result(
+            for: userID,
+            on: date
+        ),
+           let targetMinutes = result.targetMinutes {
 
             return targetMinutes
         }
@@ -1137,30 +1105,20 @@ final class SupabaseDataStore: ObservableObject {
         group: TimeUpRemoteGroup
     ) -> String {
 
-        let formatter =
-            DateFormatter()
+        let formatter = DateFormatter()
 
-        formatter.calendar =
-            Calendar(
-                identifier: .gregorian
-            )
-
-        formatter.locale =
-            Locale(
-                identifier: "en_US_POSIX"
-            )
-
-        formatter.timeZone =
-            groupTimeZone(
-                for: group
-            )
-
-        formatter.dateFormat =
-            "yyyy-MM-dd"
-
-        return formatter.string(
-            from: date
+        formatter.calendar = Calendar(
+            identifier: .gregorian
         )
+
+        formatter.locale = Locale(
+            identifier: "en_US_POSIX"
+        )
+
+        formatter.timeZone = groupTimeZone(for: group)
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        return formatter.string(from: date)
     }
 
     private func isSameGroupLocalDay(
@@ -1169,15 +1127,11 @@ final class SupabaseDataStore: ObservableObject {
         group: TimeUpRemoteGroup
     ) -> Bool {
 
-        var calendar =
-            Calendar(
-                identifier: .gregorian
-            )
+        var calendar = Calendar(
+            identifier: .gregorian
+        )
 
-        calendar.timeZone =
-            groupTimeZone(
-                for: group
-            )
+        calendar.timeZone = groupTimeZone(for: group)
 
         return calendar.isDate(
             firstDate,
@@ -1196,12 +1150,8 @@ final class SupabaseDataStore: ObservableObject {
 
             let requestedCode: String
 
-            enum CodingKeys:
-                String,
-                CodingKey {
-
-                case requestedCode =
-                    "requested_code"
+            enum CodingKeys: String, CodingKey {
+                case requestedCode = "requested_code"
             }
         }
 
@@ -1209,10 +1159,9 @@ final class SupabaseDataStore: ObservableObject {
             try await client
                 .rpc(
                     "join_timeup_group",
-                    params:
-                        JoinParameters(
-                            requestedCode: code
-                        )
+                    params: JoinParameters(
+                        requestedCode: code
+                    )
                 )
                 .execute()
                 .value
@@ -1258,19 +1207,12 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadGroupMembers(
-                groupID: groupID
-            )
-
-            await loadDailyProgress(
-                groupID: groupID
-            )
+            await loadGroupMembers(groupID: groupID)
+            await loadDailyProgress(groupID: groupID)
 
         } catch {
 
-            lastError =
-                error.localizedDescription
-
+            lastError = error.localizedDescription
             throw error
         }
     }
@@ -1282,31 +1224,22 @@ final class SupabaseDataStore: ObservableObject {
     ) async throws {
 
         guard let user = currentUser else {
-
-            throw SupabaseDataStoreError
-                .userNotLoaded
+            throw SupabaseDataStoreError.userNotLoaded
         }
 
-        struct DisplayNameUpdate:
-            Encodable {
+        struct DisplayNameUpdate: Encodable {
 
             let displayName: String
 
-            enum CodingKeys:
-                String,
-                CodingKey {
-
-                case displayName =
-                    "display_name"
+            enum CodingKeys: String, CodingKey {
+                case displayName = "display_name"
             }
         }
 
         try await client
             .from("users")
             .update(
-                DisplayNameUpdate(
-                    displayName: name
-                )
+                DisplayNameUpdate(displayName: name)
             )
             .eq(
                 "id",
@@ -1358,41 +1291,27 @@ final class SupabaseDataStore: ObservableObject {
 
         } catch {
 
-            lastError =
-                error.localizedDescription
-
+            lastError = error.localizedDescription
             throw error
         }
     }
 
     // MARK: - Helpers
 
-    var activeMemberGroup:
-        TimeUpRemoteGroup? {
+    var activeMemberGroup: TimeUpRemoteGroup? {
 
-        guard
-            currentUser?.role == "member"
-        else {
+        guard currentUser?.role == "member" else {
             return nil
         }
 
-        guard
-            let membership =
-                memberships.first(
-                    where: {
-                        $0.membershipRole ==
-                            "member"
-                    }
-                )
-        else {
+        guard let membership = memberships.first(
+            where: { $0.membershipRole == "member" }
+        ) else {
             return nil
         }
 
         return groups.first(
-            where: {
-                $0.id ==
-                    membership.groupID
-            }
+            where: { $0.id == membership.groupID }
         )
     }
 
@@ -1414,8 +1333,8 @@ final class SupabaseDataStore: ObservableObject {
             return false
         }
 
-        return currentUser.role == "member" &&
-            !currentUser.onboardingCompleted
+        return currentUser.role == "member"
+            && !currentUser.onboardingCompleted
     }
 
     // MARK: - Clear Data
@@ -1439,7 +1358,6 @@ final class SupabaseDataStore: ObservableObject {
     func reset() {
 
         clearLoadedData()
-
         lastError = nil
 
         isLoading = false
@@ -1467,25 +1385,18 @@ enum SupabaseDataStoreError: LocalizedError {
     var errorDescription: String? {
 
         switch self {
-
         case .userNotLoaded:
             return "TimeUp user is not loaded."
-
         case .adminRequired:
             return "Only a TimeUp admin can perform this action."
-
         case .invalidGroupName:
             return "Group name cannot be empty."
-
         case .groupCreationFailed:
             return "TimeUp could not create the group."
-
         case .manualGroupRequired:
             return "Manual targets can only be changed in a manual group."
-
         case .invalidTargetMinutes:
             return "Target minutes must be greater than zero."
-
         case .cannotRemoveSelf:
             return "An admin cannot remove themselves from the group."
         }
