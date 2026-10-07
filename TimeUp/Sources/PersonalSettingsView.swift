@@ -9,6 +9,9 @@ struct PersonalSettingsView: View {
     @ObservedObject private var localization =
         TimeUpLocalization.shared
 
+    @ObservedObject private var onboardingCoordinator =
+        MemberOnboardingCoordinator.shared
+
     @State private var isAuthenticating = false
     @State private var errorMessage = ""
 
@@ -47,6 +50,37 @@ struct PersonalSettingsView: View {
 
                 Text(
                     languageFooterText
+                )
+            }
+
+            // MARK: - Tutorial
+
+            Section {
+
+                Button {
+
+                    onboardingCoordinator
+                        .presentReplay()
+
+                } label: {
+
+                    Label(
+                        showTutorialAgainText,
+                        systemImage:
+                            "questionmark.circle"
+                    )
+                }
+
+            } header: {
+
+                Text(
+                    tutorialTitle
+                )
+
+            } footer: {
+
+                Text(
+                    tutorialFooterText
                 )
             }
 
@@ -179,6 +213,56 @@ struct PersonalSettingsView: View {
 
             return
                 "اختر اللغة التي سيُعرض بها TimeUp."
+        }
+    }
+
+    // MARK: - Tutorial Text
+
+    private var tutorialTitle:
+        String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הדרכה"
+
+        case .english:
+            return "Tutorial"
+
+        case .arabic:
+            return "الدليل"
+        }
+    }
+
+    private var showTutorialAgainText:
+        String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "הצג שוב את ההדרכה"
+
+        case .english:
+            return "Show Tutorial Again"
+
+        case .arabic:
+            return "عرض الدليل مرة أخرى"
+        }
+    }
+
+    private var tutorialFooterText:
+        String {
+
+        switch localization.language {
+
+        case .hebrew:
+            return "אפשר לעבור שוב על ההדרכה של TimeUp בכל שלב."
+
+        case .english:
+            return "You can view the TimeUp tutorial again at any time."
+
+        case .arabic:
+            return "يمكنك عرض دليل TimeUp مرة أخرى في أي وقت."
         }
     }
 
