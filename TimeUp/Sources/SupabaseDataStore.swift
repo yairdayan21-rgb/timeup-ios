@@ -29,14 +29,9 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var lastError: String?
 
     private let client = SupabaseManager.shared.client
-
     private let appGroupID = "group.com.timeup.shared"
-
-    private let reportedUsageMinutesKey =
-        "reportedUsageMinutes"
-
-    private let reportedUsageUpdatedAtKey =
-        "reportedUsageUpdatedAt"
+    private let reportedUsageMinutesKey = "reportedUsageMinutes"
+    private let reportedUsageUpdatedAtKey = "reportedUsageUpdatedAt"
 
     private init() {}
 
@@ -178,6 +173,21 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    private struct SecureJoinResponse: Decodable {
+
+        let success: Bool
+        let groupID: UUID?
+        let error: String?
+        let retryAfterSeconds: Int
+
+        enum CodingKeys: String, CodingKey {
+            case success
+            case groupID = "group_id"
+            case error
+            case retryAfterSeconds = "retry_after_seconds"
+        }
+    }
+
     // MARK: - Payloads
 
     private struct DailyResultUpsert: Encodable {
@@ -308,18 +318,15 @@ final class SupabaseDataStore: ObservableObject {
                     .value
 
             guard let user = users.first else {
-
                 clearLoadedData()
                 lastError = "TIMEUP_USER_NOT_FOUND"
                 return
             }
 
             currentUser = user
-
             try await loadMemberships(for: user.id)
 
         } catch {
-
             clearLoadedData()
             lastError = error.localizedDescription
         }
@@ -493,10 +500,7 @@ final class SupabaseDataStore: ObservableObject {
                     }
 
                     let index = Int(byte) % alphabet.count
-
-                    selectedBytes.append(
-                        alphabet[index]
-                    )
+                    selectedBytes.append(alphabet[index])
 
                     if selectedBytes.count == codeLength {
                         break
@@ -610,8 +614,7 @@ final class SupabaseDataStore: ObservableObject {
                         .value
 
                 guard let createdGroup = createdGroups.first else {
-                    throw SupabaseDataStoreError
-                        .groupCreationFailed
+                    throw SupabaseDataStoreError.groupCreationFailed
                 }
 
                 do {
@@ -642,11 +645,9 @@ final class SupabaseDataStore: ObservableObject {
                 }
 
                 await loadCurrentAccount()
-
                 return createdGroup
 
             } catch {
-
                 lastCreationError = error
             }
         }
@@ -656,7 +657,6 @@ final class SupabaseDataStore: ObservableObject {
             ?? SupabaseDataStoreError.groupCreationFailed
 
         lastError = finalError.localizedDescription
-
         throw finalError
     }
 
@@ -743,10 +743,8 @@ final class SupabaseDataStore: ObservableObject {
             }
 
         } catch {
-
             groupMemberships = []
             groupMembers = []
-
             lastError = error.localizedDescription
         }
     }
@@ -849,11 +847,9 @@ final class SupabaseDataStore: ObservableObject {
             groupDailyResults = loadedGroupResults
 
         } catch {
-
             dailyTargets = []
             dailyResults = []
             groupDailyResults = []
-
             lastError = error.localizedDescription
         }
     }
@@ -912,12 +908,9 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadDailyProgress(
-                groupID: group.id
-            )
+            await loadDailyProgress(groupID: group.id)
 
         } catch {
-
             lastError = error.localizedDescription
             throw error
         }
@@ -1006,15 +999,10 @@ final class SupabaseDataStore: ObservableObject {
         let achieved: Bool?
 
         if isLearningDay {
-
             achieved = nil
-
         } else if let targetMinutes {
-
             achieved = usageMinutes <= targetMinutes
-
         } else {
-
             achieved = nil
         }
 
@@ -1040,12 +1028,9 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadDailyProgress(
-                groupID: group.id
-            )
+            await loadDailyProgress(groupID: group.id)
 
         } catch {
-
             lastError = error.localizedDescription
         }
     }
@@ -1136,7 +1121,6 @@ final class SupabaseDataStore: ObservableObject {
             on: date
         ),
            let targetMinutes = result.targetMinutes {
-
             return targetMinutes
         }
 
@@ -1207,10 +1191,7 @@ final class SupabaseDataStore: ObservableObject {
             identifier: "en_US_POSIX"
         )
 
-        formatter.timeZone = groupTimeZone(
-            for: group
-        )
-
+        formatter.timeZone = groupTimeZone(for: group)
         formatter.dateFormat = "yyyy-MM-dd"
 
         return formatter.string(from: date)
@@ -1228,9 +1209,7 @@ final class SupabaseDataStore: ObservableObject {
             identifier: .gregorian
         )
 
-        calendar.timeZone = groupTimeZone(
-            for: group
-        )
+        calendar.timeZone = groupTimeZone(for: group)
 
         return calendar.isDate(
             firstDate,
@@ -1254,10 +1233,10 @@ final class SupabaseDataStore: ObservableObject {
             }
         }
 
-        let groupID: UUID =
+        let response: SecureJoinResponse =
             try await client
                 .rpc(
-                    "join_timeup_group",
+                    "join_timeup_group_secure",
                     params: JoinParameters(
                         requestedCode: code
                     )
@@ -1265,8 +1244,29 @@ final class SupabaseDataStore: ObservableObject {
                 .execute()
                 .value
 
-        await loadCurrentAccount()
+        guard response.success else {
 
+            throw SupabaseGroupJoinError(
+                code: response.error ?? "INVALID_JOIN_RESPONSE",
+                retryAfterSeconds: max(
+                    0,
+                    response.retryAfterSeconds
+                )
+            )
+        }
+
+        guard
+            let groupID = response.groupID,
+            response.error == nil
+        else {
+
+            throw SupabaseGroupJoinError(
+                code: "INVALID_JOIN_RESPONSE",
+                retryAfterSeconds: 0
+            )
+        }
+
+        await loadCurrentAccount()
         return groupID
     }
 
@@ -1306,16 +1306,10 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadGroupMembers(
-                groupID: groupID
-            )
-
-            await loadDailyProgress(
-                groupID: groupID
-            )
+            await loadGroupMembers(groupID: groupID)
+            await loadDailyProgress(groupID: groupID)
 
         } catch {
-
             lastError = error.localizedDescription
             throw error
         }
@@ -1396,7 +1390,6 @@ final class SupabaseDataStore: ObservableObject {
             await loadCurrentAccount()
 
         } catch {
-
             lastError = error.localizedDescription
             throw error
         }
@@ -1476,7 +1469,19 @@ final class SupabaseDataStore: ObservableObject {
     }
 }
 
-// MARK: - Errors
+// MARK: - Group Join Error
+
+struct SupabaseGroupJoinError: LocalizedError {
+
+    let code: String
+    let retryAfterSeconds: Int
+
+    var errorDescription: String? {
+        code
+    }
+}
+
+// MARK: - Data Store Errors
 
 enum SupabaseDataStoreError: LocalizedError {
 
