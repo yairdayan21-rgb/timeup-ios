@@ -288,13 +288,11 @@ struct JoinGroupView: View {
         errorMessage = nil
 
         guard !name.isEmpty else {
-
             errorMessage = missingNameText
             return
         }
 
         guard isValidRegistrationCode(code) else {
-
             errorMessage = invalidCodeFormatText
             return
         }
@@ -337,7 +335,6 @@ struct JoinGroupView: View {
                 }
 
             } catch {
-
                 errorMessage = message(for: error)
             }
         }
@@ -378,12 +375,24 @@ struct JoinGroupView: View {
         for error: Error
     ) -> String {
 
+        if let joinError = error as? SupabaseGroupJoinError,
+           joinError.code == "TOO_MANY_JOIN_ATTEMPTS" {
+
+            return joinWaitText(
+                retryAfterSeconds: joinError.retryAfterSeconds
+            )
+        }
+
         let raw = (
             error.localizedDescription
                 + " "
                 + String(describing: error)
         )
         .uppercased()
+
+        if raw.contains("TOO_MANY_JOIN_ATTEMPTS") {
+            return joinTemporarilyBlockedText
+        }
 
         if raw.contains("ADMIN_CODE_ALREADY_USED") {
 
@@ -468,6 +477,39 @@ struct JoinGroupView: View {
         }
 
         return genericJoinErrorText
+    }
+
+    private func joinWaitText(
+        retryAfterSeconds: Int
+    ) -> String {
+
+        guard retryAfterSeconds > 0 else {
+            return joinTemporarilyBlockedText
+        }
+
+        let minutes = max(
+            1,
+            Int(
+                ceil(
+                    Double(retryAfterSeconds) / 60.0
+                )
+            )
+        )
+
+        if minutes == 1 {
+
+            return localized(
+                "בוצעו יותר מדי ניסיונות עם קוד שגוי. ההצטרפות נחסמה זמנית. נסה שוב בעוד כדקה.",
+                "Too many incorrect code attempts. Joining is temporarily blocked. Try again in about a minute.",
+                "تم إدخال رمز غير صحيح مرات كثيرة. تم حظر الانضمام مؤقتًا. حاول مرة أخرى بعد نحو دقيقة."
+            )
+        }
+
+        return localized(
+            "בוצעו יותר מדי ניסיונות עם קוד שגוי. ההצטרפות נחסמה זמנית. נסה שוב בעוד כ־\(minutes) דקות.",
+            "Too many incorrect code attempts. Joining is temporarily blocked. Try again in about \(minutes) minutes.",
+            "تم إدخال رمز غير صحيح مرات كثيرة. تم حظر الانضمام مؤقتًا. حاول مرة أخرى بعد نحو \(minutes) دقائق."
+        )
     }
 
     // MARK: - Localization
@@ -578,6 +620,15 @@ struct JoinGroupView: View {
             "יש להזין קוד קבוצה בן 8 תווים הכולל אותיות באנגלית ומספרים.",
             "Enter an 8-character group code using English letters and numbers.",
             "أدخل رمز مجموعة من 8 أحرف باستخدام الحروف الإنجليزية والأرقام."
+        )
+    }
+
+    private var joinTemporarilyBlockedText: String {
+
+        localized(
+            "בוצעו יותר מדי ניסיונות עם קוד שגוי. ההצטרפות נחסמה זמנית. נסה שוב מאוחר יותר.",
+            "Too many incorrect code attempts. Joining is temporarily blocked. Please try again later.",
+            "تم إدخال رمز غير صحيح مرات كثيرة. تم حظر الانضمام مؤقتًا. حاول مرة أخرى لاحقًا."
         )
     }
 
