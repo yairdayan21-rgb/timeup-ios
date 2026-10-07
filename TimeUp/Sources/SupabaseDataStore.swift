@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import Combine
+import Security
 
 @MainActor
 final class SupabaseDataStore: ObservableObject {
@@ -444,6 +445,95 @@ final class SupabaseDataStore: ObservableObject {
         groups = loadedGroups
     }
 
+    // MARK: - Secure Group Code
+
+    private func generateSecureGroupCode() throws -> String {
+
+        let alphabet = Array(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".utf8
+        )
+
+        let codeLength = 8
+
+        // 248 is divisible by 62. Rejecting bytes >= 248
+        // avoids bias when mapping random bytes to the alphabet.
+        let acceptanceLimit = 248
+
+        for _ in 0..<128 {
+
+            var selectedBytes: [UInt8] = []
+            selectedBytes.reserveCapacity(codeLength)
+
+            while selectedBytes.count < codeLength {
+
+                var randomBytes = [UInt8](
+                    repeating: 0,
+                    count: 32
+                )
+
+                let status = randomBytes.withUnsafeMutableBytes {
+                    buffer in
+
+                    SecRandomCopyBytes(
+                        kSecRandomDefault,
+                        buffer.count,
+                        buffer.baseAddress!
+                    )
+                }
+
+                guard status == errSecSuccess else {
+                    throw SupabaseDataStoreError
+                        .secureCodeGenerationFailed
+                }
+
+                for byte in randomBytes {
+
+                    guard Int(byte) < acceptanceLimit else {
+                        continue
+                    }
+
+                    let index = Int(byte) % alphabet.count
+
+                    selectedBytes.append(
+                        alphabet[index]
+                    )
+
+                    if selectedBytes.count == codeLength {
+                        break
+                    }
+                }
+            }
+
+            let hasUppercase = selectedBytes.contains {
+                $0 >= 65 && $0 <= 90
+            }
+
+            let hasLowercase = selectedBytes.contains {
+                $0 >= 97 && $0 <= 122
+            }
+
+            let hasDigit = selectedBytes.contains {
+                $0 >= 48 && $0 <= 57
+            }
+
+            guard
+                hasUppercase,
+                hasLowercase,
+                hasDigit
+            else {
+                continue
+            }
+
+            return String(
+                decoding: selectedBytes,
+                as: UTF8.self
+            )
+        }
+
+        throw SupabaseDataStoreError
+            .secureCodeGenerationFailed
+    }
+
     // MARK: - Create Group
 
     @discardableResult
@@ -482,25 +572,22 @@ final class SupabaseDataStore: ObservableObject {
 
         for _ in 0..<20 {
 
-            let code = String(
-                format: "%04d",
-                Int.random(in: 1...9999)
-            )
-
-            let payload = GroupInsert(
-                name: cleanName,
-                joinCode: code,
-                createdBy: user.id,
-                goalMethod: goalMethod,
-                reductionPercent: goalMethod == "manual"
-                    ? nil
-                    : reductionPercent,
-                journeyDays: successDays ?? 7,
-                currentStreak: 0,
-                timezone: timezone
-            )
-
             do {
+
+                let code = try generateSecureGroupCode()
+
+                let payload = GroupInsert(
+                    name: cleanName,
+                    joinCode: code,
+                    createdBy: user.id,
+                    goalMethod: goalMethod,
+                    reductionPercent: goalMethod == "manual"
+                        ? nil
+                        : reductionPercent,
+                    journeyDays: successDays ?? 7,
+                    currentStreak: 0,
+                    timezone: timezone
+                )
 
                 let createdGroups: [TimeUpRemoteGroup] =
                     try await client
@@ -523,7 +610,8 @@ final class SupabaseDataStore: ObservableObject {
                         .value
 
                 guard let createdGroup = createdGroups.first else {
-                    throw SupabaseDataStoreError.groupCreationFailed
+                    throw SupabaseDataStoreError
+                        .groupCreationFailed
                 }
 
                 do {
@@ -824,7 +912,9 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadDailyProgress(groupID: group.id)
+            await loadDailyProgress(
+                groupID: group.id
+            )
 
         } catch {
 
@@ -950,7 +1040,9 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadDailyProgress(groupID: group.id)
+            await loadDailyProgress(
+                groupID: group.id
+            )
 
         } catch {
 
@@ -1102,7 +1194,7 @@ final class SupabaseDataStore: ObservableObject {
 
     private func databaseDateString(
         from date: Date,
-        group: TimeUpRemoteGroup
+        group: groupType
     ) -> String {
 
         let formatter = DateFormatter()
@@ -1115,11 +1207,16 @@ final class SupabaseDataStore: ObservableObject {
             identifier: "en_US_POSIX"
         )
 
-        formatter.timeZone = groupTimeZone(for: group)
+        formatter.timeZone = groupTimeZone(
+            for: group
+        )
+
         formatter.dateFormat = "yyyy-MM-dd"
 
         return formatter.string(from: date)
     }
+
+    private typealias groupType = TimeUpRemoteGroup
 
     private func isSameGroupLocalDay(
         _ firstDate: Date,
@@ -1131,7 +1228,9 @@ final class SupabaseDataStore: ObservableObject {
             identifier: .gregorian
         )
 
-        calendar.timeZone = groupTimeZone(for: group)
+        calendar.timeZone = groupTimeZone(
+            for: group
+        )
 
         return calendar.isDate(
             firstDate,
@@ -1207,8 +1306,13 @@ final class SupabaseDataStore: ObservableObject {
                 )
                 .execute()
 
-            await loadGroupMembers(groupID: groupID)
-            await loadDailyProgress(groupID: groupID)
+            await loadGroupMembers(
+                groupID: groupID
+            )
+
+            await loadDailyProgress(
+                groupID: groupID
+            )
 
         } catch {
 
@@ -1239,7 +1343,9 @@ final class SupabaseDataStore: ObservableObject {
         try await client
             .from("users")
             .update(
-                DisplayNameUpdate(displayName: name)
+                DisplayNameUpdate(
+                    displayName: name
+                )
             )
             .eq(
                 "id",
@@ -1378,6 +1484,7 @@ enum SupabaseDataStoreError: LocalizedError {
     case adminRequired
     case invalidGroupName
     case groupCreationFailed
+    case secureCodeGenerationFailed
     case manualGroupRequired
     case invalidTargetMinutes
     case cannotRemoveSelf
@@ -1385,18 +1492,28 @@ enum SupabaseDataStoreError: LocalizedError {
     var errorDescription: String? {
 
         switch self {
+
         case .userNotLoaded:
             return "TimeUp user is not loaded."
+
         case .adminRequired:
             return "Only a TimeUp admin can perform this action."
+
         case .invalidGroupName:
             return "Group name cannot be empty."
+
         case .groupCreationFailed:
             return "TimeUp could not create the group."
+
+        case .secureCodeGenerationFailed:
+            return "TimeUp could not securely generate a group code. Please try again."
+
         case .manualGroupRequired:
             return "Manual targets can only be changed in a manual group."
+
         case .invalidTargetMinutes:
             return "Target minutes must be greater than zero."
+
         case .cannotRemoveSelf:
             return "An admin cannot remove themselves from the group."
         }
