@@ -68,7 +68,7 @@ final class MemberOnboardingCoordinator: ObservableObject {
 
         case .firstTime:
 
-            await dataStore.completeOnboarding()
+            try? await dataStore.completeOnboarding()
 
             guard dataStore.currentUser?.onboardingCompleted == true else {
                 return
