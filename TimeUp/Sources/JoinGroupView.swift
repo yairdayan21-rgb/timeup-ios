@@ -43,12 +43,47 @@ struct JoinGroupView: View {
         }
     }
 
+    // MARK: - Code Validation
+
+    private func isAllowedCodeCharacter(
+        _ character: Character
+    ) -> Bool {
+
+        let scalars = character.unicodeScalars
+
+        guard
+            scalars.count == 1,
+            let scalar = scalars.first
+        else {
+            return false
+        }
+
+        let value = scalar.value
+
+        return (value >= 65 && value <= 90)
+            || (value >= 97 && value <= 122)
+            || (value >= 48 && value <= 57)
+    }
+
+    private func isValidRegistrationCode(
+        _ code: String
+    ) -> Bool {
+
+        if code == "0000" {
+            return true
+        }
+
+        return code.count == 8
+            && code.allSatisfy(isAllowedCodeCharacter)
+    }
+
     private var isReadyToJoin: Bool {
+
         let name = displayName.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
 
-        return groupCode.count == 4
+        return isValidRegistrationCode(groupCode)
             && !name.isEmpty
             && !isJoining
     }
@@ -105,27 +140,40 @@ struct JoinGroupView: View {
                     text: $groupCode
                 )
                 .accessibilityIdentifier("group-code-field")
-                .keyboardType(.numberPad)
+                .keyboardType(.asciiCapable)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
                 .multilineTextAlignment(.center)
                 .font(
                     .system(
-                        size: 28,
+                        size: 26,
                         weight: .semibold,
-                        design: .rounded
+                        design: .monospaced
                     )
                 )
                 .textFieldStyle(.roundedBorder)
+                .environment(
+                    \.layoutDirection,
+                    .leftToRight
+                )
                 .focused(
                     $focusedField,
                     equals: .groupCode
                 )
+                .submitLabel(.go)
                 .disabled(isJoining)
+                .onSubmit {
+
+                    if isReadyToJoin {
+                        join()
+                    }
+                }
                 .onChange(of: groupCode) { _, newValue in
 
                     let normalized = String(
                         newValue
-                            .filter { $0.isNumber }
-                            .prefix(4)
+                            .filter(isAllowedCodeCharacter)
+                            .prefix(8)
                     )
 
                     if groupCode != normalized {
@@ -151,6 +199,7 @@ struct JoinGroupView: View {
                     HStack(spacing: 10) {
 
                         if isJoining {
+
                             ProgressView()
                                 .tint(.white)
                         }
@@ -239,14 +288,13 @@ struct JoinGroupView: View {
         errorMessage = nil
 
         guard !name.isEmpty else {
+
             errorMessage = missingNameText
             return
         }
 
-        guard
-            code.count == 4,
-            code.allSatisfy({ $0.isNumber })
-        else {
+        guard isValidRegistrationCode(code) else {
+
             errorMessage = invalidCodeFormatText
             return
         }
@@ -431,16 +479,20 @@ struct JoinGroupView: View {
     ) -> String {
 
         switch localization.language {
+
         case .hebrew:
             return hebrew
+
         case .english:
             return english
+
         case .arabic:
             return arabic
         }
     }
 
     private var joinTitle: String {
+
         localized(
             "הצטרפות ל-TimeUp",
             "Join TimeUp",
@@ -449,6 +501,7 @@ struct JoinGroupView: View {
     }
 
     private var joinSubtitle: String {
+
         localized(
             "הזן את הקוד שקיבלת כדי להמשיך",
             "Enter the code you received to continue",
@@ -457,6 +510,7 @@ struct JoinGroupView: View {
     }
 
     private var namePlaceholder: String {
+
         localized(
             "השם שלך",
             "Your name",
@@ -465,6 +519,7 @@ struct JoinGroupView: View {
     }
 
     private var groupCodePlaceholder: String {
+
         localized(
             "קוד קבוצה",
             "Group code",
@@ -473,6 +528,7 @@ struct JoinGroupView: View {
     }
 
     private var joiningText: String {
+
         localized(
             "מצטרף...",
             "Joining...",
@@ -481,6 +537,7 @@ struct JoinGroupView: View {
     }
 
     private var continueText: String {
+
         localized(
             "המשך",
             "Continue",
@@ -489,14 +546,16 @@ struct JoinGroupView: View {
     }
 
     private var groupCodeHelpText: String {
+
         localized(
-            "קוד הקבוצה מתקבל ממנהל הקבוצה",
-            "The group code is provided by the group admin",
-            "يمكنك الحصول على رمز المجموعة من مدير المجموعة"
+            "קוד הקבוצה מתקבל מהמנהל ומכיל 8 תווים: אותיות באנגלית ומספרים. יש להקליד אותיות גדולות וקטנות בדיוק כפי שקיבלת.",
+            "Your group admin provides an 8-character code containing English letters and numbers. Enter uppercase and lowercase letters exactly as shown.",
+            "يقدم مدير المجموعة رمزًا من 8 أحرف يتضمن حروفًا إنجليزية وأرقامًا. أدخل الحروف الكبيرة والصغيرة تمامًا كما تظهر."
         )
     }
 
     private var doneText: String {
+
         localized(
             "סיום",
             "Done",
@@ -505,6 +564,7 @@ struct JoinGroupView: View {
     }
 
     private var missingNameText: String {
+
         localized(
             "יש להזין שם כדי להמשיך.",
             "Enter your name to continue.",
@@ -513,22 +573,25 @@ struct JoinGroupView: View {
     }
 
     private var invalidCodeFormatText: String {
+
         localized(
-            "יש להזין קוד בן 4 ספרות.",
-            "Enter a 4-digit code.",
-            "أدخل رمزًا مكوّنًا من 4 أرقام."
+            "יש להזין קוד קבוצה בן 8 תווים הכולל אותיות באנגלית ומספרים.",
+            "Enter an 8-character group code using English letters and numbers.",
+            "أدخل رمز مجموعة من 8 أحرف باستخدام الحروف الإنجليزية والأرقام."
         )
     }
 
     private var groupNotFoundText: String {
+
         localized(
-            "לא נמצאה קבוצה עם הקוד הזה.",
-            "No group was found with this code.",
-            "لم يتم العثور على مجموعة بهذا الرمز."
+            "לא נמצאה קבוצה עם הקוד הזה. בדוק גם את האותיות הגדולות והקטנות.",
+            "No group was found with this code. Check uppercase and lowercase letters.",
+            "لم يتم العثور على مجموعة بهذا الرمز. تحقق من الحروف الكبيرة والصغيرة."
         )
     }
 
     private var invalidGroupCodeText: String {
+
         localized(
             "קוד הקבוצה אינו תקין.",
             "The group code is invalid.",
@@ -537,6 +600,7 @@ struct JoinGroupView: View {
     }
 
     private var alreadyInGroupText: String {
+
         localized(
             "החשבון כבר משויך לקבוצה.",
             "This account is already assigned to a group.",
@@ -545,6 +609,7 @@ struct JoinGroupView: View {
     }
 
     private var adminCannotJoinText: String {
+
         localized(
             "חשבון מנהל אינו יכול להצטרף כחבר קבוצה.",
             "An admin account cannot join as a group member.",
@@ -553,6 +618,7 @@ struct JoinGroupView: View {
     }
 
     private var sessionExpiredText: String {
+
         localized(
             "החיבור לחשבון הסתיים. יש להתחבר מחדש.",
             "Your session has ended. Please sign in again.",
@@ -561,6 +627,7 @@ struct JoinGroupView: View {
     }
 
     private var accountNotFoundText: String {
+
         localized(
             "לא נמצא חשבון TimeUp מחובר.",
             "No connected TimeUp account was found.",
@@ -569,6 +636,7 @@ struct JoinGroupView: View {
     }
 
     private var userUnavailableText: String {
+
         localized(
             "לא ניתן לטעון את החשבון. יש להתחבר מחדש.",
             "Unable to load the account. Please sign in again.",
@@ -577,6 +645,7 @@ struct JoinGroupView: View {
     }
 
     private var genericJoinErrorText: String {
+
         localized(
             "לא ניתן להשלים את ההצטרפות כרגע. נסה שוב.",
             "Unable to complete registration right now. Please try again.",
@@ -666,16 +735,20 @@ private struct SupabaseJoinedGroupView: View {
     ) -> String {
 
         switch localization.language {
+
         case .hebrew:
             return hebrew
+
         case .english:
             return english
+
         case .arabic:
             return arabic
         }
     }
 
     private var loadingGroupText: String {
+
         localized(
             "טוען את הקבוצה...",
             "Loading the group...",
@@ -684,6 +757,7 @@ private struct SupabaseJoinedGroupView: View {
     }
 
     private var joinedSuccessfullyText: String {
+
         localized(
             "הצטרפת בהצלחה",
             "You've joined successfully",
@@ -692,6 +766,7 @@ private struct SupabaseJoinedGroupView: View {
     }
 
     private var greetingText: String {
+
         localized(
             "שלום \(displayName)",
             "Hello \(displayName)",
@@ -700,6 +775,7 @@ private struct SupabaseJoinedGroupView: View {
     }
 
     private var groupConnectedText: String {
+
         localized(
             "הקבוצה מחוברת כעת לחשבון שלך ב-TimeUp.",
             "The group is now connected to your TimeUp account.",
@@ -708,6 +784,7 @@ private struct SupabaseJoinedGroupView: View {
     }
 
     private var unableToLoadGroupTitle: String {
+
         localized(
             "לא ניתן לטעון את הקבוצה",
             "Unable to Load Group",
@@ -716,6 +793,7 @@ private struct SupabaseJoinedGroupView: View {
     }
 
     private var unableToLoadGroupDescription: String {
+
         localized(
             "ההצטרפות נשמרה, אך פרטי הקבוצה עדיין לא נטענו.",
             "Your membership was saved, but the group details have not loaded yet.",
@@ -734,8 +812,10 @@ private enum JoinGroupError: LocalizedError {
     var errorDescription: String? {
 
         switch self {
+
         case .userNotAvailable:
             return "USER_NOT_AVAILABLE"
+
         case .adminNotConfirmed:
             return "ADMIN_NOT_CONFIRMED"
         }
