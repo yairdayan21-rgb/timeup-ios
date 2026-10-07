@@ -295,6 +295,10 @@ struct MemberOnboardingTourOverlay: View {
         coordinator.currentStep
     }
 
+    private var explanationScrollID: String {
+        "\(step.scrollID)-\(localization.language.rawValue)"
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -424,6 +428,7 @@ struct MemberOnboardingTourOverlay: View {
                         vertical: true
                     )
             }
+            .id(explanationScrollID)
             .frame(maxHeight: 190)
 
             ProgressView(
@@ -635,9 +640,9 @@ struct MemberOnboardingTourOverlay: View {
 
         case .groupDetails:
             return localized(
-                "בפירוט הקבוצתי אפשר לראות את נתוני השימוש והיעדים של החברים לפי ימים. כך אפשר להבין מי עומד ביעד, לראות את ההתקדמות ולזהות איפה הקבוצה יכולה לעזור.",
-                "Group Details shows members' usage and targets by day. See who is meeting their target, follow progress, and recognize where the group can help.",
-                "تعرض تفاصيل المجموعة استخدام الأعضاء وأهدافهم حسب اليوم. يمكنك معرفة من يحقق هدفه، ومتابعة التقدّم، وتحديد أين يمكن للمجموعة تقديم المساعدة."
+                "בפירוט הקבוצתי מוצגים נתוני השימוש והיעדים של החברים להיום, כשנתוני היום זמינים. כך אפשר לראות מי עומד ביעד ואיפה הקבוצה יכולה לעזור. אם הנתונים עדיין לא הגיעו, מוצגת המתנה לנתוני היום.",
+                "Group Details shows members' usage and targets for today when today's data is available. See who is meeting their target and where the group can help. If data hasn't arrived yet, the screen shows that today's data is pending.",
+                "تعرض تفاصيل المجموعة استخدام الأعضاء وأهدافهم لهذا اليوم عندما تتوفّر بيانات اليوم. يمكنك معرفة من يحقق هدفه وأين يمكن للمجموعة تقديم المساعدة. إذا لم تصل البيانات بعد، تعرض الشاشة أنها بانتظار بيانات اليوم."
             )
 
         case .chat:
@@ -651,7 +656,7 @@ struct MemberOnboardingTourOverlay: View {
             return localized(
                 "כאן אפשר לראות את דירוג הקבוצות ואת נתוני ההתקדמות שלהן. המטרה היומית נשארת משותפת: לעמוד ביעד האישי ולעזור לכל הקבוצה להצליח.",
                 "Here you can see group rankings and their progress. Your daily goal remains shared: meet your personal target and help the whole group succeed.",
-                "يمكنك هنا مشاهدة ترتيب المجموعات وبيانات تقدّمها. يبقى الهدف اليومي مشتركًا: تحقيق هدفك الشخصي ومساعدة المجموعة بأكملها على النجاح."
+                "يمكنك هنا مشاهدة ترتيب المجموعات وبيانات تقدّمها. يبقى الهدف اليومي مشتركًا: تحقيق هدفك الشخصי ومساعدة المجموعة بأكملها على النجاح."
             )
         }
     }
@@ -668,7 +673,6 @@ struct MemberOnboardingTourOverlay: View {
             .lowercased()
 
         let percent = dataStore.activeMemberGroup?.reductionPercent
-
         let reduction = percent.map { "\($0)%" }
 
         let methodExplanation: String
