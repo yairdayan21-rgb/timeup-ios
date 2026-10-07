@@ -21,11 +21,8 @@ struct LoginView: View {
     @State private var authenticatedProvider:
         TimeUpAuthProvider?
 
-    @State private var authenticatedUserID:
-        String?
-
-    @State private var currentNonce:
-        String?
+    @State private var authenticatedUserID: String?
+    @State private var currentNonce: String?
 
     private struct SupabaseTimeUpUser: Codable {
 
@@ -48,7 +45,7 @@ struct LoginView: View {
 
         let authUserID: UUID
         let email: String?
-        let displayName: String?
+        let displayName: String
         let role: String
 
         enum CodingKeys: String, CodingKey {
@@ -74,12 +71,8 @@ struct LoginView: View {
                             weight: .light
                         )
                     )
-                    .symbolRenderingMode(
-                        .hierarchical
-                    )
-                    .foregroundStyle(
-                        .primary
-                    )
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.primary)
 
                 Text("TimeUp")
                     .font(
@@ -89,45 +82,25 @@ struct LoginView: View {
                             design: .rounded
                         )
                     )
-                    .padding(
-                        .top,
-                        20
-                    )
+                    .padding(.top, 20)
 
-                Text(
-                    taglineText
-                )
-                .font(.headline)
-                .foregroundStyle(
-                    .secondary
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-                .padding(
-                    .top,
-                    8
-                )
+                Text(taglineText)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
 
                 Spacer()
 
-                VStack(
-                    spacing: 12
-                ) {
+                VStack(spacing: 12) {
 
                     SignInWithAppleButton(
                         appleButtonLabel,
-                        onRequest:
-                            configureAppleRequest,
-                        onCompletion:
-                            handleAppleResult
+                        onRequest: configureAppleRequest,
+                        onCompletion: handleAppleResult
                     )
-                    .signInWithAppleButtonStyle(
-                        .black
-                    )
-                    .frame(
-                        height: 54
-                    )
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 54)
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 12
@@ -135,113 +108,66 @@ struct LoginView: View {
                     )
 
                     Button {
-
                         startGoogleSignIn()
-
                     } label: {
 
                         HStack {
 
                             Image(
-                                systemName:
-                                    "g.circle.fill"
+                                systemName: "g.circle.fill"
                             )
 
-                            Text(
-                                googleButtonText
-                            )
-                            .fontWeight(
-                                .semibold
-                            )
+                            Text(googleButtonText)
+                                .fontWeight(.semibold)
                         }
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .frame(
-                            height: 54
-                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
                     }
-                    .buttonStyle(
-                        .bordered
-                    )
+                    .buttonStyle(.bordered)
                 }
 
                 if !appleSignInError.isEmpty {
 
-                    Text(
-                        appleSignInError
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .red
-                    )
-                    .multilineTextAlignment(
-                        .center
-                    )
-                    .padding(
-                        .top,
-                        12
-                    )
+                    Text(appleSignInError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 12)
                 }
 
-                Text(
-                    termsText
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-                .padding(
-                    .top,
-                    20
-                )
+                Text(termsText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 20)
 
                 Spacer()
-                    .frame(
-                        height: 32
-                    )
+                    .frame(height: 32)
             }
-            .padding(
-                .horizontal,
-                24
-            )
+            .padding(.horizontal, 24)
             .navigationDestination(
-                isPresented:
-                    $showJoinScreen
+                isPresented: $showJoinScreen
             ) {
 
                 JoinGroupView(
-                    authProvider:
-                        authenticatedProvider,
-                    externalUserID:
-                        authenticatedUserID
+                    authProvider: authenticatedProvider,
+                    externalUserID: authenticatedUserID
                 )
-                .navigationBarBackButtonHidden(
-                    true
-                )
+                .navigationBarBackButtonHidden(true)
             }
             .navigationDestination(
-                isPresented:
-                    $showMemberApp
+                isPresented: $showMemberApp
             ) {
 
                 MemberTabView()
-                    .navigationBarBackButtonHidden(
-                        true
-                    )
+                    .navigationBarBackButtonHidden(true)
             }
             .navigationDestination(
-                isPresented:
-                    $showAdminApp
+                isPresented: $showAdminApp
             ) {
 
-                AdminHomeView()
-                    .navigationBarBackButtonHidden(
-                        true
-                    )
+                AdminTabView()
+                    .navigationBarBackButtonHidden(true)
             }
         }
     }
@@ -249,94 +175,62 @@ struct LoginView: View {
     // MARK: - Sign in with Apple
 
     private func configureAppleRequest(
-        _ request:
-            ASAuthorizationAppleIDRequest
+        _ request: ASAuthorizationAppleIDRequest
     ) {
 
-        let nonce =
-            randomNonceString()
+        let nonce = randomNonceString()
 
-        currentNonce =
-            nonce
+        currentNonce = nonce
 
         request.requestedScopes = [
             .fullName,
             .email
         ]
 
-        request.nonce =
-            sha256(
-                nonce
-            )
+        request.nonce = sha256(nonce)
     }
 
     private func handleAppleResult(
-        _ result: Result<
-            ASAuthorization,
-            Error
-        >
+        _ result: Result<ASAuthorization, Error>
     ) {
 
         switch result {
 
-        case .success(
-            let authorization
-        ):
+        case .success(let authorization):
 
             guard
                 let credential =
-                    authorization
-                        .credential
-                        as?
-                        ASAuthorizationAppleIDCredential
+                    authorization.credential
+                    as? ASAuthorizationAppleIDCredential
             else {
 
-                appleSignInError =
-                    unableToReadLoginText
+                appleSignInError = unableToReadLoginText
+                return
+            }
 
+            guard let nonce = currentNonce else {
+
+                appleSignInError = unableToVerifyAppleText
                 return
             }
 
             guard
-                let nonce =
-                    currentNonce
+                let identityToken = credential.identityToken,
+                let idToken = String(
+                    data: identityToken,
+                    encoding: .utf8
+                )
             else {
 
-                appleSignInError =
-                    unableToVerifyAppleText
-
+                appleSignInError = missingAppleTokenText
                 return
             }
 
-            guard
-                let identityToken =
-                    credential
-                        .identityToken,
-                let idToken =
-                    String(
-                        data:
-                            identityToken,
-                        encoding:
-                            .utf8
-                    )
-            else {
+            let appleUserID = credential.user
 
-                appleSignInError =
-                    missingAppleTokenText
+            guard !appleUserID.isEmpty else {
 
-                return
-            }
-
-            let appleUserID =
-                credential.user
-
-            guard
-                !appleUserID.isEmpty
-            else {
-
-                appleSignInError =
-                    missingAppleUserIDText
-
+                appleSignInError = missingAppleUserIDText
                 return
             }
 
@@ -347,55 +241,34 @@ struct LoginView: View {
                 do {
 
                     let session =
-                        try await
-                            SupabaseManager
-                                .shared
-                                .client
-                                .auth
-                                .signInWithIdToken(
-                                    credentials:
-                                        OpenIDConnectCredentials(
-                                            provider:
-                                                .apple,
-                                            idToken:
-                                                idToken,
-                                            nonce:
-                                                nonce
-                                        )
-                                )
+                        try await SupabaseManager.shared.client
+                            .auth
+                            .signInWithIdToken(
+                                credentials:
+                                    OpenIDConnectCredentials(
+                                        provider: .apple,
+                                        idToken: idToken,
+                                        nonce: nonce
+                                    )
+                            )
 
-                    let displayName =
-                        appleDisplayName(
-                            from:
-                                credential
-                        )
+                    let displayName = appleDisplayName(
+                        from: credential
+                    )
 
-                    try await
-                        ensureSupabaseUserExists(
-                            authUserID:
-                                session
-                                    .user
-                                    .id,
-                            email:
-                                credential
-                                    .email,
-                            displayName:
-                                displayName
-                        )
+                    try await ensureSupabaseUserExists(
+                        authUserID: session.user.id,
+                        email: credential.email,
+                        displayName: displayName
+                    )
 
-                    await dataStore
-                        .loadCurrentAccount()
+                    await dataStore.loadCurrentAccount()
 
                     await MainActor.run {
 
-                        currentNonce =
-                            nil
-
-                        authenticatedProvider =
-                            .apple
-
-                        authenticatedUserID =
-                            appleUserID
+                        currentNonce = nil
+                        authenticatedProvider = .apple
+                        authenticatedUserID = appleUserID
 
                         routeAuthenticatedUser()
                     }
@@ -404,8 +277,7 @@ struct LoginView: View {
 
                     await MainActor.run {
 
-                        currentNonce =
-                            nil
+                        currentNonce = nil
 
                         appleSignInError =
                             timeUpLoginIncompleteText
@@ -413,26 +285,16 @@ struct LoginView: View {
                 }
             }
 
-        case .failure(
-            let error
-        ):
+        case .failure(let error):
 
-            currentNonce =
-                nil
-
-            authenticatedProvider =
-                nil
-
-            authenticatedUserID =
-                nil
+            currentNonce = nil
+            authenticatedProvider = nil
+            authenticatedUserID = nil
 
             if
                 let authorizationError =
-                    error as?
-                    ASAuthorizationError,
-                authorizationError
-                    .code ==
-                    .canceled
+                    error as? ASAuthorizationError,
+                authorizationError.code == .canceled
             {
 
                 appleSignInError = ""
@@ -453,113 +315,83 @@ struct LoginView: View {
         displayName: String?
     ) async throws {
 
-        let existingUsers:
-            [SupabaseTimeUpUser] =
-            try await
-                SupabaseManager
-                    .shared
-                    .client
-                    .from("users")
-                    .select()
-                    .eq(
-                        "auth_user_id",
-                        value:
-                            authUserID
-                                .uuidString
-                    )
-                    .limit(1)
-                    .execute()
-                    .value
+        let existingUsers: [SupabaseTimeUpUser] =
+            try await SupabaseManager.shared.client
+                .from("users")
+                .select()
+                .eq(
+                    "auth_user_id",
+                    value: authUserID.uuidString
+                )
+                .limit(1)
+                .execute()
+                .value
 
+        // Keep the existing account's name, role and membership.
         if !existingUsers.isEmpty {
             return
         }
 
-        let newUser =
-            NewSupabaseTimeUpUser(
-                authUserID:
-                    authUserID,
-                email:
-                    email,
-                displayName:
-                    displayName,
-                role:
-                    "member"
-            )
+        // Apple may omit the name after the first authorization.
+        // A new user enters their required name in JoinGroupView.
+        let initialDisplayName =
+            displayName?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ) ?? ""
 
-        try await
-            SupabaseManager
-                .shared
-                .client
-                .from("users")
-                .insert(
-                    newUser
-                )
-                .execute()
+        let newUser = NewSupabaseTimeUpUser(
+            authUserID: authUserID,
+            email: email,
+            displayName: initialDisplayName,
+            role: "member"
+        )
+
+        try await SupabaseManager.shared.client
+            .from("users")
+            .insert(newUser)
+            .execute()
     }
 
     private func routeAuthenticatedUser() {
 
-        guard
-            dataStore.currentUser != nil
-        else {
+        guard dataStore.currentUser != nil else {
 
-            appleSignInError =
-                unableToLoadAccountText
-
+            appleSignInError = unableToLoadAccountText
             return
         }
 
         if dataStore.isAdmin {
 
-            showAdminApp =
-                true
-
+            showAdminApp = true
             return
         }
 
         if dataStore.hasActiveGroup {
 
-            showMemberApp =
-                true
-
+            showMemberApp = true
             return
         }
 
-        showJoinScreen =
-            true
+        showJoinScreen = true
     }
 
     private func appleDisplayName(
-        from credential:
-            ASAuthorizationAppleIDCredential
+        from credential: ASAuthorizationAppleIDCredential
     ) -> String? {
 
-        guard
-            let fullName =
-                credential.fullName
-        else {
+        guard let fullName = credential.fullName else {
             return nil
         }
 
-        let formatter =
-            PersonNameComponentsFormatter()
+        let formatter = PersonNameComponentsFormatter()
 
-        let name =
-            formatter
-                .string(
-                    from:
-                        fullName
-                )
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
+        let name = formatter
+            .string(from: fullName)
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
 
-        return
-            name.isEmpty
-                ? nil
-                : name
+        return name.isEmpty ? nil : name
     }
 
     // MARK: - Nonce
@@ -568,49 +400,36 @@ struct LoginView: View {
         length: Int = 32
     ) -> String {
 
-        precondition(
-            length > 0
+        precondition(length > 0)
+
+        let charset: [Character] = Array(
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._"
         )
 
-        let charset:
-            [Character] =
-            Array(
-                "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._"
-            )
-
         var result = ""
-        var remainingLength =
-            length
+        var remainingLength = length
 
         while remainingLength > 0 {
 
-            var random:
-                UInt8 = 0
+            var random: UInt8 = 0
 
-            let errorCode =
-                SecRandomCopyBytes(
-                    kSecRandomDefault,
-                    1,
-                    &random
-                )
+            let errorCode = SecRandomCopyBytes(
+                kSecRandomDefault,
+                1,
+                &random
+            )
 
-            if errorCode !=
-                errSecSuccess {
+            if errorCode != errSecSuccess {
 
                 fatalError(
                     "Unable to generate nonce."
                 )
             }
 
-            if random <
-                charset.count {
+            if random < charset.count {
 
                 result.append(
-                    charset[
-                        Int(
-                            random
-                        )
-                    ]
+                    charset[Int(random)]
                 )
 
                 remainingLength -= 1
@@ -624,23 +443,14 @@ struct LoginView: View {
         _ input: String
     ) -> String {
 
-        let inputData =
-            Data(
-                input.utf8
-            )
+        let inputData = Data(input.utf8)
 
-        let hashed =
-            SHA256.hash(
-                data:
-                    inputData
-            )
+        let hashed = SHA256.hash(
+            data: inputData
+        )
 
         return hashed.map {
-            String(
-                format:
-                    "%02x",
-                $0
-            )
+            String(format: "%02x", $0)
         }
         .joined()
     }
@@ -649,14 +459,10 @@ struct LoginView: View {
 
     private func startGoogleSignIn() {
 
-        authenticatedProvider =
-            nil
+        authenticatedProvider = nil
+        authenticatedUserID = nil
 
-        authenticatedUserID =
-            nil
-
-        appleSignInError =
-            googleNotConnectedText
+        appleSignInError = googleNotConnectedText
     }
 
     // MARK: - Apple Button
@@ -666,10 +472,7 @@ struct LoginView: View {
 
         switch localization.language {
 
-        case .hebrew,
-             .english,
-             .arabic:
-
+        case .hebrew, .english, .arabic:
             return .continue
         }
     }
