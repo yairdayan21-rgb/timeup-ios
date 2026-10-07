@@ -42,28 +42,19 @@ struct AdminHomeView: View {
                             )
 
                         Text(adminSubtitle)
-                            .foregroundStyle(
-                                .secondary
-                            )
+                            .foregroundStyle(.secondary)
                     }
 
                     // MARK: - Ranking
 
                     Button {
-
                         showRanking = true
-
                     } label: {
 
-                        HStack(
-                            spacing: 14
-                        ) {
+                        HStack(spacing: 14) {
 
-                            Image(
-                                systemName:
-                                    "trophy.fill"
-                            )
-                            .font(.title2)
+                            Image(systemName: "trophy.fill")
+                                .font(.title2)
 
                             VStack(
                                 alignment: .leading,
@@ -71,40 +62,23 @@ struct AdminHomeView: View {
                             ) {
 
                                 Text(rankingText)
-                                    .fontWeight(
-                                        .semibold
-                                    )
+                                    .fontWeight(.semibold)
 
-                                Text(
-                                    groupsAndUsersText
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
+                                Text(groupsAndUsersText)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
 
                             Spacer()
 
-                            Image(
-                                systemName:
-                                    chevronName
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
+                            Image(systemName: chevronName)
+                                .foregroundStyle(.secondary)
                         }
                         .padding()
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .background(
-                            .thinMaterial
-                        )
+                        .frame(maxWidth: .infinity)
+                        .background(.thinMaterial)
                         .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 18
-                            )
+                            RoundedRectangle(cornerRadius: 18)
                         )
                     }
                     .buttonStyle(.plain)
@@ -112,47 +86,27 @@ struct AdminHomeView: View {
                     // MARK: - Create Group
 
                     Button {
-
                         showCreateGroup = true
-
                     } label: {
 
                         HStack {
 
-                            Image(
-                                systemName:
-                                    "plus.circle.fill"
-                            )
-                            .font(.title2)
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
 
-                            Text(
-                                createGroupText
-                            )
-                            .fontWeight(
-                                .semibold
-                            )
+                            Text(createGroupText)
+                                .fontWeight(.semibold)
 
                             Spacer()
 
-                            Image(
-                                systemName:
-                                    chevronName
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
+                            Image(systemName: chevronName)
+                                .foregroundStyle(.secondary)
                         }
                         .padding()
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .background(
-                            .thinMaterial
-                        )
+                        .frame(maxWidth: .infinity)
+                        .background(.thinMaterial)
                         .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 18
-                            )
+                            RoundedRectangle(cornerRadius: 18)
                         )
                     }
                     .buttonStyle(.plain)
@@ -165,65 +119,44 @@ struct AdminHomeView: View {
                     ) {
 
                         Text(myGroupsText)
-                            .font(
-                                .title3.bold()
-                            )
+                            .font(.title3.bold())
 
-                        if dataStore.isLoading &&
-                            dataStore.groups.isEmpty {
+                        if dataStore.isLoading
+                            && dataStore.groups.isEmpty {
 
                             HStack {
 
                                 Spacer()
 
-                                ProgressView(
-                                    loadingGroupsText
-                                )
+                                ProgressView(loadingGroupsText)
 
                                 Spacer()
                             }
-                            .padding(
-                                .vertical,
-                                40
-                            )
+                            .padding(.vertical, 40)
 
-                        } else if
-                            dataStore.groups.isEmpty {
+                        } else if dataStore.groups.isEmpty {
 
                             ContentUnavailableView(
                                 noGroupsTitle,
-                                systemImage:
-                                    "person.3",
-                                description:
-                                    Text(
-                                        noGroupsDescription
-                                    )
+                                systemImage: "person.3",
+                                description: Text(
+                                    noGroupsDescription
+                                )
                             )
-                            .frame(
-                                maxWidth: .infinity
-                            )
-                            .padding(
-                                .vertical,
-                                30
-                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 30)
 
                         } else {
 
-                            ForEach(
-                                dataStore.groups
-                            ) { group in
-
-                                groupCard(
-                                    group: group
-                                )
+                            ForEach(dataStore.groups) { group in
+                                groupCard(group: group)
                             }
                         }
                     }
 
                     // MARK: - Error
 
-                    if let error =
-                        dataStore.lastError {
+                    if let error = dataStore.lastError {
 
                         VStack(
                             alignment: .leading,
@@ -232,27 +165,18 @@ struct AdminHomeView: View {
 
                             Label(
                                 unableToLoadDataText,
-                                systemImage:
-                                    "exclamationmark.triangle"
+                                systemImage: "exclamationmark.triangle"
                             )
-                            .fontWeight(
-                                .semibold
-                            )
+                            .fontWeight(.semibold)
 
                             Text(error)
                                 .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
+                                .foregroundStyle(.secondary)
 
-                            Button(
-                                retryText
-                            ) {
+                            Button(retryText) {
 
                                 Task {
-
-                                    await dataStore
-                                        .loadCurrentAccount()
+                                    await dataStore.loadCurrentAccount()
                                 }
                             }
                         }
@@ -261,13 +185,9 @@ struct AdminHomeView: View {
                             maxWidth: .infinity,
                             alignment: .leading
                         )
-                        .background(
-                            .thinMaterial
-                        )
+                        .background(.thinMaterial)
                         .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 18
-                            )
+                            RoundedRectangle(cornerRadius: 18)
                         )
                     }
                 }
@@ -275,63 +195,60 @@ struct AdminHomeView: View {
             }
             .refreshable {
 
-                await dataStore
-                    .loadCurrentAccount()
-
-                await rankingStore
-                    .loadAllRankings()
+                await dataStore.loadCurrentAccount()
+                await rankingStore.loadAllRankings()
             }
             .toolbar {
 
-                ToolbarItem(
-                    placement:
-                        .topBarTrailing
+                ToolbarItemGroup(
+                    placement: .topBarTrailing
                 ) {
 
                     Button {
 
                         Task {
-
-                            await dataStore
-                                .loadCurrentAccount()
-
-                            await rankingStore
-                                .loadAllRankings()
+                            await dataStore.loadCurrentAccount()
+                            await rankingStore.loadAllRankings()
                         }
 
                     } label: {
 
-                        Image(
-                            systemName:
-                                "arrow.clockwise"
-                        )
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .accessibilityLabel(refreshText)
+
+                    NavigationLink {
+
+                        PersonalSettingsView()
+
+                    } label: {
+
+                        Image(systemName: "gearshape")
                     }
                     .accessibilityLabel(
-                        refreshText
+                        localization.text(.settings)
+                    )
+                    .accessibilityIdentifier(
+                        "admin-settings-button"
                     )
                 }
             }
             .navigationDestination(
-                isPresented:
-                    $showCreateGroup
+                isPresented: $showCreateGroup
             ) {
 
                 CreateGroupView()
             }
             .navigationDestination(
-                isPresented:
-                    $showRanking
+                isPresented: $showRanking
             ) {
 
                 AdminRankingView()
             }
             .task {
 
-                await dataStore
-                    .loadCurrentAccount()
-
-                await rankingStore
-                    .loadAllRankings()
+                await dataStore.loadCurrentAccount()
+                await rankingStore.loadAllRankings()
             }
         }
     }
@@ -339,8 +256,7 @@ struct AdminHomeView: View {
     // MARK: - Group Card
 
     private func groupCard(
-        group:
-            SupabaseDataStore.TimeUpRemoteGroup
+        group: SupabaseDataStore.TimeUpRemoteGroup
     ) -> some View {
 
         VStack(
@@ -360,21 +276,14 @@ struct AdminHomeView: View {
 
                     Text(groupCodeText)
                         .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Image(
-                    systemName:
-                        "person.3.fill"
-                )
-                .font(.title3)
-                .foregroundStyle(
-                    .secondary
-                )
+                Image(systemName: "person.3.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
             }
 
             Text(group.code)
@@ -389,60 +298,42 @@ struct AdminHomeView: View {
 
             Divider()
 
-            HStack(
-                spacing: 12
-            ) {
+            HStack(spacing: 12) {
 
                 Label(
-                    goalDescription(
-                        group
-                    ),
-                    systemImage:
-                        "target"
+                    goalDescription(group),
+                    systemImage: "target"
                 )
 
                 Spacer()
 
                 Label(
                     "\(group.currentStreak)",
-                    systemImage:
-                        "flame.fill"
+                    systemImage: "flame.fill"
                 )
-                .foregroundStyle(
-                    .secondary
-                )
+                .foregroundStyle(.secondary)
 
-                if group.goalMethod !=
-                    "manual" {
+                if group.goalMethod != "manual" {
 
                     Text(
-                        daysText(
-                            group.successDays ?? 7
-                        )
+                        daysText(group.successDays ?? 7)
                     )
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    .foregroundStyle(.secondary)
                 }
             }
             .font(.subheadline)
         }
         .padding()
-        .background(
-            .thinMaterial
-        )
+        .background(.thinMaterial)
         .clipShape(
-            RoundedRectangle(
-                cornerRadius: 18
-            )
+            RoundedRectangle(cornerRadius: 18)
         )
     }
 
     // MARK: - Goal Description
 
     private func goalDescription(
-        _ group:
-            SupabaseDataStore.TimeUpRemoteGroup
+        _ group: SupabaseDataStore.TimeUpRemoteGroup
     ) -> String {
 
         switch group.goalMethod {
@@ -450,13 +341,10 @@ struct AdminHomeView: View {
         case "personal_percentage":
 
             switch localization.language {
-
             case .hebrew:
                 return "\(group.reductionPercent ?? 0)% פחות מהיום הקודם"
-
             case .english:
                 return "\(group.reductionPercent ?? 0)% less than the previous day"
-
             case .arabic:
                 return "أقل بنسبة \(group.reductionPercent ?? 0)% من اليوم السابق"
             }
@@ -464,13 +352,10 @@ struct AdminHomeView: View {
         case "group_average_percentage":
 
             switch localization.language {
-
             case .hebrew:
                 return "\(group.reductionPercent ?? 0)% פחות מהממוצע הקבוצתי"
-
             case .english:
                 return "\(group.reductionPercent ?? 0)% less than the group average"
-
             case .arabic:
                 return "أقل بنسبة \(group.reductionPercent ?? 0)% من متوسط المجموعة"
             }
@@ -478,13 +363,10 @@ struct AdminHomeView: View {
         case "manual":
 
             switch localization.language {
-
             case .hebrew:
                 return "יעד אישי"
-
             case .english:
                 return "Personal target"
-
             case .arabic:
                 return "هدف شخصي"
             }
@@ -492,13 +374,10 @@ struct AdminHomeView: View {
         default:
 
             switch localization.language {
-
             case .hebrew:
                 return "יעד קבוצה"
-
             case .english:
                 return "Group target"
-
             case .arabic:
                 return "هدف المجموعة"
             }
@@ -514,180 +393,132 @@ struct AdminHomeView: View {
     }
 
     private var adminSubtitle: String {
-
         switch localization.language {
-
         case .hebrew:
             return "ניהול הקבוצות שלך"
-
         case .english:
             return "Manage your groups"
-
         case .arabic:
             return "إدارة مجموعاتك"
         }
     }
 
     private var rankingText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "דירוג"
-
         case .english:
             return "Ranking"
-
         case .arabic:
             return "الترتيب"
         }
     }
 
     private var groupsAndUsersText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "קבוצות ומשתמשים"
-
         case .english:
             return "Groups and users"
-
         case .arabic:
             return "المجموعات والمستخدمون"
         }
     }
 
     private var createGroupText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "יצירת קבוצה חדשה"
-
         case .english:
             return "Create a new group"
-
         case .arabic:
             return "إنشاء مجموعة جديدة"
         }
     }
 
     private var myGroupsText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "הקבוצות שלי"
-
         case .english:
             return "My groups"
-
         case .arabic:
             return "مجموعاتي"
         }
     }
 
     private var loadingGroupsText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "טוען קבוצות..."
-
         case .english:
             return "Loading groups..."
-
         case .arabic:
             return "جارٍ تحميل المجموعات..."
         }
     }
 
     private var noGroupsTitle: String {
-
         switch localization.language {
-
         case .hebrew:
             return "עדיין אין קבוצות"
-
         case .english:
             return "No groups yet"
-
         case .arabic:
             return "لا توجد مجموعات بعد"
         }
     }
 
     private var noGroupsDescription: String {
-
         switch localization.language {
-
         case .hebrew:
             return "צור את הקבוצה הראשונה שלך כדי להתחיל."
-
         case .english:
             return "Create your first group to get started."
-
         case .arabic:
             return "أنشئ مجموعتك الأولى للبدء."
         }
     }
 
     private var unableToLoadDataText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "לא ניתן לטעון את הנתונים"
-
         case .english:
             return "Unable to load data"
-
         case .arabic:
             return "تعذر تحميل البيانات"
         }
     }
 
     private var retryText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "נסה שוב"
-
         case .english:
             return "Try again"
-
         case .arabic:
             return "حاول مرة أخرى"
         }
     }
 
     private var refreshText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "רענון"
-
         case .english:
             return "Refresh"
-
         case .arabic:
             return "تحديث"
         }
     }
 
     private var groupCodeText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "קוד קבוצה"
-
         case .english:
             return "Group code"
-
         case .arabic:
             return "رمز المجموعة"
         }
@@ -698,15 +529,12 @@ struct AdminHomeView: View {
     ) -> String {
 
         switch localization.language {
-
         case .hebrew:
             return "\(days) ימים"
-
         case .english:
             return days == 1
                 ? "1 day"
                 : "\(days) days"
-
         case .arabic:
             return "\(days) يوم"
         }
@@ -717,28 +545,22 @@ struct AdminHomeView: View {
 
 private struct AdminRankingView: View {
 
-    private enum RankingTab:
-        CaseIterable,
-        Identifiable {
+    private enum RankingTab: CaseIterable, Identifiable {
 
         case groups
         case users
 
         var id: String {
-
             switch self {
-
             case .groups:
                 return "groups"
-
             case .users:
                 return "users"
             }
         }
     }
 
-    @State private var selectedTab:
-        RankingTab = .groups
+    @State private var selectedTab: RankingTab = .groups
 
     @StateObject private var rankingStore =
         SupabaseRankingStore.shared
@@ -751,123 +573,78 @@ private struct AdminRankingView: View {
 
     var body: some View {
 
-        VStack(
-            spacing: 16
-        ) {
+        VStack(spacing: 16) {
 
             Picker(
                 rankingTypeText,
-                selection:
-                    $selectedTab
+                selection: $selectedTab
             ) {
 
-                ForEach(
-                    RankingTab.allCases
-                ) { tab in
+                ForEach(RankingTab.allCases) { tab in
 
-                    Text(
-                        title(
-                            for: tab
-                        )
-                    )
-                    .tag(tab)
+                    Text(title(for: tab))
+                        .tag(tab)
                 }
             }
-            .pickerStyle(
-                .segmented
-            )
-            .padding(
-                .horizontal,
-                20
-            )
-            .padding(
-                .top,
-                12
-            )
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
 
             switch selectedTab {
-
             case .groups:
-
                 groupRankingContent
-
             case .users:
-
                 userRankingContent
             }
         }
-        .navigationTitle(
-            rankingText
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
+        .navigationTitle(rankingText)
+        .navigationBarTitleDisplayMode(.inline)
         .task {
 
-            await rankingStore
-                .loadAllRankings()
+            await rankingStore.loadAllRankings()
         }
     }
 
     // MARK: - Group Ranking Content
 
     @ViewBuilder
-    private var groupRankingContent:
-        some View {
+    private var groupRankingContent: some View {
 
-        if rankingStore.isLoading &&
-            rankingStore.groupRankings.isEmpty {
+        if rankingStore.isLoading
+            && rankingStore.groupRankings.isEmpty {
 
-            loadingView(
-                text:
-                    loadingGroupRankingText
-            )
+            loadingView(text: loadingGroupRankingText)
 
-        } else if
-            rankingStore.groupRankings.isEmpty {
+        } else if rankingStore.groupRankings.isEmpty {
 
             ContentUnavailableView(
                 noGroupRankingTitle,
-                systemImage:
-                    "trophy",
-                description:
-                    Text(
-                        rankingStore.lastError ??
-                        noGroupRankingDescription
-                    )
+                systemImage: "trophy",
+                description: Text(
+                    rankingStore.lastError
+                        ?? noGroupRankingDescription
+                )
             )
 
         } else {
 
             ScrollView {
 
-                LazyVStack(
-                    spacing: 12
-                ) {
+                LazyVStack(spacing: 12) {
 
                     ForEach(
-                        rankingStore
-                            .groupRankings
+                        rankingStore.groupRankings
                     ) { ranking in
 
-                        groupRankingRow(
-                            ranking
-                        )
+                        groupRankingRow(ranking)
                     }
                 }
-                .padding(
-                    .horizontal,
-                    20
-                )
-                .padding(
-                    .bottom,
-                    20
-                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
             .refreshable {
 
-                await rankingStore
-                    .loadGroupRankings()
+                await rankingStore.loadGroupRankings()
             }
         }
     }
@@ -875,62 +652,43 @@ private struct AdminRankingView: View {
     // MARK: - User Ranking Content
 
     @ViewBuilder
-    private var userRankingContent:
-        some View {
+    private var userRankingContent: some View {
 
-        if rankingStore.isLoadingUsers &&
-            rankingStore.userRankings.isEmpty {
+        if rankingStore.isLoadingUsers
+            && rankingStore.userRankings.isEmpty {
 
-            loadingView(
-                text:
-                    loadingUserRankingText
-            )
+            loadingView(text: loadingUserRankingText)
 
-        } else if
-            rankingStore.userRankings.isEmpty {
+        } else if rankingStore.userRankings.isEmpty {
 
             ContentUnavailableView(
                 noUserRankingTitle,
-                systemImage:
-                    "person.2",
-                description:
-                    Text(
-                        rankingStore.userRankingError ??
-                        noUserRankingDescription
-                    )
+                systemImage: "person.2",
+                description: Text(
+                    rankingStore.userRankingError
+                        ?? noUserRankingDescription
+                )
             )
 
         } else {
 
             ScrollView {
 
-                LazyVStack(
-                    spacing: 12
-                ) {
+                LazyVStack(spacing: 12) {
 
                     ForEach(
-                        rankingStore
-                            .userRankings
+                        rankingStore.userRankings
                     ) { ranking in
 
-                        userRankingRow(
-                            ranking
-                        )
+                        userRankingRow(ranking)
                     }
                 }
-                .padding(
-                    .horizontal,
-                    20
-                )
-                .padding(
-                    .bottom,
-                    20
-                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
             .refreshable {
 
-                await rankingStore
-                    .loadUserRankings()
+                await rankingStore.loadUserRankings()
             }
         }
     }
@@ -938,23 +696,17 @@ private struct AdminRankingView: View {
     // MARK: - Group Row
 
     private func groupRankingRow(
-        _ ranking:
-            SupabaseRankingStore.GroupRanking
+        _ ranking: SupabaseRankingStore.GroupRanking
     ) -> some View {
 
-        let isMyGroup =
-            dataStore.groups.contains {
-                $0.id ==
-                    ranking.groupID
-            }
+        let isMyGroup = dataStore.groups.contains {
+            $0.id == ranking.groupID
+        }
 
-        return HStack(
-            spacing: 14
-        ) {
+        return HStack(spacing: 14) {
 
             positionIcon(
-                position:
-                    ranking.rankingPosition
+                position: ranking.rankingPosition
             )
 
             VStack(
@@ -962,79 +714,49 @@ private struct AdminRankingView: View {
                 spacing: 5
             ) {
 
-                HStack(
-                    spacing: 7
-                ) {
+                HStack(spacing: 7) {
 
-                    Text(
-                        ranking.groupName
-                    )
-                    .font(.headline)
+                    Text(ranking.groupName)
+                        .font(.headline)
 
                     if isMyGroup {
 
                         Text(myGroupText)
-                            .font(
-                                .caption2
-                            )
-                            .fontWeight(
-                                .semibold
-                            )
-                            .padding(
-                                .horizontal,
-                                7
-                            )
-                            .padding(
-                                .vertical,
-                                3
-                            )
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
                             .background(
                                 .thinMaterial,
-                                in:
-                                    Capsule()
+                                in: Capsule()
                             )
                     }
                 }
 
-                HStack(
-                    spacing: 14
-                ) {
+                HStack(spacing: 14) {
 
                     Label(
-                        daysText(
-                            ranking.currentStreak
-                        ),
-                        systemImage:
-                            "flame.fill"
+                        daysText(ranking.currentStreak),
+                        systemImage: "flame.fill"
                     )
 
                     if let average =
-                        ranking
-                            .averageUsageMinutes {
+                        ranking.averageUsageMinutes {
 
                         Label(
-                            formattedMinutes(
-                                average
-                            ),
-                            systemImage:
-                                "iphone"
+                            formattedMinutes(average),
+                            systemImage: "iphone"
                         )
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text(
-                "#\(ranking.rankingPosition)"
-            )
-            .font(
-                .title3.bold()
-            )
+            Text("#\(ranking.rankingPosition)")
+                .font(.title3.bold())
         }
         .padding(14)
         .frame(
@@ -1043,31 +765,22 @@ private struct AdminRankingView: View {
         )
         .background(
             isMyGroup
-            ? Color.secondary
-                .opacity(0.12)
-            : Color.secondary
-                .opacity(0.06),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 16
-                )
+                ? Color.secondary.opacity(0.12)
+                : Color.secondary.opacity(0.06),
+            in: RoundedRectangle(cornerRadius: 16)
         )
     }
 
     // MARK: - User Row
 
     private func userRankingRow(
-        _ ranking:
-            SupabaseRankingStore.UserRanking
+        _ ranking: SupabaseRankingStore.UserRanking
     ) -> some View {
 
-        HStack(
-            spacing: 14
-        ) {
+        HStack(spacing: 14) {
 
             positionIcon(
-                position:
-                    ranking.rankingPosition
+                position: ranking.rankingPosition
             )
 
             VStack(
@@ -1076,50 +789,34 @@ private struct AdminRankingView: View {
             ) {
 
                 Text(
-                    ranking.displayName ??
-                    genericUserText
+                    ranking.displayName ?? genericUserText
                 )
                 .font(.headline)
 
-                HStack(
-                    spacing: 14
-                ) {
+                HStack(spacing: 14) {
 
                     Label(
-                        daysText(
-                            ranking.personalStreak
-                        ),
-                        systemImage:
-                            "flame.fill"
+                        daysText(ranking.personalStreak),
+                        systemImage: "flame.fill"
                     )
 
                     if let average =
-                        ranking
-                            .averageUsageMinutes {
+                        ranking.averageUsageMinutes {
 
                         Label(
-                            formattedMinutes(
-                                average
-                            ),
-                            systemImage:
-                                "iphone"
+                            formattedMinutes(average),
+                            systemImage: "iphone"
                         )
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text(
-                "#\(ranking.rankingPosition)"
-            )
-            .font(
-                .title3.bold()
-            )
+            Text("#\(ranking.rankingPosition)")
+                .font(.title3.bold())
         }
         .padding(14)
         .frame(
@@ -1127,12 +824,8 @@ private struct AdminRankingView: View {
             alignment: .leading
         )
         .background(
-            Color.secondary
-                .opacity(0.06),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 16
-                )
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(cornerRadius: 16)
         )
     }
 
@@ -1147,19 +840,14 @@ private struct AdminRankingView: View {
 
             Circle()
                 .fill(
-                    Color.secondary
-                        .opacity(0.12)
+                    Color.secondary.opacity(0.12)
                 )
-                .frame(
-                    width: 48,
-                    height: 48
-                )
+                .frame(width: 48, height: 48)
 
             if position <= 3 {
 
                 Image(
-                    systemName:
-                        position == 1
+                    systemName: position == 1
                         ? "trophy.fill"
                         : "medal.fill"
                 )
@@ -1167,10 +855,8 @@ private struct AdminRankingView: View {
 
             } else {
 
-                Text(
-                    "\(position)"
-                )
-                .font(.headline)
+                Text("\(position)")
+                    .font(.headline)
             }
         }
     }
@@ -1181,16 +867,12 @@ private struct AdminRankingView: View {
         text: String
     ) -> some View {
 
-        VStack(
-            spacing: 16
-        ) {
+        VStack(spacing: 16) {
 
             ProgressView()
 
             Text(text)
-                .foregroundStyle(
-                    .secondary
-                )
+                .foregroundStyle(.secondary)
         }
         .frame(
             maxWidth: .infinity,
@@ -1204,19 +886,13 @@ private struct AdminRankingView: View {
         _ minutes: Double
     ) -> String {
 
-        let totalMinutes =
-            max(
-                0,
-                Int(
-                    minutes.rounded()
-                )
-            )
+        let totalMinutes = max(
+            0,
+            Int(minutes.rounded())
+        )
 
-        let hours =
-            totalMinutes / 60
-
-        let remainingMinutes =
-            totalMinutes % 60
+        let hours = totalMinutes / 60
+        let remainingMinutes = totalMinutes % 60
 
         switch localization.language {
 
@@ -1269,13 +945,10 @@ private struct AdminRankingView: View {
         case .groups:
 
             switch localization.language {
-
             case .hebrew:
                 return "קבוצות"
-
             case .english:
                 return "Groups"
-
             case .arabic:
                 return "المجموعات"
             }
@@ -1283,13 +956,10 @@ private struct AdminRankingView: View {
         case .users:
 
             switch localization.language {
-
             case .hebrew:
                 return "משתמשים"
-
             case .english:
                 return "Users"
-
             case .arabic:
                 return "المستخدمون"
             }
@@ -1297,150 +967,110 @@ private struct AdminRankingView: View {
     }
 
     private var rankingTypeText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "סוג דירוג"
-
         case .english:
             return "Ranking type"
-
         case .arabic:
             return "نوع الترتيب"
         }
     }
 
     private var rankingText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "דירוג"
-
         case .english:
             return "Ranking"
-
         case .arabic:
             return "الترتيب"
         }
     }
 
     private var loadingGroupRankingText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "טוען דירוג קבוצות..."
-
         case .english:
             return "Loading group ranking..."
-
         case .arabic:
             return "جارٍ تحميل ترتيب المجموعات..."
         }
     }
 
     private var noGroupRankingTitle: String {
-
         switch localization.language {
-
         case .hebrew:
             return "אין עדיין דירוג קבוצות"
-
         case .english:
             return "No group ranking yet"
-
         case .arabic:
             return "لا يوجد ترتيب للمجموعات بعد"
         }
     }
 
     private var noGroupRankingDescription: String {
-
         switch localization.language {
-
         case .hebrew:
             return "הדירוג יופיע כאשר יהיו נתונים לקבוצות."
-
         case .english:
             return "The ranking will appear when group data is available."
-
         case .arabic:
             return "سيظهر الترتيب عند توفر بيانات للمجموعات."
         }
     }
 
     private var loadingUserRankingText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "טוען דירוג משתמשים..."
-
         case .english:
             return "Loading user ranking..."
-
         case .arabic:
             return "جارٍ تحميل ترتيب المستخدمين..."
         }
     }
 
     private var noUserRankingTitle: String {
-
         switch localization.language {
-
         case .hebrew:
             return "אין עדיין דירוג משתמשים"
-
         case .english:
             return "No user ranking yet"
-
         case .arabic:
             return "لا يوجد ترتيب للمستخدمين بعد"
         }
     }
 
     private var noUserRankingDescription: String {
-
         switch localization.language {
-
         case .hebrew:
             return "הדירוג יופיע כאשר יהיו נתוני שימוש למשתמשים."
-
         case .english:
             return "The ranking will appear when user activity data is available."
-
         case .arabic:
             return "سيظهر الترتيب عند توفر بيانات استخدام للمستخدمين."
         }
     }
 
     private var myGroupText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "שלי"
-
         case .english:
             return "Mine"
-
         case .arabic:
             return "مجموعتي"
         }
     }
 
     private var genericUserText: String {
-
         switch localization.language {
-
         case .hebrew:
             return "משתמש"
-
         case .english:
             return "User"
-
         case .arabic:
             return "مستخدم"
         }
@@ -1451,15 +1081,12 @@ private struct AdminRankingView: View {
     ) -> String {
 
         switch localization.language {
-
         case .hebrew:
             return "\(days) ימים"
-
         case .english:
             return days == 1
                 ? "1 day"
                 : "\(days) days"
-
         case .arabic:
             return "\(days) يوم"
         }
