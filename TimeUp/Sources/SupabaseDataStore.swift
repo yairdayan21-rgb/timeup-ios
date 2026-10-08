@@ -19,6 +19,10 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var dailyResults: [TimeUpRemoteDailyResult] = []
     @Published private(set) var groupDailyResults: [TimeUpRemoteGroupDailyResult] = []
 
+    @Published private(set) var personalProgress: TimeUpRemoteProgress?
+    @Published private(set) var isLoadingPersonalProgress = false
+    @Published private(set) var personalProgressError: String?
+
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingGroupMembers = false
     @Published private(set) var isLoadingDailyProgress = false
@@ -27,6 +31,8 @@ final class SupabaseDataStore: ObservableObject {
     @Published private(set) var isSavingManualTarget = false
     @Published private(set) var isCompletingOnboarding = false
     @Published private(set) var lastError: String?
+
+    private var personalProgressRequestID = UUID()
 
     private let client = SupabaseManager.shared.client
     private let appGroupID = "group.com.timeup.shared"
@@ -173,6 +179,136 @@ final class SupabaseDataStore: ObservableObject {
         }
     }
 
+    // MARK: - Personal Progress Models
+
+    public struct TimeUpRemoteProgress: Decodable {
+
+        public let groupID: UUID
+        public let userID: UUID
+        public let timezone: String
+        public let asOfDate: String
+        public let baseline: ProgressBaseline
+        public let cumulative: CumulativeProgress
+        public let weekly: WeeklyProgress
+        public let today: TodayProgress
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case userID = "user_id"
+            case timezone
+            case asOfDate = "as_of_date"
+            case baseline
+            case cumulative
+            case weekly
+            case today
+        }
+    }
+
+    public struct ProgressBaseline: Decodable {
+
+        public let date: String?
+        public let usageMinutes: Int?
+        public let confirmed: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case date
+            case usageMinutes = "usage_minutes"
+            case confirmed
+        }
+    }
+
+    public struct CumulativeProgress: Decodable {
+
+        public let periodStart: String?
+        public let periodEnd: String
+        public let firstMeasuredDate: String?
+        public let lastMeasuredDate: String?
+        public let measuredDays: Int
+        public let achievedDays: Int
+        public let averageUsageMinutes: Double?
+        public let totalUsageMinutes: Int64?
+        public let reductionPercent: Double?
+        public let usageDifferenceMinutes: Int64?
+        public let alternativeCount: Int?
+        public let groupClosedDays: Int
+        public let groupSuccessfulDays: Int
+        public let groupAlternativeCount: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case periodStart = "period_start"
+            case periodEnd = "period_end"
+            case firstMeasuredDate = "first_measured_date"
+            case lastMeasuredDate = "last_measured_date"
+            case measuredDays = "measured_days"
+            case achievedDays = "achieved_days"
+            case averageUsageMinutes = "average_usage_minutes"
+            case totalUsageMinutes = "total_usage_minutes"
+            case reductionPercent = "reduction_percent"
+            case usageDifferenceMinutes = "usage_difference_minutes"
+            case alternativeCount = "alternative_count"
+            case groupClosedDays = "group_closed_days"
+            case groupSuccessfulDays = "group_successful_days"
+            case groupAlternativeCount = "group_alternative_count"
+        }
+    }
+
+    public struct WeeklyProgress: Decodable {
+
+        public let periodStart: String
+        public let periodEnd: String
+        public let measuredDays: Int
+        public let achievedDays: Int
+        public let averageUsageMinutes: Double?
+        public let totalUsageMinutes: Int64?
+        public let comparisonDays: Int
+        public let reductionPercent: Double?
+        public let usageDifferenceMinutes: Int64?
+        public let alternativeCount: Int
+        public let groupClosedDays: Int
+        public let groupSuccessfulDays: Int
+        public let groupAlternativeCount: Int
+
+        enum CodingKeys: String, CodingKey {
+            case periodStart = "period_start"
+            case periodEnd = "period_end"
+            case measuredDays = "measured_days"
+            case achievedDays = "achieved_days"
+            case averageUsageMinutes = "average_usage_minutes"
+            case totalUsageMinutes = "total_usage_minutes"
+            case comparisonDays = "comparison_days"
+            case reductionPercent = "reduction_percent"
+            case usageDifferenceMinutes = "usage_difference_minutes"
+            case alternativeCount = "alternative_count"
+            case groupClosedDays = "group_closed_days"
+            case groupSuccessfulDays = "group_successful_days"
+            case groupAlternativeCount = "group_alternative_count"
+        }
+    }
+
+    public struct TodayProgress: Decodable {
+
+        public let date: String
+        public let usageMinutes: Int?
+        public let targetMinutes: Int?
+        public let isLearningDay: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case date
+            case usageMinutes = "usage_minutes"
+            case targetMinutes = "target_minutes"
+            case isLearningDay = "is_learning_day"
+        }
+    }
+
+    private struct ProgressParameters: Encodable {
+
+        let groupID: UUID
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "p_group_id"
+        }
+    }
+
     private struct SecureJoinResponse: Decodable {
 
         let success: Bool
@@ -291,7 +427,6 @@ final class SupabaseDataStore: ObservableObject {
         }
 
         do {
-
             let session = try await client.auth.session
             let authUserID = session.user.id
 
@@ -323,8 +458,17 @@ final class SupabaseDataStore: ObservableObject {
                 return
             }
 
+            if currentUser?.id != user.id {
+                clearPersonalProgress()
+            }
+
             currentUser = user
+
             try await loadMemberships(for: user.id)
+
+            if personalProgress?.groupID != activeMemberGroup?.id {
+                clearPersonalProgress()
+            }
 
         } catch {
             clearLoadedData()
@@ -360,11 +504,8 @@ final class SupabaseDataStore: ObservableObject {
         memberships = loadedMemberships
 
         if currentUser?.role == "admin" {
-
             try await loadAdminGroups(for: userID)
-
         } else {
-
             let groupIDs = loadedMemberships.map {
                 $0.groupID
             }
@@ -462,8 +603,7 @@ final class SupabaseDataStore: ObservableObject {
 
         let codeLength = 8
 
-        // 248 is divisible by 62. Rejecting bytes >= 248
-        // avoids bias when mapping random bytes to the alphabet.
+        // Reject bytes >= 248 to avoid modulo bias.
         let acceptanceLimit = 248
 
         for _ in 0..<128 {
@@ -577,7 +717,6 @@ final class SupabaseDataStore: ObservableObject {
         for _ in 0..<20 {
 
             do {
-
                 let code = try generateSecureGroupCode()
 
                 let payload = GroupInsert(
@@ -618,7 +757,6 @@ final class SupabaseDataStore: ObservableObject {
                 }
 
                 do {
-
                     let membership = MembershipInsert(
                         groupID: createdGroup.id,
                         userID: user.id,
@@ -631,7 +769,6 @@ final class SupabaseDataStore: ObservableObject {
                         .execute()
 
                 } catch {
-
                     try? await client
                         .from("groups")
                         .delete()
@@ -674,7 +811,6 @@ final class SupabaseDataStore: ObservableObject {
         }
 
         do {
-
             let loadedMemberships: [TimeUpRemoteMembership] =
                 try await client
                     .from("group_memberships")
@@ -733,7 +869,6 @@ final class SupabaseDataStore: ObservableObject {
             }
 
             groupMembers = loadedUsers.sorted {
-
                 let firstName = $0.displayName ?? ""
                 let secondName = $1.displayName ?? ""
 
@@ -763,7 +898,6 @@ final class SupabaseDataStore: ObservableObject {
         }
 
         do {
-
             async let targetsRequest: [TimeUpRemoteDailyTarget] =
                 client
                     .from("daily_targets")
@@ -829,6 +963,21 @@ final class SupabaseDataStore: ObservableObject {
                         "group_id",
                         value: groupID.uuidString
                     )
+                    .not(
+                        "finalized_at",
+                        operator: .is,
+                        value: "null"
+                    )
+                    .not(
+                        "succeeded",
+                        operator: .is,
+                        value: "null"
+                    )
+                    .not(
+                        "streak_after_day",
+                        operator: .is,
+                        value: "null"
+                    )
                     .execute()
                     .value
 
@@ -852,6 +1001,92 @@ final class SupabaseDataStore: ObservableObject {
             groupDailyResults = []
             lastError = error.localizedDescription
         }
+
+        await loadPersonalProgress(groupID: groupID)
+    }
+
+    // MARK: - Personal Progress
+
+    func loadPersonalProgress(
+        groupID: UUID
+    ) async {
+
+        guard
+            let user = currentUser,
+            user.role == "member",
+            activeMemberGroup?.id == groupID
+        else {
+            return
+        }
+
+        let requestID = UUID()
+        personalProgressRequestID = requestID
+        isLoadingPersonalProgress = true
+        personalProgressError = nil
+
+        // Prevent a summary from another account or group being displayed.
+        if personalProgress?.userID != user.id
+            || personalProgress?.groupID != groupID {
+            personalProgress = nil
+        }
+
+        defer {
+            if personalProgressRequestID == requestID {
+                isLoadingPersonalProgress = false
+            }
+        }
+
+        do {
+            let loadedProgress: TimeUpRemoteProgress =
+                try await client
+                    .rpc(
+                        "get_timeup_progress",
+                        params: ProgressParameters(
+                            groupID: groupID
+                        )
+                    )
+                    .execute()
+                    .value
+
+            guard
+                personalProgressRequestID == requestID,
+                currentUser?.id == user.id,
+                currentUser?.role == "member",
+                activeMemberGroup?.id == groupID
+            else {
+                return
+            }
+
+            guard
+                loadedProgress.userID == user.id,
+                loadedProgress.groupID == groupID
+            else {
+                throw SupabaseDataStoreError
+                    .invalidProgressResponse
+            }
+
+            personalProgress = loadedProgress
+
+        } catch {
+            guard
+                personalProgressRequestID == requestID,
+                currentUser?.id == user.id,
+                activeMemberGroup?.id == groupID
+            else {
+                return
+            }
+
+            personalProgress = nil
+            personalProgressError = error.localizedDescription
+        }
+    }
+
+    private func clearPersonalProgress() {
+
+        personalProgressRequestID = UUID()
+        personalProgress = nil
+        personalProgressError = nil
+        isLoadingPersonalProgress = false
     }
 
     // MARK: - Manual Target
@@ -899,7 +1134,6 @@ final class SupabaseDataStore: ObservableObject {
         )
 
         do {
-
             try await client
                 .from("daily_targets")
                 .upsert(
@@ -1019,7 +1253,6 @@ final class SupabaseDataStore: ObservableObject {
         )
 
         do {
-
             try await client
                 .from("daily_results")
                 .upsert(
@@ -1245,7 +1478,6 @@ final class SupabaseDataStore: ObservableObject {
                 .value
 
         guard response.success else {
-
             throw SupabaseGroupJoinError(
                 code: response.error ?? "INVALID_JOIN_RESPONSE",
                 retryAfterSeconds: max(
@@ -1259,7 +1491,6 @@ final class SupabaseDataStore: ObservableObject {
             let groupID = response.groupID,
             response.error == nil
         else {
-
             throw SupabaseGroupJoinError(
                 code: "INVALID_JOIN_RESPONSE",
                 retryAfterSeconds: 0
@@ -1292,7 +1523,6 @@ final class SupabaseDataStore: ObservableObject {
         lastError = nil
 
         do {
-
             try await client
                 .from("group_memberships")
                 .delete()
@@ -1372,7 +1602,6 @@ final class SupabaseDataStore: ObservableObject {
         let completedAt = Date()
 
         do {
-
             try await client
                 .from("users")
                 .update(
@@ -1440,6 +1669,8 @@ final class SupabaseDataStore: ObservableObject {
 
     private func clearLoadedData() {
 
+        clearPersonalProgress()
+
         currentUser = nil
         memberships = []
         groups = []
@@ -1493,6 +1724,7 @@ enum SupabaseDataStoreError: LocalizedError {
     case manualGroupRequired
     case invalidTargetMinutes
     case cannotRemoveSelf
+    case invalidProgressResponse
 
     var errorDescription: String? {
 
@@ -1521,6 +1753,9 @@ enum SupabaseDataStoreError: LocalizedError {
 
         case .cannotRemoveSelf:
             return "An admin cannot remove themselves from the group."
+
+        case .invalidProgressResponse:
+            return "TimeUp received progress for a different account or group."
         }
     }
 }
