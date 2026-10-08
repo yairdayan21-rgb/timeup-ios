@@ -20,7 +20,6 @@ struct MemberTabView: View {
 
     private enum MemberTab: Hashable {
         case ranking
-        case ai
         case group
         case dashboard
     }
@@ -216,21 +215,6 @@ struct MemberTabView: View {
                 Label(t(.ranking), systemImage: "trophy")
             }
             .tag(MemberTab.ranking)
-
-            NavigationStack {
-                placeholderView(
-                    title: t(.ai),
-                    icon: "sparkles",
-                    message: t(.aiComingSoon)
-                )
-                .toolbar {
-                    profileToolbar
-                }
-            }
-            .tabItem {
-                Label(t(.ai), systemImage: "sparkles")
-            }
-            .tag(MemberTab.ai)
 
             NavigationStack {
                 if dataStore.activeMemberGroup != nil {
@@ -1567,33 +1551,6 @@ struct MemberTabView: View {
                 dataStore.lastError ?? t(.tryLoginAgain)
             )
         )
-    }
-
-    private func placeholderView(
-        title: String,
-        icon: String,
-        message: String
-    ) -> some View {
-        VStack(spacing: 18) {
-            Spacer()
-
-            Image(systemName: icon)
-                .font(.system(size: 54))
-
-            Text(title)
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text(message)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func displayName(
