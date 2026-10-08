@@ -13,6 +13,7 @@ struct MemberGroupView: View {
     private var reduceMotion
 
     @State private var selectedSection: GroupSection = .overview
+    @State private var pendingChatDraft: String?
 
     private enum GroupSection: CaseIterable, Hashable {
         case overview
@@ -61,7 +62,14 @@ struct MemberGroupView: View {
                             membersView(group: group)
 
                         case .chat:
-                            MemberGroupChatView(group: group)
+                            MemberGroupChatView(
+                                group: group,
+                                initialDraft: pendingChatDraft ?? ""
+                            )
+                            .onAppear {
+                                // The chat owns its editable draft now.
+                                pendingChatDraft = nil
+                            }
                         }
                     }
                     .frame(
@@ -96,6 +104,11 @@ struct MemberGroupView: View {
         .onChange(
             of: onboardingCoordinator.isPresented
         ) { _, _ in
+            routeToCurrentTourStep()
+        }
+        .onChange(of: group?.id) { _, _ in
+            pendingChatDraft = nil
+            selectedSection = .overview
             routeToCurrentTourStep()
         }
         .timeUpLocalization()
@@ -295,6 +308,8 @@ struct MemberGroupView: View {
                         )
                         .memberOnboardingAnchor(.groupStatus)
 
+                    encouragementCard
+
                     membersPreview(group: group)
 
                     if let error = dataStore.lastError {
@@ -339,6 +354,147 @@ struct MemberGroupView: View {
         }
     }
 
+    // MARK: - Encouragement
+
+    private var encouragementCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(
+                localized(
+                    "עוזרים אחד לשני",
+                    "Support each other",
+                    "ندعم بعضنا"
+                ),
+                systemImage: "hands.clap"
+            )
+            .font(.headline)
+
+            Text(
+                localized(
+                    "מילה טובה או הזמנה לפעילות בלי מסך יכולים להיות הצעד הבא שלכם ביחד.",
+                    "A kind word or an invitation to a screen-free activity can be your next step together.",
+                    "قد تكون كلمة طيبة أو دعوة إلى نشاط دون شاشة خطوتكم التالية معًا."
+                )
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                openEncouragement(for: nil)
+            } label: {
+                Label(
+                    localized(
+                        "לעודד את הקבוצה",
+                        "Encourage the group",
+                        "شجّع المجموعة"
+                    ),
+                    systemImage: "bubble.left.and.bubble.right"
+                )
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(
+                currentUser == nil ||
+                onboardingCoordinator.isPresented
+            )
+            .accessibilityIdentifier("encourage-group-button")
+
+            Text(
+                localized(
+                    "ההודעה תיפתח כטיוטה בצ׳אט הקבוצתי. אפשר לערוך אותה לפני השליחה.",
+                    "The message opens as a draft in the group chat. You can edit it before sending.",
+                    "تُفتح الرسالة كمسودة في دردشة المجموعة. يمكنك تعديلها قبل إرسالها."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.accentColor.opacity(0.08),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func encourageMemberButton(
+        _ member: SupabaseDataStore.TimeUpRemoteUser
+    ) -> some View {
+        if let currentUser, member.id != currentUser.id {
+            Button {
+                openEncouragement(for: member)
+            } label: {
+                Label(
+                    localized(
+                        "לעודד",
+                        "Encourage",
+                        "شجّع"
+                    ),
+                    systemImage: "bubble.left"
+                )
+                .font(.caption)
+                .fontWeight(.semibold)
+            }
+            .buttonStyle(.bordered)
+            .disabled(onboardingCoordinator.isPresented)
+            .accessibilityLabel(
+                localized(
+                    "לעודד את \(memberName(member)) בצ׳אט הקבוצתי",
+                    "Encourage \(memberName(member)) in the group chat",
+                    "شجّع \(memberName(member)) في دردشة المجموعة"
+                )
+            )
+            .accessibilityIdentifier(
+                "encourage-member-\(member.id.uuidString)"
+            )
+        }
+    }
+
+    private func openEncouragement(
+        for member: SupabaseDataStore.TimeUpRemoteUser?
+    ) {
+        guard
+            currentUser != nil,
+            group != nil,
+            !onboardingCoordinator.isPresented
+        else {
+            return
+        }
+
+        if let member {
+            let name = memberName(member)
+
+            pendingChatDraft = localized(
+                "\(name), אנחנו איתך! רוצה לצאת להליכה בלי מסכים? נעזור אחד לשני לעמוד ביעד.",
+                "\(name), we're with you! Want to go for a screen-free walk? Let's help each other meet our targets.",
+                "\(name)، نحن معك! هل ترغب في المشي دون شاشات؟ لنساعد بعضنا على تحقيق أهدافنا."
+            )
+        } else {
+            pendingChatDraft = localized(
+                "בואו נעזור אחד לשני לעמוד ביעד היום. מי מצטרף לפעילות בלי מסכים?",
+                "Let's help each other meet today's targets. Who wants to join a screen-free activity?",
+                "لنساعد بعضنا على تحقيق أهداف اليوم. من ينضم إلى نشاط دون شاشات؟"
+            )
+        }
+
+        selectedSection = .chat
+    }
+
+    private func memberName(
+        _ member: SupabaseDataStore.TimeUpRemoteUser
+    ) -> String {
+        let name = member.displayName?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        return name.isEmpty ? genericUserText : name
+    }
+
     // MARK: - Header
 
     private func groupHeader(
@@ -351,7 +507,6 @@ struct MemberGroupView: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "person.3.fill")
-
                 Text(membersCountText(memberCount))
             }
             .font(.subheadline)
@@ -432,11 +587,9 @@ struct MemberGroupView: View {
 
                 Spacer()
 
-                Text(
-                    "\(min(streak, successDays))/\(successDays)"
-                )
-                .font(.headline)
-                .monospacedDigit()
+                Text("\(min(streak, successDays))/\(successDays)")
+                    .font(.headline)
+                    .monospacedDigit()
             }
 
             ProgressView(
@@ -652,6 +805,8 @@ struct MemberGroupView: View {
                         }
 
                         Spacer()
+
+                        encourageMemberButton(member)
                     }
 
                     if member.id !=
@@ -836,59 +991,78 @@ struct MemberGroupView: View {
             group: group
         )
 
-        return HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(.secondary)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 5) {
-                    Text(member.displayName ?? genericUserText)
-                        .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 5) {
+                        Text(member.displayName ?? genericUserText)
+                            .fontWeight(.semibold)
 
-                    if member.id == currentUser?.id {
-                        Text("• \(youText)")
+                        if member.id == currentUser?.id {
+                            Text("• \(youText)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let result {
+                        if result.isLearningDay {
+                            Text(
+                                "\(formatMinutes(result.usageMinutes)) • \(learningDayText)"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        } else {
+                            Text(
+                                result.targetMinutes.map {
+                                    "\(formatMinutes(result.usageMinutes)) / \(formatMinutes($0))"
+                                } ?? formatMinutes(result.usageMinutes)
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text(waitingForTodayDataText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
 
+                Spacer()
+
                 if let result {
                     if result.isLearningDay {
-                        Text(
-                            "\(formatMinutes(result.usageMinutes)) • \(learningDayText)"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    } else {
-                        Text(
-                            result.targetMinutes.map {
-                                "\(formatMinutes(result.usageMinutes)) / \(formatMinutes($0))"
-                            } ?? formatMinutes(result.usageMinutes)
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Image(systemName: "clock.fill")
+                            .foregroundStyle(.secondary)
+                    } else if result.achieved == true {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else if result.achieved == false {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
                     }
-                } else {
-                    Text(waitingForTodayDataText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
 
-            Spacer()
-
-            if let result {
-                if result.isLearningDay {
-                    Image(systemName: "clock.fill")
-                        .foregroundStyle(.secondary)
-                } else if result.achieved == true {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else if result.achieved == false {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.red)
+            if let currentUser, member.id != currentUser.id {
+                HStack {
+                    Spacer()
+                    encourageMemberButton(member)
                 }
+
+                Text(
+                    localized(
+                        "העידוד נשלח בצ׳אט הקבוצתי.",
+                        "Encouragement is shared in the group chat.",
+                        "يُشارك التشجيع في دردشة المجموعة."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(14)
@@ -1044,39 +1218,15 @@ struct MemberGroupView: View {
     ) -> String {
         switch section {
         case .overview:
-            return localized(
-                "סקירה",
-                "Overview",
-                "نظرة عامة"
-            )
-
+            return localized("סקירה", "Overview", "نظرة عامة")
         case .detail:
-            return localized(
-                "פירוט",
-                "Details",
-                "التفاصيل"
-            )
-
+            return localized("פירוט", "Details", "التفاصيل")
         case .dashboard:
-            return localized(
-                "לוח בקרה",
-                "Dashboard",
-                "لوحة التحكم"
-            )
-
+            return localized("לוח בקרה", "Dashboard", "لوحة التحكم")
         case .members:
-            return localized(
-                "חברים",
-                "Members",
-                "الأعضاء"
-            )
-
+            return localized("חברים", "Members", "الأعضاء")
         case .chat:
-            return localized(
-                "צ׳אט",
-                "Chat",
-                "الدردشة"
-            )
+            return localized("צ׳אט", "Chat", "الدردشة")
         }
     }
 
@@ -1197,11 +1347,7 @@ struct MemberGroupView: View {
     }
 
     private var showAllText: String {
-        localized(
-            "הצג הכל",
-            "Show All",
-            "عرض الكل"
-        )
+        localized("הצג הכל", "Show All", "عرض الكل")
     }
 
     private var noMembersTitle: String {
@@ -1213,19 +1359,11 @@ struct MemberGroupView: View {
     }
 
     private var genericUserText: String {
-        localized(
-            "משתמש",
-            "User",
-            "مستخدم"
-        )
+        localized("משתמש", "User", "مستخدم")
     }
 
     private var youText: String {
-        localized(
-            "אתה",
-            "You",
-            "أنت"
-        )
+        localized("אתה", "You", "أنت")
     }
 
     private var groupDetailTitle: String {
@@ -1253,27 +1391,15 @@ struct MemberGroupView: View {
     }
 
     private var dashboardTitle: String {
-        localized(
-            "לוח בקרה",
-            "Dashboard",
-            "لوحة التحكم"
-        )
+        localized("לוח בקרה", "Dashboard", "لوحة التحكم")
     }
 
     private var daysLabel: String {
-        localized(
-            "ימים",
-            "days",
-            "أيام"
-        )
+        localized("ימים", "days", "أيام")
     }
 
     private var usersLabel: String {
-        localized(
-            "משתמשים",
-            "users",
-            "مستخدمون"
-        )
+        localized("משתמשים", "users", "مستخدمون")
     }
 
     private var successDaysTitle: String {
@@ -1285,11 +1411,7 @@ struct MemberGroupView: View {
     }
 
     private var journeyGoalSubtitle: String {
-        localized(
-            "יעד המסע",
-            "journey goal",
-            "هدف الرحلة"
-        )
+        localized("יעד המסע", "journey goal", "هدف الرحلة")
     }
 
     private var averageUsageTitle: String {
@@ -1309,11 +1431,7 @@ struct MemberGroupView: View {
     }
 
     private var membersSectionTitle: String {
-        localized(
-            "חברים",
-            "Members",
-            "الأعضاء"
-        )
+        localized("חברים", "Members", "الأعضاء")
     }
 
     private var learningDayText: String {
