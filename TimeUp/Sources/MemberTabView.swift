@@ -539,6 +539,10 @@ struct MemberTabView: View {
 
                         groupAlternativesFeedSection(groupID: group.id)
 
+                        MemberPersonalProgressView(groupID: group.id)
+                            .id(group.id)
+                            .disabled(onboardingCoordinator.isPresented)
+
                     } else {
                         ContentUnavailableView(
                             noActiveGroupTitle,
