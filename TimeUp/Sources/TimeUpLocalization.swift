@@ -15,15 +15,11 @@ enum TimeUpLanguage: String, CaseIterable, Identifiable, Codable {
     }
 
     var displayName: String {
-
         switch self {
-
         case .hebrew:
             return "עברית"
-
         case .english:
             return "English"
-
         case .arabic:
             return "العربية"
         }
@@ -34,19 +30,14 @@ enum TimeUpLanguage: String, CaseIterable, Identifiable, Codable {
     }
 
     var layoutDirection: LayoutDirection {
-
         switch self {
-
-        case .hebrew,
-             .arabic:
+        case .hebrew, .arabic:
             return .rightToLeft
-
         case .english:
             return .leftToRight
         }
     }
 }
-
 
 // MARK: - Localization Manager
 
@@ -58,80 +49,48 @@ final class TimeUpLocalization: ObservableObject {
     private static let languageKey =
         "timeup.preferredLanguage"
 
-    @Published private(set) var language:
-        TimeUpLanguage
+    @Published private(set) var language: TimeUpLanguage
 
     private init() {
-
-        // Hebrew is the default language
-        // for every new installation/user.
-
-        if let savedValue =
-            UserDefaults.standard.string(
-                forKey:
-                    Self.languageKey
-            ),
-           let savedLanguage =
-            TimeUpLanguage(
-                rawValue:
-                    savedValue
-            ) {
-
-            language =
-                savedLanguage
-
+        if let savedValue = UserDefaults.standard.string(
+            forKey: Self.languageKey
+        ),
+           let savedLanguage = TimeUpLanguage(
+                rawValue: savedValue
+           ) {
+            language = savedLanguage
         } else {
-
-            language =
-                .hebrew
+            language = .hebrew
         }
     }
 
-    func setLanguage(
-        _ newLanguage:
-            TimeUpLanguage
-    ) {
-
-        guard language !=
-                newLanguage
-        else {
+    func setLanguage(_ newLanguage: TimeUpLanguage) {
+        guard language != newLanguage else {
             return
         }
 
-        language =
-            newLanguage
+        language = newLanguage
 
         UserDefaults.standard.set(
             newLanguage.rawValue,
-            forKey:
-                Self.languageKey
+            forKey: Self.languageKey
         )
     }
 
     func reset() {
-
-        language =
-            .hebrew
+        language = .hebrew
 
         UserDefaults.standard.removeObject(
-            forKey:
-                Self.languageKey
+            forKey: Self.languageKey
         )
     }
 
     // MARK: - Text
 
-    func text(
-        _ key: TimeUpText
-    ) -> String {
-
-        key.value(
-            language:
-                language
-        )
+    func text(_ key: TimeUpText) -> String {
+        key.value(language: language)
     }
 }
-
 
 // MARK: - Localized Text Keys
 
@@ -155,7 +114,6 @@ enum TimeUpText {
     case dashboard
     case group
     case ranking
-    case ai
 
     // MARK: Dashboard
 
@@ -221,26 +179,13 @@ enum TimeUpText {
     case english
     case arabic
 
-    // MARK: AI
-
-    case aiComingSoon
-
-
-    func value(
-        language:
-            TimeUpLanguage
-    ) -> String {
-
+    func value(language: TimeUpLanguage) -> String {
         switch language {
 
-        // ====================================================
-        // Hebrew
-        // ====================================================
+        // MARK: Hebrew
 
         case .hebrew:
-
             switch self {
-
             case .close:
                 return "סגור"
 
@@ -279,9 +224,6 @@ enum TimeUpText {
 
             case .ranking:
                 return "דירוג"
-
-            case .ai:
-                return "AI"
 
             case .hello:
                 return "שלום"
@@ -420,20 +362,12 @@ enum TimeUpText {
 
             case .arabic:
                 return "ערבית"
-
-            case .aiComingSoon:
-                return "כאן יהיה הצ׳אט האישי שלך עם TimeUp AI."
             }
 
-
-        // ====================================================
-        // English
-        // ====================================================
+        // MARK: English
 
         case .english:
-
             switch self {
-
             case .close:
                 return "Close"
 
@@ -472,9 +406,6 @@ enum TimeUpText {
 
             case .ranking:
                 return "Ranking"
-
-            case .ai:
-                return "AI"
 
             case .hello:
                 return "Hello"
@@ -613,20 +544,12 @@ enum TimeUpText {
 
             case .arabic:
                 return "Arabic"
-
-            case .aiComingSoon:
-                return "Your personal TimeUp AI chat will appear here."
             }
 
-
-        // ====================================================
-        // Arabic
-        // ====================================================
+        // MARK: Arabic
 
         case .arabic:
-
             switch self {
-
             case .close:
                 return "إغلاق"
 
@@ -665,9 +588,6 @@ enum TimeUpText {
 
             case .ranking:
                 return "الترتيب"
-
-            case .ai:
-                return "AI"
 
             case .hello:
                 return "مرحبًا"
@@ -806,14 +726,10 @@ enum TimeUpText {
 
             case .arabic:
                 return "العربية"
-
-            case .aiComingSoon:
-                return "ستظهر هنا محادثتك الشخصية مع TimeUp AI."
             }
         }
     }
 }
-
 
 // MARK: - Convenience View
 
@@ -824,36 +740,23 @@ struct TimeUpLocalizedText: View {
 
     let key: TimeUpText
 
-    init(
-        _ key: TimeUpText
-    ) {
-
+    init(_ key: TimeUpText) {
         self.key = key
     }
 
     var body: some View {
-
-        Text(
-            localization.text(
-                key
-            )
-        )
+        Text(localization.text(key))
     }
 }
 
-
 // MARK: - View Localization Environment
 
-private struct TimeUpLocalizationModifier:
-    ViewModifier {
+private struct TimeUpLocalizationModifier: ViewModifier {
 
     @ObservedObject private var localization =
         TimeUpLocalization.shared
 
-    func body(
-        content: Content
-    ) -> some View {
-
+    func body(content: Content) -> some View {
         content
             .environment(
                 \.locale,
@@ -869,9 +772,6 @@ private struct TimeUpLocalizationModifier:
 extension View {
 
     func timeUpLocalization() -> some View {
-
-        modifier(
-            TimeUpLocalizationModifier()
-        )
+        modifier(TimeUpLocalizationModifier())
     }
 }
