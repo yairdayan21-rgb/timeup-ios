@@ -16,6 +16,7 @@ struct MemberTabView: View {
 
     @State private var selectedTab: MemberTab = .dashboard
     @State private var showProfile = false
+    @State private var showGoalExplanation = false
 
     private enum MemberTab: Hashable {
         case ranking
@@ -97,6 +98,7 @@ struct MemberTabView: View {
             }
 
             showProfile = false
+            showGoalExplanation = false
             routeToCurrentTourStep()
         }
         .onChange(
@@ -110,6 +112,7 @@ struct MemberTabView: View {
             if oldID != nil && oldID != newID {
                 onboardingCoordinator.dismiss()
                 showProfile = false
+                showGoalExplanation = false
                 selectedTab = .dashboard
             }
         }
@@ -118,6 +121,7 @@ struct MemberTabView: View {
         ) { _, groupID in
             if groupID == nil && !dataStore.isLoading {
                 onboardingCoordinator.dismiss()
+                showGoalExplanation = false
             }
         }
         .onDisappear {
@@ -140,6 +144,7 @@ struct MemberTabView: View {
 
         if onboardingCoordinator.isPresented {
             showProfile = false
+            showGoalExplanation = false
             routeToCurrentTourStep()
         }
     }
@@ -176,11 +181,21 @@ struct MemberTabView: View {
             return
         }
 
+        scrollDashboard(
+            to: step.scrollID,
+            using: proxy
+        )
+    }
+
+    private func scrollDashboard(
+        to scrollID: String,
+        using proxy: ScrollViewProxy
+    ) {
         if reduceMotion {
-            proxy.scrollTo(step.scrollID, anchor: .top)
+            proxy.scrollTo(scrollID, anchor: .top)
         } else {
             withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(step.scrollID, anchor: .top)
+                proxy.scrollTo(scrollID, anchor: .top)
             }
         }
     }
@@ -264,6 +279,16 @@ struct MemberTabView: View {
             }
             .timeUpLocalization()
         }
+        .sheet(
+            isPresented: $showGoalExplanation
+        ) {
+            NavigationStack {
+                MemberGoalExplanationView(userID: user.id)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .timeUpLocalization()
+        }
     }
 
     // MARK: - Ranking
@@ -275,7 +300,6 @@ struct MemberTabView: View {
 
                 VStack(spacing: 16) {
                     ProgressView()
-
                     Text(t(.loadingRanking))
                         .foregroundStyle(.secondary)
                 }
@@ -299,9 +323,7 @@ struct MemberTabView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 12) {
-                            ForEach(
-                                rankingStore.groupRankings
-                            ) { ranking in
+                            ForEach(rankingStore.groupRankings) { ranking in
                                 if ranking.groupID ==
                                     rankingStore.groupRankings.first?.groupID {
 
@@ -503,6 +525,13 @@ struct MemberTabView: View {
                             )
                             .memberOnboardingAnchor(.personalTarget)
 
+                        suggestedActionCard {
+                            scrollDashboard(
+                                to: MemberOnboardingStep.alternatives.scrollID,
+                                using: proxy
+                            )
+                        }
+
                         alternativesSection(groupID: group.id)
                             .id(
                                 MemberOnboardingStep.alternatives.scrollID
@@ -584,6 +613,64 @@ struct MemberTabView: View {
         }
     }
 
+    // MARK: - Suggested Action
+
+    @ViewBuilder
+    private func suggestedActionCard(
+        action: @escaping () -> Void
+    ) -> some View {
+        if let alternative = alternativesStore.alternatives.first {
+            VStack(alignment: .leading, spacing: 14) {
+                Label(
+                    localized(
+                        "משהו טוב לעשות עכשיו",
+                        "Something good to do now",
+                        "شيء جيد يمكنك فعله الآن"
+                    ),
+                    systemImage: "figure.walk"
+                )
+                .font(.headline)
+
+                Text(alternative.alternativeText)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(
+                    localized(
+                        "בחר רגע בלי מסך. אחרי שתבצע את הפעילות, תוכל לסמן אותה ברשימת החלופות.",
+                        "Take a moment away from screens. After completing the activity, you can check it off in your alternatives.",
+                        "خذ استراحة بعيدًا عن الشاشات. بعد إكمال النشاط، يمكنك تحديده في قائمة البدائل."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                Button(action: action) {
+                    Label(
+                        localized(
+                            "לחלופות שלי",
+                            "My alternatives",
+                            "بدائلي"
+                        ),
+                        systemImage: "arrow.down"
+                    )
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 5)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(onboardingCoordinator.isPresented)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color.accentColor.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+        }
+    }
+
     // MARK: - Alternatives
 
     @ViewBuilder
@@ -610,7 +697,6 @@ struct MemberTabView: View {
 
                 HStack(spacing: 12) {
                     ProgressView()
-
                     Text(t(.loadingAlternatives))
                         .foregroundStyle(.secondary)
                 }
@@ -635,9 +721,7 @@ struct MemberTabView: View {
 
             } else {
                 VStack(spacing: 10) {
-                    ForEach(
-                        alternativesStore.alternatives
-                    ) { alternative in
+                    ForEach(alternativesStore.alternatives) { alternative in
                         alternativeRow(
                             alternative,
                             groupID: groupID
@@ -747,7 +831,6 @@ struct MemberTabView: View {
 
                 HStack(spacing: 12) {
                     ProgressView()
-
                     Text(t(.loadingGroupActivity))
                         .foregroundStyle(.secondary)
                 }
@@ -846,6 +929,8 @@ struct MemberTabView: View {
                 }
             }
 
+            remainingTimeView(userID: user.id)
+
             HStack(spacing: 12) {
                 progressValue(
                     title: t(.usage),
@@ -865,6 +950,41 @@ struct MemberTabView: View {
             }
 
             statusView(userID: user.id)
+
+            Divider()
+
+            Button {
+                showGoalExplanation = true
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "info.circle")
+
+                    Text(
+                        localized(
+                            "איך נקבע היעד שלי?",
+                            "How is my target set?",
+                            "كيف يتم تحديد هدفي؟"
+                        )
+                    )
+
+                    Spacer(minLength: 0)
+
+                    Image(
+                        systemName: localization.language == .english
+                            ? "chevron.right"
+                            : "chevron.left"
+                    )
+                    .font(.caption)
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
+            .disabled(onboardingCoordinator.isPresented)
+            .accessibilityIdentifier("goal-explanation-button")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -872,6 +992,97 @@ struct MemberTabView: View {
             .thinMaterial,
             in: RoundedRectangle(cornerRadius: 18)
         )
+    }
+
+    @ViewBuilder
+    private func remainingTimeView(
+        userID: UUID
+    ) -> some View {
+        if !dataStore.isLearningDay(for: userID),
+           let target = dataStore.targetMinutes(for: userID),
+           let usage = dataStore.usageMinutes(for: userID),
+           target > 0,
+           usage >= 0 {
+
+            let remaining = max(0, target - usage)
+            let exceeded = usage > target
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(
+                    exceeded
+                        ? localized(
+                            "מעבר ליעד היומי",
+                            "Above your daily target",
+                            "فوق هدفك اليومي"
+                        )
+                        : localized(
+                            "זמן שנותר ליעד",
+                            "Time remaining to your target",
+                            "الوقت المتبقي حتى هدفك"
+                        )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                Text(
+                    formattedDuration(
+                        exceeded ? usage - target : remaining
+                    )
+                )
+                .font(
+                    .system(
+                        size: 36,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    exceeded ? Color.red : Color.primary
+                )
+                .accessibilityIdentifier("remaining-screen-time")
+
+                ProgressView(
+                    value: min(
+                        1.0,
+                        Double(usage) / Double(target)
+                    ),
+                    total: 1.0
+                )
+                .tint(
+                    exceeded ? Color.red : Color.accentColor
+                )
+                .accessibilityLabel(
+                    localized(
+                        "שימוש מתוך היעד היומי",
+                        "Usage against your daily target",
+                        "الاستخدام مقارنة بهدفك اليومي"
+                    )
+                )
+
+                Text(
+                    exceeded
+                        ? localized(
+                            "אפשר לבחור עכשיו פעילות בלי מסך ולהמשיך לצמצם את השימוש.",
+                            "Choose a screen-free activity now to keep reducing your usage.",
+                            "يمكنك اختيار نشاط دون شاشة الآن لمواصلة تقليل الاستخدام."
+                        )
+                        : remaining == 0
+                            ? localized(
+                                "הגעת בדיוק ליעד. זה זמן טוב להניח את הטלפון.",
+                                "You have reached your target limit. This is a good time to put your phone down.",
+                                "وصلت إلى حد هدفك. هذا وقت مناسب لترك الهاتف."
+                            )
+                            : localized(
+                                "כל רגע בלי מסך עוזר לך ולקבוצה.",
+                                "Every moment away from screens helps you and your group.",
+                                "كل لحظة بعيدًا عن الشاشات تساعدك وتساعد مجموعتك."
+                            )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+        }
     }
 
     // MARK: - Group
@@ -1081,7 +1292,6 @@ struct MemberTabView: View {
 
                 HStack(spacing: 12) {
                     ProgressView()
-
                     Text(t(.loadingGroup))
                         .foregroundStyle(.secondary)
                 }
@@ -1153,7 +1363,6 @@ struct MemberTabView: View {
                 }
 
                 Spacer()
-
                 memberStatusIcon(userID: member.id)
             }
 
@@ -1340,7 +1549,6 @@ struct MemberTabView: View {
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
-
             Text(t(.accountLoading))
                 .foregroundStyle(.secondary)
         }
@@ -1401,6 +1609,21 @@ struct MemberTabView: View {
         localization.text(key)
     }
 
+    private func localized(
+        _ hebrew: String,
+        _ english: String,
+        _ arabic: String
+    ) -> String {
+        switch localization.language {
+        case .hebrew:
+            return hebrew
+        case .english:
+            return english
+        case .arabic:
+            return arabic
+        }
+    }
+
     private func streakText(
         _ streak: Int
     ) -> String {
@@ -1433,35 +1656,360 @@ struct MemberTabView: View {
     }
 
     private var noActiveGroupTitle: String {
-        switch localization.language {
-        case .hebrew:
-            return "אין קבוצה פעילה"
-        case .english:
-            return "No Active Group"
-        case .arabic:
-            return "لا توجد مجموعة نشطة"
-        }
+        localized(
+            "אין קבוצה פעילה",
+            "No Active Group",
+            "لا توجد مجموعة نشطة"
+        )
     }
 
     private var noActiveGroupDescription: String {
-        switch localization.language {
-        case .hebrew:
-            return "החשבון אינו משויך כרגע לקבוצה פעילה."
-        case .english:
-            return "Your account is not currently assigned to an active group."
-        case .arabic:
-            return "حسابك غير مرتبط حاليًا بمجموعة نشطة."
-        }
+        localized(
+            "החשבון אינו משויך כרגע לקבוצה פעילה.",
+            "Your account is not currently assigned to an active group.",
+            "حسابك غير مرتبط حاليًا بمجموعة نشطة."
+        )
     }
 
     private var noActiveMembersDescription: String {
+        localized(
+            "לא נמצאו חברים פעילים בקבוצה.",
+            "No active members were found in the group.",
+            "لم يتم العثور على أعضاء نشطين في المجموعة."
+        )
+    }
+}
+
+// MARK: - Goal Explanation
+
+private struct MemberGoalExplanationView: View {
+
+    let userID: UUID
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    @StateObject private var dataStore = SupabaseDataStore.shared
+    @ObservedObject private var localization = TimeUpLocalization.shared
+
+    private enum GoalMethod {
+        case personal
+        case average
+        case manual
+        case unknown
+    }
+
+    private var group: SupabaseDataStore.TimeUpRemoteGroup? {
+        dataStore.activeMemberGroup
+    }
+
+    private var goalMethod: GoalMethod {
+        let raw = dataStore.target(for: userID)?.goalMethod
+            ?? group?.goalMethod
+            ?? ""
+
+        switch raw {
+        case "personal_percentage", "previousDay":
+            return .personal
+        case "group_average_percentage", "adaptiveAverage":
+            return .average
+        case "manual":
+            return .manual
+        default:
+            return .unknown
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Image(systemName: "target")
+                        .font(.system(size: 40))
+                        .foregroundStyle(Color.accentColor)
+
+                    Text(methodTitle)
+                        .font(.title2.bold())
+
+                    Text(methodDescription)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Label(
+                        localized(
+                            "המספרים שלך היום",
+                            "Your numbers today",
+                            "أرقامك اليوم"
+                        ),
+                        systemImage: "chart.bar"
+                    )
+                    .font(.headline)
+
+                    metricRow(
+                        title: localized(
+                            "היעד שלי היום",
+                            "My target today",
+                            "هدفي اليوم"
+                        ),
+                        value: formattedMinutes(
+                            dataStore.targetMinutes(for: userID)
+                        )
+                    )
+
+                    Divider()
+
+                    metricRow(
+                        title: localized(
+                            "השימוש שלי היום",
+                            "My usage today",
+                            "استخدامي اليوم"
+                        ),
+                        value: formattedMinutes(
+                            dataStore.usageMinutes(for: userID)
+                        )
+                    )
+
+                    if goalMethod == .personal || goalMethod == .average,
+                       let percent = group?.reductionPercent {
+
+                        Divider()
+
+                        metricRow(
+                            title: localized(
+                                "אחוז ההפחתה שהוגדר בקבוצה כיום",
+                                "Current group reduction setting",
+                                "نسبة التخفيض المحددة حاليًا للمجموعة"
+                            ),
+                            value: "\(percent)%"
+                        )
+                    }
+                }
+                .padding()
+                .background(
+                    .thinMaterial,
+                    in: RoundedRectangle(cornerRadius: 18)
+                )
+
+                if dataStore.isLearningDay(for: userID) {
+                    explanationCard(
+                        title: localized(
+                            "יום הלמידה",
+                            "Learning day",
+                            "يوم التعلم"
+                        ),
+                        text: localized(
+                            "יום הלמידה מודד את השימוש שלך ומספק נתונים לקביעת היעד הראשון. הוא אינו נספר ברצף הקבוצתי.",
+                            "The learning day measures your usage and provides data for your first target. It does not count toward the group streak.",
+                            "يقيس يوم التعلم استخدامك ويوفر بيانات لتحديد هدفك الأول. ولا يُحتسب ضمن سلسلة نجاح المجموعة."
+                        ),
+                        icon: "book"
+                    )
+                }
+
+                if goalMethod == .personal || goalMethod == .average {
+                    explanationCard(
+                        title: localized(
+                            "מה קורה כשהקבוצה לא מצליחה?",
+                            "What if the group does not succeed?",
+                            "ماذا يحدث إذا لم تنجح المجموعة؟"
+                        ),
+                        text: localized(
+                            "היעד הקודם נשאר. היעד הבא מתעדכן רק כאשר כל חברי הקבוצה עומדים ביעד שלהם.",
+                            "The previous target stays in place. The next target changes only when every group member meets their target.",
+                            "يبقى الهدف السابق كما هو. ولا يتغير الهدف التالي إلا عندما يحقق جميع أعضاء المجموعة أهدافهم."
+                        ),
+                        icon: "arrow.triangle.2.circlepath"
+                    )
+                }
+
+                explanationCard(
+                    title: localized(
+                        "מצליחים ביחד",
+                        "Succeed together",
+                        "ننجح معًا"
+                    ),
+                    text: localized(
+                        "הקבוצה עוזרת לך לעמוד ביעד — ואתה עוזר לקבוצה להצליח. יום הצלחה קבוצתי נספר רק כשכולם עומדים ביעד. אם אחד נכשל, הרצף הקבוצתי מתאפס.",
+                        "Your group helps you meet your target, and you help your group succeed. A successful group day counts only when everyone meets their target. If one member fails, the group streak resets.",
+                        "تساعدك المجموعة على تحقيق هدفك، وأنت تساعد المجموعة على النجاح. لا يُحتسب يوم نجاح للمجموعة إلا عندما يحقق الجميع أهدافهم. وإذا أخفق أحد الأعضاء، تعود سلسلة المجموعة إلى الصفر."
+                    ),
+                    icon: "person.3"
+                )
+            }
+            .padding(20)
+        }
+        .navigationTitle(
+            localized(
+                "איך נקבע היעד שלי?",
+                "How is my target set?",
+                "كيف يتم تحديد هدفي؟"
+            )
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(
+                    localized("סיום", "Done", "تم")
+                ) {
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    private var methodTitle: String {
+        switch goalMethod {
+        case .personal:
+            return localized(
+                "יעד לפי השימוש האישי",
+                "A target based on your own usage",
+                "هدف يعتمد على استخدامك الشخصي"
+            )
+
+        case .average:
+            return localized(
+                "יעד לפי ממוצע הקבוצה",
+                "A target based on the group average",
+                "هدف يعتمد على متوسط المجموعة"
+            )
+
+        case .manual:
+            return localized(
+                "יעד אישי שהמנהל הגדיר",
+                "A personal target set by your admin",
+                "هدف شخصي حدده المدير"
+            )
+
+        case .unknown:
+            return localized(
+                "היעד האישי שלך",
+                "Your personal target",
+                "هدفك الشخصي"
+            )
+        }
+    }
+
+    private var methodDescription: String {
+        switch goalMethod {
+        case .personal:
+            return localized(
+                "כשהקבוצה מצליחה ביום מסוים, היעד האישי הבא מחושב לפי השימוש שלך באותו יום, פחות אחוז ההפחתה שהמנהל הגדיר. לכן לכל חבר יכול להיות יעד אחר.",
+                "When the group succeeds on a given day, your next personal target is calculated from your own usage that day, minus the reduction percentage set by your admin. Each member can therefore have a different target.",
+                "عندما تنجح المجموعة في يوم معين، يُحسب هدفك الشخصي التالي من استخدامك في ذلك اليوم بعد خصم نسبة التخفيض التي حددها المدير. لذلك قد يكون لكل عضو هدف مختلف."
+            )
+
+        case .average:
+            return localized(
+                "כשהקבוצה מצליחה ביום מסוים, מחשבים את ממוצע השימוש בפועל של חברי הקבוצה באותו יום ומפחיתים את האחוז שהמנהל הגדיר. כולם מקבלים אותו יעד, בעיגול כלפי מעלה לדקה שלמה.",
+                "When the group succeeds on a given day, the members' actual usage that day is averaged and reduced by the percentage set by your admin. Everyone receives the same target, rounded up to a whole minute.",
+                "عندما تنجح المجموعة في يوم معين، يُحسب متوسط الاستخدام الفعلي للأعضاء في ذلك اليوم وتُخصم منه النسبة التي حددها المدير. يحصل الجميع على الهدف نفسه، مع التقريب إلى الأعلى إلى دقيقة كاملة."
+            )
+
+        case .manual:
+            return localized(
+                "המנהל הגדיר לך יעד אישי קבוע. היעד נשאר כפי שהוא עד שהמנהל משנה אותו, גם כאשר הרצף הקבוצתי עולה או מתאפס.",
+                "Your admin has set a fixed personal target for you. It stays the same until your admin changes it, even when the group streak increases or resets.",
+                "حدد المدير لك هدفًا شخصيًا ثابتًا. ويبقى كما هو حتى يغيره المدير، حتى عندما ترتفع سلسلة نجاح المجموعة أو تعود إلى الصفر."
+            )
+
+        case .unknown:
+            return localized(
+                "פרטי שיטת היעד אינם זמינים כרגע. המספרים המוצגים כאן הם הנתונים שנמצאים בחשבון שלך.",
+                "The target method details are currently unavailable. The numbers shown here are the data available in your account.",
+                "تفاصيل طريقة تحديد الهدف غير متاحة حاليًا. الأرقام المعروضة هنا هي البيانات المتاحة في حسابك."
+            )
+        }
+    }
+
+    private func metricRow(
+        title: String,
+        value: String
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.headline)
+                .monospacedDigit()
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func explanationCard(
+        title: String,
+        text: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+    }
+
+    private func formattedMinutes(
+        _ minutes: Int?
+    ) -> String {
+        guard let minutes else {
+            return "—"
+        }
+
+        let safeMinutes = max(0, minutes)
+        let hours = safeMinutes / 60
+        let remainder = safeMinutes % 60
+
+        if hours == 0 {
+            return localized(
+                "\(remainder) דק׳",
+                "\(remainder) min",
+                "\(remainder) د"
+            )
+        }
+
+        if remainder == 0 {
+            return localized(
+                "\(hours) שע׳",
+                "\(hours) hr",
+                "\(hours) س"
+            )
+        }
+
+        return localized(
+            "\(hours) שע׳ \(remainder) דק׳",
+            "\(hours) hr \(remainder) min",
+            "\(hours) س \(remainder) د"
+        )
+    }
+
+    private func localized(
+        _ hebrew: String,
+        _ english: String,
+        _ arabic: String
+    ) -> String {
         switch localization.language {
         case .hebrew:
-            return "לא נמצאו חברים פעילים בקבוצה."
+            return hebrew
         case .english:
-            return "No active members were found in the group."
+            return english
         case .arabic:
-            return "لم يتم العثور على أعضاء نشطين في المجموعة."
+            return arabic
         }
     }
 }
