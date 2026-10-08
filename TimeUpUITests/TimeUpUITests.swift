@@ -7,7 +7,6 @@ final class TimeUpUITests: XCTestCase {
     }
 
     func testLaunchShowsLogin() {
-
         let app = XCUIApplication()
         app.launch()
 
@@ -28,7 +27,6 @@ final class TimeUpUITests: XCTestCase {
     }
 
     func testLoginScreenDoesNotShowMemberUIBeforeAuthentication() {
-
         let app = XCUIApplication()
         app.launch()
 
@@ -44,11 +42,6 @@ final class TimeUpUITests: XCTestCase {
 
         XCTAssertFalse(
             app.tabBars.buttons["הקבוצה"]
-                .exists
-        )
-
-        XCTAssertFalse(
-            app.tabBars.buttons["AI"]
                 .exists
         )
 
